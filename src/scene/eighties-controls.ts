@@ -155,7 +155,7 @@ function capTexture(kit: PanelKit, legend: string, ink: string, shift = 0) {
     size,
     size,
     '#f8f7f3',
-    [...legend].reduce((n, letter) => n * 31 + letter.charCodeAt(0), 117),
+    legend.split('').reduce((n, letter) => n * 31 + letter.charCodeAt(0), 117),
   );
   context.strokeStyle = 'rgba(0,0,0,0.18)';
   context.lineWidth = 3;

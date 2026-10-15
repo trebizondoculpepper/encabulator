@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createGhosting, defaultGhostingSettings } from './ghosting';
 import type { Pose } from './ghosting';
 

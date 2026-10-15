@@ -1,5 +1,5 @@
 import { BoxGeometry, Mesh, Scene } from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createPs1Material } from './ps1-material';
 import { createRoomLighting } from './room-lighting';
 

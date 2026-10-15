@@ -419,7 +419,7 @@ export function createKeycap(
     c.canvas.width,
     px,
     colour,
-    [...legend].reduce((n, letter) => n * 31 + letter.charCodeAt(0), 311),
+    legend.split('').reduce((n, letter) => n * 31 + letter.charCodeAt(0), 311),
   );
   c.fillStyle = 'rgba(255,255,255,0.18)';
   c.fillRect(0, 0, c.canvas.width, 4);

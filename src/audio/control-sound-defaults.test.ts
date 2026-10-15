@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it } from 'vite-plus/test';
 import { defaultControlRecording } from './control-sound-defaults';
 it('gives push-buttons, switches and rockers distinct shared defaults', () => {
   expect(defaultControlRecording('button')).toBe('button');

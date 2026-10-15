@@ -1,9 +1,0 @@
-node_modules/
-dist/
-coverage/
-.claude/
-.idea/
-AGENTS.md
-CLAUDE.md
-package-lock.json
-public/

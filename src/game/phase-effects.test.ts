@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { anomalyEffects, anomalyStage, CHANNEL_HZ } from './phase-effects';
 
 describe('phase effects', () => {

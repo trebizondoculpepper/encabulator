@@ -70,7 +70,7 @@ export function loadHallSettings(): HallSettings {
     return {
       ...defaults,
       ...saved,
-      materials: { ...defaults.materials, ...(saved.materials ?? {}) },
+      materials: { ...defaults.materials, ...saved.materials },
     };
   } catch {
     return defaults;

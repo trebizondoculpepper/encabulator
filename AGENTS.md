@@ -2,7 +2,7 @@
 
 This file provides guidance to coding agents (Claude Code, Codex and others) working in this repository. `CLAUDE.md` is a symlink to it.
 
-A browser game about a mysterious machine whose operation is stupid, opaque and profoundly unsafe, after the Rockwell Retro Encabulator film. The setting is an industrial plant in the United States in the late 1990s, and the game is in English. It follows the VX3 Simulator (`../vx3_simulator`), from which it took its controls and widgets, its effects, its world graph library and some of its sounds. Stack: Vite, TypeScript, Three.js, `@preact/signals-core`, Vitest, ESLint, Prettier.
+A browser game about a mysterious machine whose operation is stupid, opaque and profoundly unsafe, after the Rockwell Retro Encabulator film. The setting is an industrial plant in the United States in the late 1990s, and the game is in English. It follows the VX3 Simulator (`../vx3_simulator`), from which it took its controls and widgets, its effects, its world graph library and some of its sounds. Stack: Vite+ (`vp`: Vite, Vitest, Oxlint and Oxfmt in one toolchain, configured in `vite.config.ts`), TypeScript, Three.js, `@preact/signals-core`.js, `@preact/signals-core`, Vitest, ESLint, Prettier.
 
 For now the game is a series of development rooms that test the concepts the machine will need; the machine itself, and the plant around it, are not built yet.
 
@@ -19,8 +19,9 @@ For now the game is a series of development rooms that test the concepts the mac
 ## Commands
 
 - `npm run dev`: Vite dev server on `http://127.0.0.1:5174/` (strict port; the VX3 Simulator has 5173).
-- `npx vitest run src/game/world/devices.test.ts`: one test file; add `-t "<name>"` for one test.
-- `npm run format`: apply Prettier.
+- `npx vp test run src/game/world/devices.test.ts`: one test file; add `-t "<name>"` for one test. Tests import from `vite-plus/test`, not `vitest`.
+- `npm run format`: apply Oxfmt. `npm run check` runs formatting, linting and type checks together (`vp check`).
+- Linting is Oxlint, type-aware, with the old ESLint rules carried over (`lint` in `vite.config.ts`); formatting is Oxfmt (`fmt`, single quotes, trailing commas, 80 columns).
 
 ## Rooms
 

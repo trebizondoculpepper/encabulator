@@ -610,11 +610,9 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   // the hall's instanced batches are already tiled. Then detail too small
   // or too far to see is hidden.
   const culler = createDetailCuller(camera);
-  const merged = [
-    ...[...propGroup.children, ...doorGroup.children].flatMap((piece) =>
-      mergeStatic(piece, 3),
-    ),
-  ];
+  const merged = [...propGroup.children, ...doorGroup.children].flatMap(
+    (piece) => mergeStatic(piece, 3),
+  );
   for (const mesh of merged) culler.add(mesh, { minSize: 0.012 });
   for (const { mesh, detail } of [...services.built, ...hall.pendants]) {
     if (detail) culler.add(mesh, { minSize: 0, maxDistance: detail * m });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { slide } from './walk-collision';
 
 const wall = { minX: -10, maxX: 10, minZ: 4, maxZ: 5 };

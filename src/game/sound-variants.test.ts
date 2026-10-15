@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it } from 'vite-plus/test';
 import { createVariantPicker } from './sound-variants';
 it('uses all five samples per set without adjacent repeats', () => {
   const pick = createVariantPicker(5, () => 0.3);

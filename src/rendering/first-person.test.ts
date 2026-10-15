@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { MAX_ZOOM, MIN_ZOOM, wheelZoom } from './first-person';
 
 describe('wheel zoom', () => {

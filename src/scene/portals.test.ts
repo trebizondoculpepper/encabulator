@@ -1,5 +1,5 @@
 import { Texture } from 'three';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import { slide } from '../game/walk-collision';
 import { createPortals } from './portals';

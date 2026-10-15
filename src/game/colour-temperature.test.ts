@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { kelvinToHex, kelvinToRgb } from './colour-temperature';
 
 describe('colour temperature', () => {

@@ -9,3 +9,4 @@ coverage/
 # Agent mailbox identity
 agent-mailbox.toml
 agent-inbox.toml
+.vitest/

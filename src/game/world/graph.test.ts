@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createGraph } from './graph';
 
 /** A small machine: a switch, a heater warming a tank, a lamp on it. */
