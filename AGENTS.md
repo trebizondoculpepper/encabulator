@@ -2,7 +2,7 @@
 
 This file provides guidance to coding agents (Claude Code, Codex and others) working in this repository. `CLAUDE.md` is a symlink to it.
 
-A browser game about a mysterious machine whose operation is stupid, opaque and profoundly unsafe, after the Rockwell Retro Encabulator film. The setting is an industrial plant in the United States in the late 1990s, and the game is in English. It follows the VX3 Simulator (`../vx3_simulator`), from which it took its controls and widgets, its effects, its world graph library and some of its sounds. Stack: Vite+ (`vp`: Vite, Vitest, Oxlint and Oxfmt in one toolchain, configured in `vite.config.ts`), TypeScript, Three.js, `@preact/signals-core`.js, `@preact/signals-core`, Vitest, ESLint, Prettier.
+A browser game about a mysterious machine whose operation is stupid, opaque and profoundly unsafe, after the Rockwell Retro Encabulator film. The setting is an industrial plant in the United States in the late 1990s, and the game is in English. It follows the VX3 Simulator (`../vx3_simulator`), from which it took its controls and widgets, its effects, its world graph library and some of its sounds. Stack: Vite+ (`vp`: Vite, Vitest, Oxlint and Oxfmt in one toolchain, configured in `vite.config.ts`), TypeScript, Three.js, `@preact/signals-core`.
 
 For now the game is a series of development rooms that test the concepts the machine will need; the machine itself, and the plant around it, are not built yet.
 
