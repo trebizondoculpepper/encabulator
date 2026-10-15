@@ -18,9 +18,9 @@ import {
 } from 'three';
 import type { Mesh, Object3D } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { N8AOPass } from 'n8ao';
 import { kelvinToRgb } from '../game/colour-temperature';
 import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
@@ -662,7 +662,18 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
 
   // Bloom, so the skylights, windows and lamps glare.
   const composer = new EffectComposer(renderer);
-  composer.addPass(new RenderPass(scene, camera));
+  // Ambient occlusion: the soft darkening where things meet the floor and
+  // walls, under desks and inside racking (N8AO). It renders the scene
+  // itself and finds the occlusion in that same depth, so the hall is not
+  // drawn twice for it. Its radius is in world units: 1.6 m.
+  const ao = new N8AOPass(scene, camera, 256, 256);
+  ao.configuration.aoRadius = 1.6 * m;
+  ao.configuration.distanceFalloff = 0.6 * m;
+  ao.configuration.halfRes = true;
+  ao.configuration.depthAwareUpsampling = true;
+  ao.configuration.gammaCorrection = false;
+  ao.setQualityMode('Medium');
+  composer.addPass(ao);
   const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.55, 0.6, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -699,6 +710,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     shine.setStrength(s.floorShine);
     shine.setBlur(s.floorBlur);
     bloom.strength = s.bloom;
+    // The AO pass also draws the scene, so it stays on; zero is no shading.
+    ao.configuration.intensity = s.occlusion;
     fog.near = (90 - 70 * s.haze) * m;
     fog.far = (520 - 420 * s.haze) * m;
   };

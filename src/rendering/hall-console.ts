@@ -29,6 +29,8 @@ export interface HallSettings {
   floorShine: number;
   floorBlur: number;
   bloom: number;
+  /** How strongly corners and contacts are shaded (ambient occlusion), 0 to 6. */
+  occlusion: number;
   /** How thick the haze is, 0 to 1. */
   haze: number;
 }
@@ -53,6 +55,7 @@ export function defaultHallSettings(): HallSettings {
     floorShine: 0.55,
     floorBlur: 0.45,
     bloom: 0.5,
+    occlusion: 2.5,
     haze: 0.35,
   };
 }
@@ -245,6 +248,14 @@ export function createHallConsole(
     {
       title: 'AIR',
       dials: [
+        dial(
+          'AO',
+          0,
+          6,
+          () => settings.occlusion,
+          (v) => (settings.occlusion = v),
+          { steps: 24 },
+        ),
         dial(
           'BLOOM',
           0,
