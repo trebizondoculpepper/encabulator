@@ -36,6 +36,19 @@ The room already knows, at every arrival: the plinth arrived at, the one visited
 | 10  | `dark-first.wav`        | In the dark, away from all three, after the first plinth has been seen _(guess)_                                             | You know, none of these shapes really pass muster. I think it's best just to stay away. None of these shapes are good things. They make us think bad thoughts. Take us to bad places. They make us worse people. I think we should just stay far away and leave them alone, because none of them are up to any good.                                                                                                                                              |
 | 11  | `dark-rhombus-plot.wav` | Still in the dark, some time after clip 10 _(guess: "On third thought" follows it)_                                          | On third thought, that rhombus... I think it's up to something. Did you notice what it was doing when we were looking away? I think it's plotting. I think the rhombus wants to kill us.                                                                                                                                                                                                                                                                          |
 
+## Walking away
+
+Short lines for stepping out of a plinth's light. Each moment has several versions, played in turn so a return visit does not repeat; clips 3 and 8 above are versions too.
+
+| #   | File                  | Plays when          | Line                                                                          |
+| --- | --------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| 12  | `sphere-leave-1.wav`  | Leaving the sphere  | Oh, the sphere's too good for us, isn't he?                                   |
+| 13  | `sphere-leave-2.wav`  | Leaving the sphere  | Oh, that sphere. That wonderful sphere. We'll never see his like again.       |
+| 14  | `helix-leave-2.wav`   | Leaving the helix   | Yes, just walk away from the helix. Walk away. It's the coward's thing to do. |
+| 15  | `rhombus-leave-2.wav` | Leaving the rhombus | Let's not speak of the rhombus.                                               |
+| 16  | `rhombus-leave-3.wav` | Leaving the rhombus | Let's put that rhombus behind us.                                             |
+| 17  | `rhombus-leave-4.wav` | Leaving the rhombus | Of that rhombus, we'll have none.                                             |
+
 ## Open moments
 
 When two clips fit one moment (a first arrival at the sphere straight from the helix fits clips 1 and 7), the more specific one should win, and the other can wait for a later moment or be skipped. These moments have no clip yet: sphere to rhombus and sphere to helix; rhombus to sphere and rhombus to helix; returning to the sphere or the helix; lingering at the sphere or the rhombus; arriving in the room before any plinth.
