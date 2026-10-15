@@ -4,6 +4,14 @@ The narrator's lines for dev5, the plinth room (`src/rendering/plinth-room.ts`).
 
 Where the moment a clip plays is my guess from its content rather than something the owner said, it is marked _(guess)_. Small wording tidies for performance are marked _(tidied)_, with what was said in the note.
 
+## The narrator's feelings
+
+Every line keeps to the narrator's feeling about its shape:
+
+- **The sphere** is good: a trustworthy, dependable shape that reminds us of all that is good and wholesome in the world.
+- **The helix** is wistful: regret, lost opportunity, lost love, failure in one's personal life. It is admired, and it hurts.
+- **The rhombus** is disgust and suspicion: a shape out of place that stirs opprobrium for reasons never quite stated. Not fear: distaste, and a growing suspicion that it is up to something.
+
 ## Triggers
 
 The room already knows, at every arrival: the plinth arrived at, the one visited just before (`previous`), every one before that and how many times this one has been visited (`visit`). Some clips below also need moments the room does not report yet:
