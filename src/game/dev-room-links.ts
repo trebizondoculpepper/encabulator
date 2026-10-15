@@ -8,7 +8,7 @@ import type { Footprint } from './walk-collision';
  * has a single exit to it.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev6';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev6' | 'dev7';
 export type RoomId = DevRoomId | 'hall' | 'rhombus';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
@@ -26,6 +26,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev2',
   'dev3',
   'dev6',
+  'dev7',
 ];
 
 /** The Hall and mini-game have their own public room IDs. */
@@ -44,6 +45,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
   dev6: 'DEV6 · RETRO ENCABULATOR',
+  dev7: 'DEV7 · UNDERGROUND CORRIDOR',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
 };
@@ -54,6 +56,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
   dev6: '#9a9685',
+  dev7: '#2d9ca0',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
 };

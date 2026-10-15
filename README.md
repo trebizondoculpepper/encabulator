@@ -12,6 +12,7 @@ The machine is not built yet. The game currently has development rooms, the Hall
 - `?room=hall` The Hall: the vast concrete hall the game will take place in, with a door station to every other room and a console desk to change its materials and light.
 - `?room=dev3` Racks: rack cabinets and rack-mount units of every kind, built to catalogue dimensions.
 - `?room=dev6` Retro Encabulator MCC: a seven-section CENTERLINE-style motor-control lineup with opening buckets and modelled interiors.
+- `?room=dev7` Corridor: a zig-zagging basement service passage with access to a locker room, plant room, service bay and lift lobby, modelled from the photographs in `resources/reference/underground-corridors/`.
 
 - `?room=rhombus` Rhombus mini-game: a narrated gallery with three mysterious shapes.
 

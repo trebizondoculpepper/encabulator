@@ -46,6 +46,8 @@ const openRoom = async () => {
     start = (await import('./rendering/hall-room')).startHallRoom;
   else if (room === 'dev6')
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
+  else if (room === 'dev7')
+    start = (await import('./rendering/corridor-room')).startCorridorRoom;
   else if (room === 'dev3')
     start = (await import('./rendering/racks-room')).startRacksRoom;
   else if (room === 'dev2')
