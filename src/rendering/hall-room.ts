@@ -1,9 +1,7 @@
 import { createNodePipeline, createNodeRenderer } from './node-pipeline';
-import { CubeRenderTarget } from 'three/webgpu';
 import {
   Box3,
   Color,
-  CubeCamera,
   DirectionalLight,
   Fog,
   Group,
@@ -62,8 +60,7 @@ import { knobDirection } from '../scene/rotary-knob';
 /**
  * Dev4, the Hall: the great enclosed concrete hall the game will take
  * place in (`src/scene/industrial-hall.ts`), to try out the environment.
- * Polished concrete reflects the skylights, windows and lamps (an
- * environment map taken in the hall), overcast daylight blooms white and
+ * Polished concrete reflects the skylights, windows and lamps; overcast daylight blooms white and
  * a haze gives the distance depth. A door station in the middle of the
  * nave leads to the other dev rooms. Around the edges stand the plant's
  * ephemera: shipping containers, palletised cargo, drums and IBC totes,
@@ -73,7 +70,9 @@ import { knobDirection } from '../scene/rotary-knob';
 export function startHallRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
-  const renderer = createNodeRenderer(canvas);
+  // The Hall's full-screen GI, reflections, bloom and temporal pass make
+  // Retina's fourfold pixel count too expensive on integrated GPUs.
+  const renderer = createNodeRenderer(canvas, 1);
   renderer.setClearColor('#d8dadb');
   const fog = new Fog('#d4d7d8', 45 * m, 260 * m);
   scene.fog = fog;
@@ -95,10 +94,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const hall = createIndustrialHall(surfaces);
   hall.group.scale.setScalar(m);
   scene.add(hall.group);
-
-  // Screen-space reflections give the floor its shine (hall-pipeline.ts);
-  // the environment map only its soft fill.
-  surfaces.floor.material.envMapIntensity = 0.35;
 
   // The door station in the middle of the nave.
   const station = createDoorStation(HALL, STATION_ROOMS, m);
@@ -409,13 +404,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     Math.PI,
   );
   stand(solidPiece(code.gasCage('OXYGEN')), -39.5, southWall - 0.6, Math.PI);
-  // The sprinkler riser and its alarm valve, on the east wall.
-  stand(
-    solidPiece(code.sprinklerRiser(SIDE_HEIGHT)),
-    HALL_LENGTH / 2 - 0.05,
-    -40,
-    -Math.PI / 2,
-  );
   // A stair from the nave floor up to the north balcony.
   stand(solidPiece(code.stair(SIDE_HEIGHT + 0.9)), 50, -NAVE_WIDTH / 2 + 0.4);
   // The safety notice board, by the time clock.
@@ -427,7 +415,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     Math.PI / 2,
   );
 
-  // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
+  // ---- Services: heaters, cable trays, exhaust fans ----------------------
   const services = createHallServices();
   services.group.scale.setScalar(m);
   scene.add(services.group);
@@ -630,22 +618,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     if (detail) culler.add(mesh, { minSize: 0, maxDistance: detail * m });
   }
 
-  // ---- The environment: the hall seen from its middle, for image light --
-  let environment: CubeRenderTarget | null = null;
-  const reflect = () => {
-    const target = new CubeRenderTarget(256);
-    const cube = new CubeCamera(0.1 * m, 400 * m, target);
-    cube.position.set(0, 1.6 * m, 12 * m);
-    scene.environment = null;
-    culler.showAll();
-    cube.update(renderer, scene);
-    environment?.dispose();
-    environment = target;
-    scene.environment = target.texture;
-  };
-
   // The render pipeline: global illumination, reflections, bloom, TRAA.
-  const pipeline = createNodePipeline(renderer, scene, camera, m);
+  const pipeline = createNodePipeline(renderer, scene, camera, m, true);
 
   /** Put the settings into the materials and lights. */
   const apply = (s: HallSettings) => {
@@ -663,6 +637,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     const sky = new Color(...kelvinToRgb(s.skyKelvin));
     const lampColour = new Color(...kelvinToRgb(s.lampKelvin));
     hall.sky.color.copy(sky).multiplyScalar(1.7 * s.skyIntensity);
+    for (const material of hall.windowMaterials)
+      material.color.copy(hall.sky.color);
     hall.lampGlow.color.copy(lampColour).multiplyScalar(2.2 * s.lampIntensity);
     hall.lampLining.color
       .setRGB(1.2, 0.62, 0.3)
@@ -684,14 +660,11 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     fog.far = (520 - 420 * s.haze) * m;
   };
   apply(settings);
-  let reflectTimer = 0;
   // The console desk, a few metres from the door station, its panel
   // facing the doors.
   const kit = createPanelKit();
   const desk = createHallConsole(kit, settings, () => {
     apply(settings);
-    window.clearTimeout(reflectTimer);
-    reflectTimer = window.setTimeout(reflect, 400);
   });
   desk.group.scale.setScalar(m);
   desk.group.position.set(0, 0, 6.5 * m);
@@ -803,7 +776,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     set(partial: Partial<HallSettings>) {
       Object.assign(settings, partial);
       apply(settings);
-      reflect();
     },
     settings: () => structuredClone(settings),
     /** What the last frame cost: draw calls, triangles, geometries, textures. */
@@ -817,7 +789,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     /** Show a great door in style `n`, 1 to 6 (see hall-doors.ts). */
     door(n: number, end: 'east' | 'west' = 'east') {
       setDoor(n, end);
-      reflect();
       return DOOR_STYLES[n - 1];
     },
   };
@@ -843,19 +814,16 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     culler.update();
     pipeline.render();
   };
-  // The renderer starts asynchronously (it may be opening WebGPU); the
-  // environment is captured and the frames begin once it is ready.
+  // The renderer starts asynchronously (it may be opening WebGPU).
   let running = true;
   void renderer.init().then(() => {
     if (!running) return;
-    reflect();
     void renderer.setAnimationLoop(frame);
   });
   const dispose = () => {
     running = false;
     void renderer.setAnimationLoop(null);
     observer.disconnect();
-    window.clearTimeout(reflectTimer);
     walk.dispose();
     station.dispose();
     disposeKit(kit, desk.group);
@@ -870,7 +838,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     props.dispose();
     for (const s of Object.values(surfaces)) s.material.dispose();
     disposeFinishTextures();
-    environment?.dispose();
     pipeline.dispose();
     void renderer.dispose();
   };

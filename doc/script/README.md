@@ -31,10 +31,10 @@ Given the one long file:
 3. Find every slate ("clip <number>", "clip <number>, again") in the transcript. A clip runs from the end of its slate to the start of the next slate; where a clip has several takes, use the last.
 4. Tighten each cut to the silences either side with `ffmpeg` (`silencedetect`), so no slate words and no dead air remain; keep about 150 ms of room tone at each end, with short fades.
 5. Normalise each clip's loudness consistently (`ffmpeg -af loudnorm`, about -16 LUFS for dialogue) and remove the low rumble (`highpass=f=80`).
-6. Export each to `src/audio/assets/narration/plinths/<file>.ogg` (Opus or Vorbis, mono, about 64–96 kb/s), named as in the master's file column (`sphere-first.ogg` for `sphere-first.wav`).
+6. Export browser-ready copies to `src/audio/assets/narration/plinths/`. The current deliveries are numbered `clip_01.mp3` through `clip_31.mp3`, mono 44.1 kHz at 96 kb/s for browser compatibility. `resources/sound/narrations/rhombus_room/clips.csv` maps the numbers to the master's filenames and source times.
 7. Compare each clip's transcript with its line in the master; report clips missing from the recording, and improvisations that changed a line's meaning or moment, rather than silently reassigning them.
 8. Record the narration in `CREDITS.md` (performer, date recorded, licence as the owner says).
 
 ## 4. Wiring it in
 
-The room dispatches `plinth-arrival` (with the plinth, the previous one, every one before and the visit count). Still to add: leaving a plinth, staying at one, being in the dark for a while, and being near the exit; and an exit on the far wall, since clip 29 says the door is "on the other side". The narration player then picks the clip for each moment, most specific first (a move from one shape to another beats a first visit, which beats a generic line), rotates walking-away versions, never interrupts a clip that is playing with a lesser one, and plays each one-off clip (the entry, the first visits) only once.
+The room dispatches `plinth-arrival` (with the plinth, the previous one, every one before and the visit count). `src/game/plinth-narration.ts` selects lines for arrival, leaving a plinth, lingering, being in the dark and approaching the far east exit. `src/audio/plinth-narration.ts` plays them after a user gesture, rotates variants, pauses when the room is hidden, and lets a more immediate moment interrupt a lesser one. The east exit leads to the Hall; the original west portals remain.

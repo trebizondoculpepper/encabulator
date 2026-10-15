@@ -19,4 +19,4 @@ npm ci
 npm run dev   # http://127.0.0.1:5174/
 ```
 
-Walk with WASD, click or press E to work a part, turn a knob down or up by clicking its left or right half, and press Esc to free the cursor. See `AGENTS.md` for how it is put together and `CREDITS.md` for the sounds.
+Walk with WASD, click or press E to work a part, turn a knob down or up by clicking its left or right half, and press Esc to free the cursor. See `AGENTS.md` for how it is put together, `CREDITS.md` for the sounds, and `resources/sound/README.md` for the working sound library.

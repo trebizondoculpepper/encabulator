@@ -240,43 +240,6 @@ export function createCompliance() {
         ] as Footprint[],
       };
     },
-    /** The sprinkler riser: a red main up the wall with its alarm valve, gauges and gate valve. */
-    sprinklerRiser(height = 10) {
-      const g = new Group();
-      kit.cyl(g, red, 0.1, height, 0, height / 2, 0.3);
-      kit.box(g, red, 0.4, 0.5, 0.35, 0, 1.4, 0.3);
-      kit.cyl(g, red, 0.12, 0.3, 0, 0.6, 0.3, 0.12);
-      const wheel = kit.cyl(
-        g,
-        kit.paint('#1d1d1e', 0.5),
-        0.2,
-        0.03,
-        0,
-        0.6,
-        0.55,
-      );
-      wheel.rotation.x = Math.PI / 2;
-      for (const y of [1.8, 1.1]) {
-        const gauge = kit.cyl(g, steel, 0.05, 0.03, 0.22, y, 0.35);
-        gauge.rotation.z = Math.PI / 2;
-      }
-      kit.box(g, red, 0.4, 0.06, 0.06, 0.25, 1.95, 0.3);
-      const sign = kit.sign(
-        'SPRINKLER RISER\nALARM VALVE',
-        0.6,
-        0.25,
-        '#ffffff',
-        '#c0261b',
-      );
-      sign.position.set(0, 2.3, 0.01);
-      g.add(sign);
-      return {
-        group: g,
-        solids: [
-          { minX: -0.35, maxX: 0.35, minZ: 0, maxZ: 0.6 },
-        ] as Footprint[],
-      };
-    },
     /**
      * A steel stair up to `height`: switchback flights of 7 in risers and
      * 11 in treads, 1.1 m wide, with landings, yellow nosings, and

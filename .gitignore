@@ -10,3 +10,7 @@ coverage/
 agent-mailbox.toml
 agent-inbox.toml
 .vitest/
+
+# Working sound recordings stay local until edited and approved for the game.
+resources/sound/**/*.wav
+tmp/audio/

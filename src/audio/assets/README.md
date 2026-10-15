@@ -1,5 +1,7 @@
 # Audio asset record
 
+The 31 plinth-room narration deliveries in `narration/plinths/clip_01.mp3` through `clip_31.mp3` come from the owner-supplied cuts in `resources/sound/narrations/rhombus_room/`. They are mono 44.1 kHz MP3 at 96 kb/s for broad browser playback, high-passed at 80 Hz and normalised with FFmpeg loudnorm targeting -16 LUFS, -1.5 dB true peak and 11 LU loudness range. Short fades were applied to the working WAV cuts. The clip numbers and original source times are in that folder's `clips.csv`; 26 and 31 were identified by their script lines because no spoken slate was audible at those boundaries.
+
 All authors, original source URLs and licences are recorded centrally in [CREDITS.md](../../../CREDITS.md).
 
 `printer-line-1.wav` through `printer-line-5.wav` are distinct 0.70-second excerpts beginning at 0.15, 4.05, 7.10, 11.10 and 16.10 seconds in the credited Star LC-10 recording. Delivery format is mono 22,050 Hz, 16-bit PCM WAV. Each uses a 120 Hz high-pass, 8 kHz low-pass, 8 ms fade in, 15 ms fade out and a matched peak of 0.55. The playback gain is 0.035 before spatial and master-volume attenuation. Shuffled sets use every variant and avoid adjacent repeats; the cue fires at a printed line's start rather than repeatedly every frame. Printing and paper feed stop while idle.

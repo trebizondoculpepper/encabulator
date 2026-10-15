@@ -95,6 +95,9 @@ export function devPortals(
       x: bounds.minX,
       z: bounds.minZ + 1.6 * metre,
     });
+  // The plinth story's exit stands across the gallery from its entrance.
+  if (id === 'dev5')
+    portals.push({ to: HALL, side: 'east', x: bounds.maxX, z: 0 });
   return portals;
 }
 

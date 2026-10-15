@@ -37,10 +37,13 @@ const MAX_PIXEL_RATIO = 2;
  * Neutral tone mapping keeps paint colours as painted. `init` must finish
  * before the first frame.
  */
-export function createNodeRenderer(canvas: HTMLCanvasElement) {
+export function createNodeRenderer(
+  canvas: HTMLCanvasElement,
+  maxPixelRatio = MAX_PIXEL_RATIO,
+) {
   const renderer = new WebGPURenderer({ canvas, antialias: false });
   renderer.setPixelRatio(
-    Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO),
+    Math.min(globalThis.devicePixelRatio ?? 1, maxPixelRatio),
   );
   renderer.toneMapping = NeutralToneMapping;
   renderer.toneMappingExposure = 1;
@@ -72,6 +75,7 @@ export function createNodePipeline(
   scene: Scene,
   camera: PerspectiveCamera,
   metre: number,
+  economical = false,
 ) {
   const scenePass = pass(scene, camera);
   scenePass.setMRT(
@@ -96,7 +100,7 @@ export function createNodePipeline(
 
   // Bounced light and occlusion: medium quality, smoothed by TRAA.
   const gi = ssgi(colour, depth, normal, camera);
-  gi.sliceCount.value = 2;
+  gi.sliceCount.value = economical ? 1 : 2;
   gi.stepCount.value = 8;
   const giStrength = uniform(1);
   const aoStrength = uniform(1);
@@ -117,7 +121,7 @@ export function createNodePipeline(
   });
   reflections.maxDistance.value = 60 * metre;
   reflections.thickness.value = 0.4 * metre;
-  reflections.resolutionScale = 0.5;
+  reflections.resolutionScale = economical ? 0.35 : 0.5;
   // SSR's alpha is the reflection's length, not its opacity: its colour
   // is already weighted, so it is added.
   const reflected = vec4(lit.rgb.add(reflections.rgb), lit.a);

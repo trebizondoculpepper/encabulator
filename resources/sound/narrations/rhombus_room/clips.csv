@@ -1,0 +1,32 @@
+clip_number,file,script_file,source_start_seconds,source_end_seconds,duration_seconds,selection
+1,clip_01.wav,sphere-first.wav,145.135,165.895,20.760,last retake
+2,clip_02.wav,rhombus-first.wav,294.538,319.238,24.700,spoken slate
+3,clip_03.wav,rhombus-leave.wav,382.267,385.547,3.280,spoken slate
+4,clip_04.wav,helix-first.wav,414.848,420.468,5.620,spoken slate
+5,clip_05.wav,helix-linger.wav,483.974,505.454,21.480,spoken slate
+6,clip_06.wav,helix-to-rhombus.wav,875.005,893.345,18.340,spoken slate
+7,clip_07.wav,helix-to-sphere.wav,837.380,867.480,30.100,last retake
+8,clip_08.wav,helix-leave.wav,554.388,560.128,5.740,spoken slate
+9,clip_09.wav,rhombus-return.wav,325.834,344.054,18.220,spoken slate
+10,clip_10.wav,dark-first.wav,901.309,926.009,24.700,spoken slate
+11,clip_11.wav,dark-rhombus-plot.wav,937.390,948.890,11.500,spoken slate
+12,clip_12.wav,sphere-leave-1.wav,274.900,277.980,3.080,last retake
+13,clip_13.wav,sphere-leave-2.wav,282.300,287.160,4.860,spoken slate
+14,clip_14.wav,helix-leave-2.wav,565.116,572.936,7.820,spoken slate
+15,clip_15.wav,rhombus-leave-2.wav,389.967,392.387,2.420,spoken slate
+16,clip_16.wav,rhombus-leave-3.wav,397.117,399.477,2.360,spoken slate
+17,clip_17.wav,rhombus-leave-4.wav,403.823,406.573,2.750,spoken slate
+18,clip_18.wav,sphere-to-rhombus.wav,581.992,619.772,37.780,spoken slate
+19,clip_19.wav,rhombus-to-sphere-1.wav,690.598,716.298,25.700,spoken slate
+20,clip_20.wav,rhombus-to-sphere-2.wav,723.243,771.903,48.660,spoken slate
+21,clip_21.wav,sphere-linger-1.wav,228.886,236.466,7.580,spoken slate
+22,clip_22.wav,sphere-linger-2.wav,242.500,264.380,21.880,spoken slate
+23,clip_23.wav,rhombus-linger.wav,352.265,375.705,23.440,spoken slate
+24,clip_24.wav,helix-linger-2.wav,512.649,548.889,36.240,spoken slate
+25,clip_25.wav,sphere-to-helix.wav,636.713,685.313,48.600,last retake
+26,clip_26.wav,rhombus-to-helix.wav,777.250,813.167,35.917,matched to master script; no audible slate
+27,clip_27.wav,sphere-return.wav,172.866,222.746,49.880,spoken slate
+28,clip_28.wav,helix-return.wav,427.574,476.854,49.280,spoken slate
+29,clip_29.wav,room-enter.wav,10.954,95.094,84.140,spoken slate
+30,clip_30.wav,exit-untouched.wav,955.657,997.317,41.660,spoken slate
+31,clip_31.wav,exit-after-shapes.wav,1002.823,1035.203,32.380,matched to master script; no audible slate

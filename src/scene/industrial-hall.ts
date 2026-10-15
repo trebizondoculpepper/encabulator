@@ -1,5 +1,6 @@
 import {
   BoxGeometry,
+  CanvasTexture,
   Color,
   Group,
   Matrix4,
@@ -8,6 +9,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   Quaternion,
+  SRGBColorSpace,
   Vector3,
 } from 'three';
 import type { BufferGeometry, InstancedMesh, Material } from 'three';
@@ -96,6 +98,8 @@ export interface Hall {
   lamps: Vector3[];
   /** The sky through the glass, and the lamps' lenses, to colour and brighten. */
   sky: MeshBasicMaterial;
+  /** Window grid materials share the sky colour but have painted mullions. */
+  windowMaterials: MeshBasicMaterial[];
   lampGlow: MeshBasicMaterial;
   /** The copper lining of the lamps' domes, lit by their bulbs. */
   lampLining: MeshBasicMaterial;
@@ -114,6 +118,9 @@ export function createIndustrialHall(
   const batch = createBatcher();
   const geometries: BufferGeometry[] = [batch.geometry];
   const materials: Material[] = [];
+  const windowMaterials: MeshBasicMaterial[] = [];
+  const windowTextures: CanvasTexture[] = [];
+  const windowGrids = new Map<string, MeshBasicMaterial>();
   const solids: Footprint[] = [];
   const lamps: Vector3[] = [];
   const doorways: Doorway[] = [];
@@ -135,13 +142,53 @@ export function createIndustrialHall(
     roughness: 0.5,
     metalness: 0.6,
   });
-  const mullion = new MeshStandardMaterial({
-    color: '#2b2f32',
-    roughness: 0.5,
-    metalness: 0.5,
-  });
   const yellow = new MeshStandardMaterial({ color: '#d9a514', roughness: 0.4 });
-  materials.push(sky, lampGlow, steel, mullion, yellow);
+  materials.push(sky, lampGlow, steel, yellow);
+
+  const windowGrid = (
+    length: number,
+    height: number,
+    panes: number,
+    rows: number,
+  ) => {
+    const key = `${panes}:${rows}:${length.toFixed(2)}:${height.toFixed(2)}`;
+    const cached = windowGrids.get(key);
+    if (cached) return cached;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = '#191b1d';
+    const vertical = Math.max(1, Math.round((0.08 / length) * 256));
+    const horizontal = Math.max(1, Math.round((0.08 / height) * 256));
+    for (let i = 0; i <= panes; i++)
+      ctx.fillRect(
+        Math.round((i * 256) / panes - vertical / 2),
+        0,
+        vertical,
+        256,
+      );
+    for (let i = 0; i <= rows; i++)
+      ctx.fillRect(
+        0,
+        Math.round((i * 256) / rows - horizontal / 2),
+        256,
+        horizontal,
+      );
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    const material = new MeshBasicMaterial({
+      map: texture,
+      color: sky.color,
+      toneMapped: false,
+    });
+    windowTextures.push(texture);
+    windowMaterials.push(material);
+    materials.push(material);
+    windowGrids.set(key, material);
+    return material;
+  };
 
   /** A high-bay lamp hung at `y` from `top`. */
   /** A pendant lamp, its dome's rim at `y`, its chain hung from `top`. */
@@ -181,13 +228,16 @@ export function createIndustrialHall(
       alongX
         ? batch.box(material, w, hh, d, along, y, at)
         : batch.box(material, d, hh, w, at, y, along);
-    place(mid, from + h / 2, length, h, 0.05, sky);
     const panes = Math.max(1, Math.round(length / pane));
-    for (let i = 0; i <= panes; i++)
-      place(start + (i * length) / panes, from + h / 2, 0.08, h, 0.14, mullion);
     const rows = Math.max(1, Math.round(h / 1.5));
-    for (let r = 0; r <= rows; r++)
-      place(mid, from + (r * h) / rows, length, 0.08, 0.14, mullion);
+    place(
+      mid,
+      from + h / 2,
+      length,
+      h,
+      0.05,
+      windowGrid(length, h, panes, rows),
+    );
   };
   /**
    * A wall of tall vertical windows: piers every `bay` metres with glass
@@ -530,6 +580,7 @@ export function createIndustrialHall(
     solids,
     lamps,
     sky,
+    windowMaterials,
     lampGlow,
     lampLining: pendants.lining,
     pendants: pendants.built,
@@ -537,6 +588,7 @@ export function createIndustrialHall(
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
+      for (const t of windowTextures) t.dispose();
       pendants.dispose();
     },
   };

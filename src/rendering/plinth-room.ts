@@ -22,7 +22,9 @@ import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { PLINTHS, createPlinthTracker, spotlightLevels } from '../game/plinths';
 import type { Arrival, ExhibitId } from '../game/plinths';
+import { createPlinthNarration } from '../game/plinth-narration';
 import { createPlinthDrones } from '../audio/plinth-drones';
+import { createPlinthNarrationPlayer } from '../audio/plinth-narration';
 import type { DroneKind } from '../audio/plinth-drones';
 import { createPortals } from '../scene/portals';
 import { EXHIBIT_CENTRE, createExhibit } from '../scene/plinth-exhibits';
@@ -252,8 +254,15 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
       z: p.z,
     })),
   );
-  const unlockSound = () => void drones.unlock();
-  canvas.addEventListener('pointerdown', unlockSound);
+  const story = createPlinthNarration();
+  const narrator = createPlinthNarrationPlayer();
+  const unlockSound = () => {
+    if (canvas.parentElement?.hidden) return;
+    narrator.unlock();
+    void drones.unlock();
+  };
+  const soundTarget = canvas.parentElement ?? canvas;
+  soundTarget.addEventListener('pointerdown', unlockSound);
   window.addEventListener('keydown', unlockSound);
   const facing = new Vector3();
   let soundFailed = false;
@@ -295,7 +304,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.id = 'plinth-notes';
   notes.textContent =
-    'DEV5 · Plinths: walk within 4 m of a plinth to light it and hear it · Portals: dev3 west, the Hall west · WASD: walk · Esc: cursor';
+    'DEV5 · Plinths: walk within 4 m to light and hear one · Exit: far east wall · Portals: dev3 and Hall west · WASD: walk · Esc: cursor';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',
@@ -343,6 +352,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     previous: () => tracker.previous(),
     /** Whether the plinths' ambience is playing. */
     sound: () => drones.state(),
+    narration: () => narrator.state(),
     /** Every arrival so far, with what came before each. */
     arrivals: () => structuredClone(arrivals),
     stats: () => ({
@@ -367,11 +377,18 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     );
     if (arrival) {
       arrivals.push(arrival);
-      // Where the story's audio will be chosen, from `arrival`.
       window.dispatchEvent(
         new CustomEvent('plinth-arrival', { detail: arrival }),
       );
     }
+    narrator.offer(
+      story.update(
+        delta,
+        active,
+        arrival,
+        walk.walker.x / m > HALF - 4 && Math.abs(walk.walker.z / m) < 3,
+      ),
+    );
     camera.getWorldDirection(facing);
     // Sound must never stop the room: an error thrown here would end the
     // frame loop for good.
@@ -422,9 +439,10 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     notes.remove();
-    canvas.removeEventListener('pointerdown', unlockSound);
+    soundTarget.removeEventListener('pointerdown', unlockSound);
     window.removeEventListener('keydown', unlockSound);
     drones.dispose();
+    narrator.dispose();
     for (const { exhibit } of exhibits) exhibit.dispose();
     for (const mesh of roomMeshes) mesh.geometry.dispose();
     for (const material of materials) material.dispose();
@@ -433,9 +451,16 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     void renderer.dispose();
   };
   return Object.assign(dispose, {
-    suspend: () => drones.setVisible(false),
-    resume: () => drones.setVisible(true),
+    suspend() {
+      drones.setVisible(false);
+      narrator.setVisible(false);
+    },
+    resume() {
+      drones.setVisible(true);
+      narrator.setVisible(true);
+    },
     enter(previous: string | null) {
+      narrator.offer(story.enter());
       const view =
         views[new URLSearchParams(location.search).get('view') ?? ''];
       if (view) {
