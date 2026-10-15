@@ -76,6 +76,15 @@ function createBatcher() {
   };
 }
 
+/** An opening in the hall's east end wall, for a door; its inside face's middle at (x, z). */
+export interface Doorway {
+  x: number;
+  z: number;
+  width: number;
+  height: number;
+  kind: 'main' | 'dock';
+}
+
 export interface Hall {
   group: Group;
   /** The columns and walls, metres, for walking into. */
@@ -87,6 +96,8 @@ export interface Hall {
   lampGlow: MeshBasicMaterial;
   /** The copper lining of the lamps' domes, lit by their bulbs. */
   lampLining: MeshBasicMaterial;
+  /** The openings in the east end wall: the great door and the dock doors. */
+  doorways: Doorway[];
   dispose(): void;
 }
 
@@ -100,6 +111,7 @@ export function createIndustrialHall(
   const materials: Material[] = [];
   const solids: Footprint[] = [];
   const lamps: Vector3[] = [];
+  const doorways: Doorway[] = [];
   const L = HALL_LENGTH;
   const W = HALL_WIDTH;
   const nave = NAVE_WIDTH;
@@ -139,9 +151,6 @@ export function createIndustrialHall(
   floor.rotation.x = -Math.PI / 2;
   geometries.push(floor.geometry);
   group.add(floor);
-  // Yellow aisle lines down the nave and along each side hall.
-  for (const z of [-4, 4, -nave / 2 - 3, nave / 2 + 3])
-    batch.box(yellow, L - 20, 0.004, 0.12, 0, 0.002, z);
 
   /** A band of glass between two heights along x at `z`, or along z at `x`. */
   const windowBand = (
@@ -299,10 +308,11 @@ export function createIndustrialHall(
   // low end walls, for daylight at eye level and for the floor to reflect.
   outer(true, -W / 2 - 0.3, L, low + 1.4, -1, (i) => i % 2 === 1);
   outer(true, W / 2 + 0.3, L, low + 1.4, 1, (i) => i % 2 === 1);
-  for (const sx of [-1, 1]) {
-    const x = sx * (L / 2 + 0.3);
-    outer(false, x, W, low + 1.4, sx, (i) => i % 2 === 0);
-    // The nave's end wall rises high above the side halls, with tall windows.
+  // The west end wall: windows low across the side halls, and the nave's
+  // end rising high with tall windows.
+  {
+    const x = -(L / 2 + 0.3);
+    outer(false, x, W, low + 1.4, -1, (i) => i % 2 === 0);
     clerestory(
       false,
       x,
@@ -315,6 +325,63 @@ export function createIndustrialHall(
       7.33,
       1.6,
     );
+  }
+  // The east end wall: solid, with the great door in the nave's end and a
+  // truck dock door in each side hall.
+  {
+    const x = L / 2 + 0.3;
+    const top = high + 1.6;
+    const main = { width: 24, height: 14 };
+    const dock = {
+      width: 3.66,
+      height: 4.27,
+      z: nave / 2 + (W / 2 - nave / 2) / 2,
+    };
+    const piece = (z0: number, z1: number, y0: number, y1: number) => {
+      if (z1 <= z0 || y1 <= y0) return;
+      batch.box(walls, 0.6, y1 - y0, z1 - z0, x, (y0 + y1) / 2, (z0 + z1) / 2);
+    };
+    // The nave's end, round the great door.
+    piece(-nave / 2, -main.width / 2, 0, top);
+    piece(main.width / 2, nave / 2, 0, top);
+    piece(-main.width / 2, main.width / 2, main.height, top);
+    // The side halls' ends, round their dock doors.
+    for (const sz of [-1, 1]) {
+      const [a, b] =
+        sz > 0 ? [nave / 2, W / 2 + 0.6] : [-W / 2 - 0.6, -nave / 2];
+      const d0 = sz * dock.z - dock.width / 2;
+      const d1 = sz * dock.z + dock.width / 2;
+      piece(a, d0, 0, low + 1.4);
+      piece(d1, b, 0, low + 1.4);
+      piece(d0, d1, dock.height, low + 1.4);
+      doorways.push({
+        x: x - 0.3,
+        z: sz * dock.z,
+        width: dock.width,
+        height: dock.height,
+        kind: 'dock',
+      });
+    }
+    // Pilasters on the inside face, clear of the openings.
+    for (let z = -W / 2 + 7.5; z < W / 2 - 1; z += 7.5) {
+      const clear = (z0: number, z1: number) => z < z0 - 1 || z > z1 + 1;
+      if (!clear(-main.width / 2, main.width / 2)) continue;
+      if (
+        !clear(dock.z - dock.width / 2, dock.z + dock.width / 2) ||
+        !clear(-dock.z - dock.width / 2, -dock.z + dock.width / 2)
+      )
+        continue;
+      const h = Math.abs(z) < nave / 2 ? top : low + 1.4;
+      batch.box(walls, 0.5, h, 1.4, x - 0.55, h / 2, z);
+    }
+    doorways.push({
+      x: x - 0.3,
+      z: 0,
+      width: main.width,
+      height: main.height,
+      kind: 'main',
+    });
+    solids.push({ minX: x - 0.9, maxX: x + 0.9, minZ: -W / 2, maxZ: W / 2 });
   }
 
   // ---- The side halls: thick slabs, balcony edges, columns, lamps --------
@@ -388,6 +455,7 @@ export function createIndustrialHall(
     sky,
     lampGlow,
     lampLining: pendants.lining,
+    doorways,
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();

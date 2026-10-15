@@ -935,6 +935,21 @@ export function createProps() {
           cylinder(g, black, 0.06, 0.05, sx * 0.8, 0.06, sz * 0.5, 'x', 10);
       return g;
     },
+    /**
+     * A truck dock's fittings, for a dock door `width` wide: black rubber
+     * bumpers either side, a steel dock leveller plate with a yellow lip,
+     * and a swing-arm dock light. Built facing +z, the door's plane at z = 0.
+     */
+    dock(width: number) {
+      const g = new Group();
+      for (const sx of [-1, 1])
+        box(g, black, 0.25, 0.5, 0.12, sx * (width / 2 + 0.25), 0.9, 0.06);
+      box(g, paint('#7f8589', 0.4, 0.8), width - 0.2, 0.04, 2.4, 0, 0.02, 1.2);
+      box(g, yellow, width - 0.2, 0.05, 0.1, 0, 0.03, 2.4);
+      box(g, steel, 0.06, 0.06, 1.2, width / 2 + 0.6, 3.2, 0.6);
+      box(g, black, 0.25, 0.2, 0.25, width / 2 + 0.6, 3.1, 1.2);
+      return g;
+    },
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials.values()) m.dispose();

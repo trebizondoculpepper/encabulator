@@ -25,6 +25,9 @@ import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { createDoorStation } from '../scene/door-station';
+import { DOOR_STYLES, createBigDoor } from '../scene/hall-doors';
+import { createHallServices } from '../scene/hall-services';
+import { createFloorMarkings } from '../scene/floor-markings';
 import { createFloorReflection } from '../scene/floor-reflection';
 import {
   HALL_LENGTH,
@@ -137,12 +140,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       cx += length + 1.5;
     },
   );
-  // One more at the far east end of the south side hall.
+  // One more along the south wall, clear of the dock doors.
   put(
     props.container(CONTAINER.long, containerColours[4]),
-    HALL_LENGTH / 2 - 3,
-    southWall - 8,
-    0,
+    -14,
+    southWall - CONTAINER.width / 2,
+    Math.PI / 2,
   );
   // Palletised cargo: shrink-wrapped cartons along the north wall.
   for (let i = 0; i < 10; i++)
@@ -206,6 +209,157 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.boomLift(5.5, '#e1a915'), -22, southWall - 7, 2.6);
   put(props.palletJack(), 25, southWall - 3.5, 0.6);
   put(props.bollards(3, 1.3), -46, southWall - 2.2);
+
+  // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
+  const services = createHallServices();
+  services.group.scale.setScalar(m);
+  scene.add(services.group);
+
+  // ---- The east wall's doors: the great door, and the dock doors ---------
+  const doorGroup = new Group();
+  doorGroup.scale.setScalar(m);
+  scene.add(doorGroup);
+  const main = hall.doorways.find((d) => d.kind === 'main')!;
+  let bigDoor = createBigDoor(1, main.width, main.height);
+  const hang = (door: { group: Group }, at: typeof main) => {
+    // Doors are built facing +z; the east wall's inside faces -x.
+    door.group.position.set(at.x - 0.05, 0, at.z);
+    door.group.rotation.y = -Math.PI / 2;
+    doorGroup.add(door.group);
+  };
+  hang(bigDoor, main);
+  const setDoor = (style: number) => {
+    doorGroup.remove(bigDoor.group);
+    bigDoor.dispose();
+    bigDoor = createBigDoor(style, main.width, main.height);
+    hang(bigDoor, main);
+  };
+  const docks = hall.doorways
+    .filter((d) => d.kind === 'dock')
+    .map((d) => {
+      const door = createBigDoor(2, d.width, d.height);
+      hang(door, d);
+      // Dock bumpers either side, and the leveller plate at the floor.
+      const dockGear = new Group();
+      dockGear.position.set(d.x - 0.05, 0, d.z);
+      dockGear.rotation.y = -Math.PI / 2;
+      doorGroup.add(dockGear);
+      const rubber = props.dock(d.width);
+      dockGear.add(rubber);
+      return door;
+    });
+
+  // ---- Floor markings: lanes, cells, storage, hazards --------------------
+  const marks = createFloorMarkings();
+  marks.group.scale.setScalar(m);
+  scene.add(marks.group);
+  {
+    const L = HALL_LENGTH;
+    const W = HALL_WIDTH;
+    const nave = NAVE_WIDTH;
+    // Forklift lanes down the nave, two-way, either side of the middle bay.
+    for (const z of [-17, -11, 11, 17])
+      marks.line(-L / 2 + 4, z, L / 2 - 6, z, 0.12);
+    for (let x = -60; x <= 60; x += 30) {
+      marks.arrow(x, -14, Math.PI / 2);
+      marks.arrow(x + 4, 14, -Math.PI / 2);
+    }
+    marks.stencil('FORKLIFT ROUTE', -48, -14, 0.7, Math.PI / 2);
+    marks.stencil('FORKLIFT ROUTE', 48, 14, 0.7, -Math.PI / 2);
+    // Pedestrian walkways along the nave's edges, and crossings.
+    for (const sz of [-1, 1]) {
+      marks.line(
+        -L / 2 + 4,
+        sz * (nave / 2 - 1),
+        L / 2 - 6,
+        sz * (nave / 2 - 1),
+        0.1,
+      );
+      marks.line(
+        -L / 2 + 4,
+        sz * (nave / 2 - 2.6),
+        L / 2 - 6,
+        sz * (nave / 2 - 2.6),
+        0.1,
+      );
+    }
+    for (const x of [-45, -15, 15, 45]) {
+      marks.crossing(x, -19.4, -8.6, 2.6);
+      marks.crossing(x, 8.6, 19.4, 2.6);
+    }
+    marks.stencil(
+      'WALKWAY',
+      -66,
+      -nave / 2 + 1.8,
+      0.45,
+      Math.PI / 2,
+      '#e1a915',
+    );
+    marks.stencil('WALKWAY', 66, nave / 2 - 1.8, 0.45, -Math.PI / 2, '#e1a915');
+    // The middle bay: reserved, its corners hatched.
+    marks.outline(0, 0, 100, 20, 'yellow', 0.15);
+    for (const sx of [-1, 1])
+      for (const sz of [-1, 1])
+        marks.striped(sx * 48.5, sz * 8.5, 3, 3, 'hazard');
+    marks.stencil('BAY 1 · RESERVED', -38, 0, 1.1, Math.PI / 2);
+    // The door station's work cell.
+    marks.outline(0, 2.5, 18, 12, 'white', 0.1);
+    marks.stencil('DOOR STATION', 0, -2.6, 0.5, 0, '#ecebe6');
+    // Storage locations in the side halls, outlined in white with labels.
+    const north = -W / 2 + 1.2;
+    const south = W / 2 - 1.2;
+    marks.outline(-43, north + 1.6, 57, 3.6, 'white');
+    marks.stencil('CONTAINER STORAGE', -43, north + 4.2, 0.5, 0, '#ecebe6');
+    marks.outline(7, north + 1.4, 8, 3.2, 'white');
+    marks.stencil('A1', 7, north + 3.6, 0.6, 0, '#ecebe6');
+    for (let i = 0; i < 3; i++) {
+      marks.outline(18 + i * 8.6, north + 0.35, 8.4, 1.4, 'white');
+      marks.stencil(
+        `RACK ${i + 1}`,
+        18 + i * 8.6,
+        north + 1.6,
+        0.4,
+        0,
+        '#ecebe6',
+      );
+      marks.outline(34 + i * 8.6, south - 0.35, 8.4, 1.4, 'white');
+      marks.stencil(
+        `RACK ${i + 4}`,
+        34 + i * 8.6,
+        south - 1.6,
+        0.4,
+        Math.PI,
+        '#ecebe6',
+      );
+    }
+    // Keep clear of the switchgear and transformer; hazards round the lifts.
+    marks.striped(64.5, north + 1.9, 9, 1.2, 'keep-clear');
+    marks.stencil('KEEP CLEAR', 64.5, north + 3.2, 0.5, 0, '#c8261c');
+    marks.outline(31, north + 9, 4, 3, 'yellow');
+    marks.outline(52, north + 8, 9, 6, 'yellow');
+    // The chemical store and the gas cage.
+    marks.outline(-L / 2 + 8, south - 1.6, 14, 3.6, 'yellow', 0.15);
+    marks.stencil('CHEMICAL STORAGE', -L / 2 + 8, south - 4, 0.55, Math.PI);
+    marks.striped(-46, south - 1.6, 2.4, 0.6, 'hazard');
+    marks.outline(-50, south - 0.8, 10, 1.8, 'yellow');
+    // Side-hall forklift lanes.
+    for (const sz of [-1, 1]) {
+      const z = sz * (nave / 2 + 9.5);
+      marks.line(-L / 2 + 20, z - 1.6, L / 2 - 8, z - 1.6, 0.1);
+      marks.line(-L / 2 + 20, z + 1.6, L / 2 - 8, z + 1.6, 0.1);
+      for (let x = -40; x <= 50; x += 30)
+        marks.arrow(x, z, sz > 0 ? Math.PI / 2 : -Math.PI / 2, 1);
+    }
+    // In front of the great door and the dock doors: striped, keep clear.
+    marks.striped(L / 2 - 2.2, 0, 3.6, 24, 'hazard');
+    marks.stencil('DOOR · KEEP CLEAR', L / 2 - 6, 0, 0.9, -Math.PI / 2);
+    for (const sz of [-1, 1]) {
+      const z = sz * (nave / 2 + (W / 2 - nave / 2) / 2);
+      marks.striped(L / 2 - 2.5, z, 4, 4.6, 'hazard');
+      marks.stencil(`DOCK ${sz > 0 ? 2 : 1}`, L / 2 - 6, z, 0.7, -Math.PI / 2);
+    }
+  }
+  marks.finish();
 
   // ---- Reflections: the hall seen from its middle, for the floor ---------
   const pmrem = new PMREMGenerator(renderer);
@@ -373,6 +527,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       reflect();
     },
     settings: () => structuredClone(settings),
+    /** Show the great door in style `n`, 1 to 6 (see hall-doors.ts). */
+    door(n: number) {
+      setDoor(n);
+      reflect();
+      return DOOR_STYLES[n - 1];
+    },
   };
 
   let last = 0;
@@ -399,6 +559,10 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     notes.remove();
     hall.dispose();
     shine.dispose();
+    services.dispose();
+    marks.dispose();
+    bigDoor.dispose();
+    for (const d of docks) d.dispose();
     props.dispose();
     for (const s of Object.values(surfaces)) s.material.dispose();
     disposeFinishTextures();
