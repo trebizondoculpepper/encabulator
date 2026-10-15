@@ -46,3 +46,7 @@ The hall is set in a large American plant in the late 1990s. Three bodies of rul
 7. The sprinkler riser with its alarm valve and gauges in a corner, and a fire department connection on an end wall.
 8. Midrails, toeboards and stairs for the balconies.
 9. A safety notice board by the time clock with the OSHA poster.
+
+## Done (October 2026)
+
+All nine suggested additions are now in the hall (`src/scene/code-compliance.ts`, placed in `src/rendering/hall-room.ts`): extinguishers on every nave column, on the long walls and by the end doors; five exit doors in the side walls (`NORTH_EXITS`, `SOUTH_EXITS` in `src/scene/industrial-hall.ts`), each with an EXIT sign, an emergency light pack, a pull station and a horn-strobe, as the end walls' personnel doors also now have; a forklift battery charging station with its eyewash; a break room with lockers and benches; flammables cabinets and an MSDS station; separate oxygen and fuel gas cages 6.5 m apart; the sprinkler riser with its alarm valve; a stair with guardrails and midrails up to the north balcony; and a safety notice board by the time clock. The balconies' 1.2 m concrete upstand already serves as their guard.

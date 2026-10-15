@@ -406,6 +406,7 @@ export function createPersonnelDoor(
   outside: Material,
   width = 0.92,
   height = 2.13,
+  open = true,
 ) {
   const group = new Group();
   group.name = 'Personnel door';
@@ -454,7 +455,7 @@ export function createPersonnelDoor(
   // The leaf, open into the hall on its left hinge.
   const hinge = new Group();
   hinge.position.set(-width / 2, 0, 0.08);
-  hinge.rotation.y = -1.75;
+  hinge.rotation.y = open ? -1.75 : 0;
   group.add(hinge);
   box(hinge, leafPaint, width, height - 0.01, 0.045, width / 2, height / 2, 0);
   box(hinge, steel, width - 0.1, 0.25, 0.05, width / 2, 0.15, 0);

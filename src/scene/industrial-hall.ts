@@ -40,6 +40,9 @@ export const HALL_WIDTH = 90;
 export const NAVE_WIDTH = 44;
 export const NAVE_HEIGHT = 24;
 export const SIDE_HEIGHT = 10;
+/** Where the exit doors stand in the north and south walls, along x. */
+export const NORTH_EXITS = [-29, 48];
+export const SOUTH_EXITS = [-57, 4.5, 62];
 
 /** Collects boxes by material and builds one instanced mesh per material. */
 function createBatcher() {
@@ -82,9 +85,11 @@ export interface Doorway {
   z: number;
   width: number;
   height: number;
-  kind: 'main' | 'dock' | 'person';
+  kind: 'main' | 'dock' | 'person' | 'exit';
   /** Which way along x is into the hall: -1 at the east end, +1 at the west. */
   inward: number;
+  /** The turn about y that faces a door built facing +z into the hall. */
+  yaw: number;
 }
 
 export interface Hall {
@@ -233,6 +238,7 @@ export function createIndustrialHall(
     height: number,
     outward: number,
     windowed: (bay: number) => boolean = () => false,
+    exits: number[] = [],
   ) => {
     const face = at - outward * 0.3;
     // The wall in 7.5 m bays between pilasters; a windowed bay has tall
@@ -248,6 +254,28 @@ export function createIndustrialHall(
     for (let i = 0; i < bays; i++) {
       const start = -length / 2 + i * step;
       const mid = start + step / 2;
+      // A bay with an exit door: solid, with the door's opening cut.
+      const exit = exits.find((e) => e > start + 1.2 && e < start + step - 1.2);
+      if (exit !== undefined) {
+        piece((start + exit - 0.5) / 2, exit - 0.5 - start, 0, height);
+        piece(
+          (exit + 0.5 + start + step) / 2,
+          start + step - exit - 0.5,
+          0,
+          height,
+        );
+        piece(exit, 1.0, 2.2, height);
+        doorways.push({
+          x: alongX ? exit : face,
+          z: alongX ? face : exit,
+          width: 1.0,
+          height: 2.2,
+          kind: 'exit',
+          inward: 0,
+          yaw: outward < 0 ? 0 : Math.PI,
+        });
+        continue;
+      }
       if (!windowed(i)) {
         piece(mid, step, 0, height);
         continue;
@@ -267,6 +295,7 @@ export function createIndustrialHall(
       );
     }
     for (let t = -length / 2 + 7.5; t < length / 2 - 1; t += 7.5) {
+      if (exits.some((e) => Math.abs(e - t) < 1.4)) continue;
       if (alongX)
         batch.box(
           walls,
@@ -288,8 +317,36 @@ export function createIndustrialHall(
           t,
         );
     }
-    if (alongX) batch.box(walls, length, 1, 0.3, 0, 0.5, face - outward * 0.15);
-    else batch.box(walls, 0.3, 1, length, face - outward * 0.15, 0.5, 0);
+    // The plinth along the foot, broken at each exit door.
+    const cuts = [
+      -length / 2,
+      ...exits.flatMap((e) => [e - 0.6, e + 0.6]).sort((a, b) => a - b),
+      length / 2,
+    ];
+    for (let k = 0; k < cuts.length; k += 2) {
+      const [a, b] = [cuts[k], cuts[k + 1]];
+      if (b <= a) continue;
+      if (alongX)
+        batch.box(
+          walls,
+          b - a,
+          1,
+          0.3,
+          (a + b) / 2,
+          0.5,
+          face - outward * 0.15,
+        );
+      else
+        batch.box(
+          walls,
+          0.3,
+          1,
+          b - a,
+          face - outward * 0.15,
+          0.5,
+          (a + b) / 2,
+        );
+    }
     solids.push(
       alongX
         ? {
@@ -308,8 +365,10 @@ export function createIndustrialHall(
   };
   // Windows in every other bay of the side halls' long walls, and in the
   // low end walls, for daylight at eye level and for the floor to reflect.
-  outer(true, -W / 2 - 0.3, L, low + 1.4, -1, (i) => i % 2 === 1);
-  outer(true, W / 2 + 0.3, L, low + 1.4, 1, (i) => i % 2 === 1);
+  // Exit doors in the long walls, so nowhere in the side halls is more
+  // than about 75 m (250 ft) from a way out.
+  outer(true, -W / 2 - 0.3, L, low + 1.4, -1, (i) => i % 2 === 1, NORTH_EXITS);
+  outer(true, W / 2 + 0.3, L, low + 1.4, 1, (i) => i % 2 === 1, SOUTH_EXITS);
   /**
    * An end wall, solid board-formed concrete: a great door's opening in
    * the nave's end with a personnel door beside it, and, if `docks`, a
@@ -365,6 +424,7 @@ export function createIndustrialHall(
           height: dock.height,
           kind: 'dock',
           inward: -sx,
+          yaw: (-sx * Math.PI) / 2,
         });
     }
     // Pilasters on the inside face, clear of the openings.
@@ -387,6 +447,7 @@ export function createIndustrialHall(
       height: main.height,
       kind: 'main',
       inward: -sx,
+      yaw: (-sx * Math.PI) / 2,
     });
     doorways.push({
       x: face,
@@ -395,6 +456,7 @@ export function createIndustrialHall(
       height: person.height,
       kind: 'person',
       inward: -sx,
+      yaw: (-sx * Math.PI) / 2,
     });
     solids.push({ minX: x - 0.9, maxX: x + 0.9, minZ: -W / 2, maxZ: W / 2 });
   };

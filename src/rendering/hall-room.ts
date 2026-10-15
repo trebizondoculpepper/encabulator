@@ -44,6 +44,7 @@ import {
   HALL_LENGTH,
   HALL_WIDTH,
   NAVE_WIDTH,
+  SIDE_HEIGHT,
   createIndustrialHall,
 } from '../scene/industrial-hall';
 import {
@@ -54,6 +55,7 @@ import {
 } from '../scene/hall-surfaces';
 import type { HallSurface, Surface } from '../scene/hall-surfaces';
 import { CONTAINER, createProps } from '../scene/warehouse-props';
+import { createCompliance } from '../scene/code-compliance';
 import { createFirstPerson } from './first-person';
 import { ps1Uniforms } from './ps1-material';
 import { createHallConsole, loadHallSettings } from './hall-console';
@@ -76,6 +78,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
   const renderer = createRenderer(canvas);
+  renderer.info.autoReset = false;
   renderer.setClearColor('#d8dadb');
   const fog = new Fog('#d4d7d8', 45 * m, 260 * m);
   scene.fog = fog;
@@ -208,14 +211,13 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.switchgear(6), 62, northWall + 0.3);
   put(props.transformer(), 68.6, northWall + 0.4);
   put(props.bollards(5, 1.3), 62, northWall + 2.2);
-  put(props.dumpster(), 8, southWall - 0.7, Math.PI);
+  put(props.dumpster(), 1.5, southWall - 0.7, Math.PI);
   put(props.rollingLadder(8), 44, northWall + 3.2, Math.PI);
   for (let i = 0; i < 3; i++)
     put(props.racking(3, 3, i + 7), 34 + i * 8.6, southWall - 0.35, Math.PI);
   put(props.compressor(), -52, southWall - 0.6, Math.PI);
-  put(props.gasCage(), -46, southWall - 0.6, Math.PI);
-  put(props.workshop(), -38, southWall - 0.5, Math.PI);
-  put(props.scissorLift(0, '#2a5fa8'), -2, southWall - 4, 1.2);
+  put(props.workshop(), -33, southWall - 0.5, Math.PI);
+  put(props.scissorLift(0, '#2a5fa8'), -11, southWall - 6, 1.2);
   put(props.scissorLift(5.5, '#c8261c'), 48, southWall - 7, -0.2);
   put(props.boomLift(5.5, '#e1a915'), -22, southWall - 7, 2.6);
   put(props.palletJack(), 25, southWall - 3.5, 0.6);
@@ -286,6 +288,133 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   // The emergency shower and eyewash by the chemical store.
   stand(createSafetyShower(), -60, southWall - 4, Math.PI);
 
+  // ---- Up to code (doc/research/plant-code-1990s.md) ---------------------
+  const code = createCompliance();
+  disposers.push(code.dispose);
+  /** Hang a wall fitting at (x, y, z), facing along `yaw`. */
+  const mount = (
+    object: Object3D,
+    x: number,
+    y: number,
+    z: number,
+    yaw = 0,
+  ) => {
+    object.position.set(x, y, z);
+    object.rotation.y = yaw;
+    propGroup.add(object);
+  };
+  const solidPiece = (piece: { group: Group; solids: Footprint[] }) => ({
+    ...piece,
+    dispose: () => {},
+  });
+  // Fire extinguishers on every nave column, on the long walls' pilasters
+  // and by the end walls' doors: none more than 75 ft (22.9 m) away.
+  for (let x = -60; x <= 60; x += 15) {
+    mount(code.extinguisher(), x, 0, -NAVE_WIDTH / 2 + 0.6, 0);
+    mount(code.extinguisher(), x, 0, NAVE_WIDTH / 2 - 0.6, Math.PI);
+  }
+  for (let x = -63.75; x <= 70; x += 22.5) {
+    mount(code.extinguisher(), x, 0, -HALL_WIDTH / 2 + 0.55, 0);
+    mount(code.extinguisher(), x, 0, HALL_WIDTH / 2 - 0.55, Math.PI);
+  }
+  for (const sx of [-1, 1])
+    for (const z of [-30, 30])
+      mount(
+        code.extinguisher(),
+        sx * (HALL_LENGTH / 2 - 0.05),
+        0,
+        z,
+        (-sx * Math.PI) / 2,
+      );
+  // Every personnel and exit door: an emergency light pack over it, a pull
+  // station and a horn-strobe beside it.
+  for (const d of hall.doorways.filter(
+    (dw) => dw.kind === 'person' || dw.kind === 'exit',
+  )) {
+    const along = { x: Math.cos(d.yaw), z: -Math.sin(d.yaw) };
+    const out = { x: Math.sin(d.yaw) * 0.02, z: Math.cos(d.yaw) * 0.02 };
+    mount(
+      code.emergencyLight(),
+      d.x + out.x + along.x * 0.9,
+      2.7,
+      d.z + out.z + along.z * 0.9,
+      d.yaw,
+    );
+    mount(
+      code.pullStation(),
+      d.x + out.x - along.x * 0.9,
+      0,
+      d.z + out.z - along.z * 0.9,
+      d.yaw,
+    );
+    mount(
+      code.hornStrobe(),
+      d.x + out.x - along.x * 0.9,
+      2.4,
+      d.z + out.z - along.z * 0.9,
+      d.yaw,
+    );
+  }
+  // The forklift battery charging station, on the south wall.
+  stand(
+    solidPiece(code.batteryStation()),
+    11.25,
+    HALL_WIDTH / 2 - 0.05,
+    Math.PI,
+  );
+  // The break room, with lockers, in the south side hall.
+  const breakRoom = code.breakRoom();
+  stand(
+    solidPiece(breakRoom),
+    -4,
+    HALL_WIDTH / 2 - 0.4 - breakRoom.size.d / 2,
+    Math.PI,
+  );
+  // Flammables cabinets and the MSDS station by the chemical store.
+  stand(
+    solidPiece(code.flammablesCabinet()),
+    -HALL_LENGTH / 2 + 0.05,
+    31,
+    Math.PI / 2,
+  );
+  stand(
+    solidPiece(code.flammablesCabinet()),
+    -HALL_LENGTH / 2 + 0.05,
+    32.3,
+    Math.PI / 2,
+  );
+  stand(
+    solidPiece(code.msdsStation()),
+    -HALL_LENGTH / 2 + 0.5,
+    29.2,
+    Math.PI / 2,
+  );
+  // Gas cylinders in two cages, oxygen 6.5 m from the fuel gases.
+  stand(
+    solidPiece(code.gasCage('FUEL GAS · ACETYLENE · PROPANE')),
+    -46,
+    southWall - 0.6,
+    Math.PI,
+  );
+  stand(solidPiece(code.gasCage('OXYGEN')), -39.5, southWall - 0.6, Math.PI);
+  // The sprinkler riser and its alarm valve, on the east wall.
+  stand(
+    solidPiece(code.sprinklerRiser(SIDE_HEIGHT)),
+    HALL_LENGTH / 2 - 0.05,
+    -40,
+    -Math.PI / 2,
+  );
+  // A stair from the nave floor up to the north balcony.
+  stand(solidPiece(code.stair(SIDE_HEIGHT + 0.9)), 50, -NAVE_WIDTH / 2 + 0.4);
+  // The safety notice board, by the time clock.
+  mount(
+    code.noticeBoard(),
+    -8.8 + amenities.size.w + 0.07,
+    0,
+    northWall - 0.4 + amenities.size.d / 2 - 2.6,
+    Math.PI / 2,
+  );
+
   // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
   const services = createHallServices();
   services.group.scale.setScalar(m);
@@ -298,8 +427,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   type Doorway = (typeof hall.doorways)[number];
   const hang = (door: { group: Group }, at: Doorway) => {
     // Doors are built facing +z; turn each to face into the hall.
-    door.group.position.set(at.x + at.inward * 0.05, 0, at.z);
-    door.group.rotation.y = (at.inward * Math.PI) / 2;
+    door.group.position.set(
+      at.x + Math.sin(at.yaw) * 0.05,
+      0,
+      at.z + Math.cos(at.yaw) * 0.05,
+    );
+    door.group.rotation.y = at.yaw;
     doorGroup.add(door.group);
   };
   // The great doors: the yellow high-speed door at the east end, the blue
@@ -320,11 +453,17 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     bigDoors[i] = createBigDoor(style, mains[i].width, mains[i].height);
     hang(bigDoors[i], mains[i]);
   };
-  // Beside each, a personnel door standing open on the day outside.
+  // Beside each, a personnel door standing open on the day outside; in
+  // the long walls, the exit doors, shut.
   const personDoors = hall.doorways
-    .filter((d) => d.kind === 'person')
+    .filter((d) => d.kind === 'person' || d.kind === 'exit')
     .map((d) => {
-      const door = createPersonnelDoor(hall.sky);
+      const door = createPersonnelDoor(
+        hall.sky,
+        0.92,
+        2.13,
+        d.kind === 'person',
+      );
       hang(door, d);
       return door;
     });
@@ -630,6 +769,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       reflect();
     },
     settings: () => structuredClone(settings),
+    /** What the last frame cost: draw calls, triangles, geometries, textures. */
+    stats: () => ({ ...renderer.info.render, ...renderer.info.memory }),
     /** Show a great door in style `n`, 1 to 6 (see hall-doors.ts). */
     door(n: number, end: 'east' | 'west' = 'east') {
       setDoor(n, end);
@@ -650,6 +791,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     walk.update(delta);
     station.update(delta, walk.walker.x, walk.walker.z);
     desk.update(delta);
+    // Count the whole frame (reflection, scene, bloom), not the last pass.
+    renderer.info.reset();
     composer.render();
   });
   const dispose = () => {
