@@ -10,6 +10,7 @@ import {
   HemisphereLight,
   PerspectiveCamera,
   PMREMGenerator,
+  Raycaster,
   Scene,
   Vector2,
   WebGLCubeRenderTarget,
@@ -24,6 +25,7 @@ import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { createDoorStation } from '../scene/door-station';
+import { createFloorReflection } from '../scene/floor-reflection';
 import {
   HALL_LENGTH,
   HALL_WIDTH,
@@ -31,6 +33,7 @@ import {
   createIndustrialHall,
 } from '../scene/industrial-hall';
 import {
+  FINISHES,
   HALL_SURFACES,
   createSurface,
   disposeFinishTextures,
@@ -39,8 +42,10 @@ import type { HallSurface, Surface } from '../scene/hall-surfaces';
 import { CONTAINER, createProps } from '../scene/warehouse-props';
 import { createFirstPerson } from './first-person';
 import { ps1Uniforms } from './ps1-material';
-import { createHallPanel, loadHallSettings } from './hall-panel';
-import type { HallSettings } from './hall-panel';
+import { createHallConsole, loadHallSettings } from './hall-console';
+import type { HallSettings } from './hall-console';
+import { createPanelKit, disposeKit } from '../scene/eighties-controls';
+import { knobDirection } from '../scene/rotary-knob';
 
 /**
  * Dev4, the Hall: the great enclosed concrete hall the game will take
@@ -50,8 +55,8 @@ import type { HallSettings } from './hall-panel';
  * a haze gives the distance depth. A door station in the middle of the
  * nave leads to the other dev rooms. Around the edges stand the plant's
  * ephemera: shipping containers, palletised cargo, drums and IBC totes,
- * a forklift and the janitor's things. The control panel sets the
- * building's materials and its light.
+ * a forklift and the janitor's things. A console desk by the door station
+ * sets the building's materials, the floor's shine and the light.
  */
 export function startHallRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -78,6 +83,14 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const hall = createIndustrialHall(surfaces);
   hall.group.scale.setScalar(m);
   scene.add(hall.group);
+
+  // The polished floor's shine: the hall reflected in it.
+  const shine = createFloorReflection(HALL_LENGTH * m, HALL_WIDTH * m);
+  shine.mesh.position.y = 0.004 * m;
+  scene.add(shine.mesh);
+  // The planar reflection gives the floor its shine; the environment map
+  // only its soft fill.
+  surfaces.floor.material.envMapIntensity = 0.35;
 
   // The door station in the middle of the nave.
   const station = createDoorStation(HALL, STATION_ROOMS, m);
@@ -172,6 +185,28 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.janitorial(), -9, -NAVE_WIDTH / 2 - 2.2, 0.3);
   put(props.janitorial(), 52, NAVE_WIDTH / 2 + 2.2, Math.PI + 0.4);
 
+  // Plant and machinery in the background, round the side halls' walls;
+  // the nave's middle is left clear for the game.
+  for (let i = 0; i < 3; i++)
+    put(props.racking(3, 3, i + 1), 18 + i * 8.6, northWall + 0.35);
+  put(props.scissorLift(4.2), 31, northWall + 9, 0.3);
+  put(props.boomLift(9.5), 52, northWall + 8, -0.6);
+  put(props.switchgear(6), 62, northWall + 0.3);
+  put(props.transformer(), 68.6, northWall + 0.4);
+  put(props.bollards(5, 1.3), 62, northWall + 2.2);
+  put(props.dumpster(), -6, northWall + 0.5);
+  put(props.rollingLadder(8), 44, northWall + 3.2, Math.PI);
+  for (let i = 0; i < 3; i++)
+    put(props.racking(3, 3, i + 7), 34 + i * 8.6, southWall - 0.35, Math.PI);
+  put(props.compressor(), -52, southWall - 0.6, Math.PI);
+  put(props.gasCage(), -46, southWall - 0.6, Math.PI);
+  put(props.workshop(), -38, southWall - 0.5, Math.PI);
+  put(props.scissorLift(0, '#2a5fa8'), -2, southWall - 4, 1.2);
+  put(props.scissorLift(5.5, '#c8261c'), 48, southWall - 7, -0.2);
+  put(props.boomLift(5.5, '#e1a915'), -22, southWall - 7, 2.6);
+  put(props.palletJack(), 25, southWall - 3.5, 0.6);
+  put(props.bollards(3, 1.3), -46, southWall - 2.2);
+
   // ---- Reflections: the hall seen from its middle, for the floor ---------
   const pmrem = new PMREMGenerator(renderer);
   let environment: ReturnType<PMREMGenerator['fromCubemap']> | null = null;
@@ -180,7 +215,9 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     const cube = new CubeCamera(0.1 * m, 400 * m, target);
     cube.position.set(0, 1.6 * m, 12 * m);
     scene.environment = null;
+    shine.mesh.visible = false;
     cube.update(renderer, scene);
+    shine.mesh.visible = settings.floorShine > 0.001;
     environment?.dispose();
     environment = pmrem.fromCubemap(target.texture);
     target.dispose();
@@ -199,8 +236,11 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     for (const surface of HALL_SURFACES) {
       const want = s.materials[surface];
       const made = surfaces[surface];
-      if (made.finish.name !== want.finish) made.setFinish(want.finish);
-      made.setColour(want.colour);
+      const finish = FINISHES[surface][want.finish] ?? FINISHES[surface][0];
+      if (made.finish.name !== finish.name) made.setFinish(finish.name);
+      made.setColour(
+        new Color(finish.colour).multiplyScalar(want.shade).getStyle(),
+      );
       made.setRoughness(want.roughness);
       made.setMetalness(want.metalness);
     }
@@ -208,6 +248,10 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     const lampColour = new Color(...kelvinToRgb(s.lampKelvin));
     hall.sky.color.copy(sky).multiplyScalar(1.7 * s.skyIntensity);
     hall.lampGlow.color.copy(lampColour).multiplyScalar(2.2 * s.lampIntensity);
+    hall.lampLining.color
+      .setRGB(1.2, 0.62, 0.3)
+      .multiply(lampColour)
+      .multiplyScalar(0.9 * s.lampIntensity);
     daylight.color.copy(sky);
     daylight.intensity = 2.2 * s.skyIntensity;
     skyKey.color.copy(sky);
@@ -216,6 +260,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     lampFill.intensity = 0.9 * s.lampIntensity;
     lampKey.color.copy(lampColour);
     lampKey.intensity = 0.6 * s.lampIntensity;
+    shine.setStrength(s.floorShine);
+    shine.setBlur(s.floorBlur);
     bloom.strength = s.bloom;
     fog.near = (90 - 70 * s.haze) * m;
     fog.far = (520 - 420 * s.haze) * m;
@@ -223,20 +269,41 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   apply(settings);
   reflect();
   let reflectTimer = 0;
-  const panel = createHallPanel(
-    canvas.parentElement ?? document.body,
-    settings,
-    apply,
-    () => {
-      window.clearTimeout(reflectTimer);
-      reflectTimer = window.setTimeout(reflect, 150);
-    },
-  );
+  // The console desk, a few metres from the door station, its panel
+  // facing the doors.
+  const kit = createPanelKit();
+  const desk = createHallConsole(kit, settings, () => {
+    apply(settings);
+    window.clearTimeout(reflectTimer);
+    reflectTimer = window.setTimeout(reflect, 400);
+  });
+  desk.group.scale.setScalar(m);
+  desk.group.position.set(0, 0, 6.5 * m);
+  desk.group.rotation.y = Math.PI;
+  scene.add(desk.group);
+  const deskSolid: Footprint = {
+    minX: -desk.width / 2 - 0.2,
+    maxX: desk.width / 2 + 0.2,
+    minZ: 6.5 - 0.3,
+    maxZ: 6.5 + desk.depth + 0.2,
+  };
+  const raycaster = new Raycaster();
+  const pointer = new Vector2();
+  const use = (x: number, y: number) => {
+    pointer.set(x, y);
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects([...desk.uses.keys()], true)[0];
+    if (!hit) return;
+    for (let o: Object3D | null = hit.object; o; o = o.parent) {
+      const work = desk.uses.get(o);
+      if (work) return work(knobDirection(o, hit.point, camera));
+    }
+  };
 
   const notes = document.createElement('div');
   notes.id = 'hall-notes';
   notes.textContent =
-    'DEV4 · The Hall: the door station in the middle of the nave leads to the other dev rooms · panel: materials and light · WASD: walk · Shift: run · Esc: cursor';
+    "DEV4 · The Hall: the door station in the middle of the nave leads to the other dev rooms · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',
@@ -263,7 +330,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       pitch: 0.05,
     },
     solids: () => [
-      ...[...hall.solids, ...propSolids].map((s) => ({
+      ...[...hall.solids, ...propSolids, deskSolid].map((s) => ({
         minX: s.minX * m,
         maxX: s.maxX * m,
         minZ: s.minZ * m,
@@ -271,13 +338,14 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       })),
       ...station.solids(),
     ],
-    use: () => {},
+    use,
   });
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
     renderer.setSize(Math.round(width), Math.round(height), false);
     composer.setSize(Math.round(width), Math.round(height));
+    shine.setSize(Math.round(width * 0.75), Math.round(height * 0.75));
     ps1Uniforms.resolution.value.set(Math.round(width), Math.round(height));
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -305,9 +373,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       reflect();
     },
     settings: () => structuredClone(settings),
-    hidePanel(hidden = true) {
-      panel.element.style.display = hidden ? 'none' : '';
-    },
   };
 
   let last = 0;
@@ -321,6 +386,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     station.update(delta, walk.walker.x, walk.walker.z);
+    desk.update(delta);
     composer.render();
   });
   const dispose = () => {
@@ -329,9 +395,10 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     window.clearTimeout(reflectTimer);
     walk.dispose();
     station.dispose();
-    panel.dispose();
+    disposeKit(kit, desk.group);
     notes.remove();
     hall.dispose();
+    shine.dispose();
     props.dispose();
     for (const s of Object.values(surfaces)) s.material.dispose();
     disposeFinishTextures();
@@ -344,12 +411,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     enter(previous: string | null) {
       const pose = station.arrival(previous);
       if (pose) walk.place(pose.x, pose.z, pose.yaw, pose.pitch);
-    },
-    suspend() {
-      panel.element.style.display = 'none';
-    },
-    resume() {
-      panel.element.style.display = '';
     },
   });
 }

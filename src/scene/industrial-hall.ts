@@ -1,7 +1,6 @@
 import {
   BoxGeometry,
   Color,
-  CylinderGeometry,
   Group,
   InstancedMesh,
   Matrix4,
@@ -15,6 +14,8 @@ import {
 import type { BufferGeometry, Material } from 'three';
 import type { Footprint } from '../game/walk-collision';
 import type { HallSurface, Surface } from './hall-surfaces';
+import { createPendantLamps } from './pendant-lamps';
+import type { PendantPlace } from './pendant-lamps';
 
 /**
  * The great hall the game takes place in: a vast enclosed American
@@ -23,7 +24,7 @@ import type { HallSurface, Surface } from './hall-surfaces';
  * lit from tall vertical clerestory windows down both sides and at both
  * ends, runs between two 10 m side halls under thick slabs, whose edges
  * are balconies over the nave on a line of massive columns. Polished
- * concrete underfoot, high-bay lamps throughout, overcast daylight as a
+ * concrete underfoot, industrial pendant lamps on chains throughout, overcast daylight as a
  * flat white glare (the room adds bloom). No way out: the hall is the
  * whole world.
  *
@@ -84,6 +85,8 @@ export interface Hall {
   /** The sky through the glass, and the lamps' lenses, to colour and brighten. */
   sky: MeshBasicMaterial;
   lampGlow: MeshBasicMaterial;
+  /** The copper lining of the lamps' domes, lit by their bulbs. */
+  lampLining: MeshBasicMaterial;
   dispose(): void;
 }
 
@@ -124,18 +127,11 @@ export function createIndustrialHall(
   materials.push(sky, lampGlow, steel, mullion, yellow);
 
   /** A high-bay lamp hung at `y` from `top`. */
-  const lamp = (x: number, z: number, y: number, top: number) => {
-    batch.box(steel, 0.03, top - y, 0.03, x, (y + top) / 2, z);
-    batch.box(steel, 0.35, 0.3, 0.35, x, y + 0.3, z);
-    const reflector = new Mesh(
-      new CylinderGeometry(0.22, 0.45, 0.5, 12, 1, true),
-      steel,
-    );
-    reflector.position.set(x, y, z);
-    group.add(reflector);
-    geometries.push(reflector.geometry);
-    batch.box(lampGlow, 0.62, 0.02, 0.62, x, y - 0.25, z);
-    lamps.push(new Vector3(x, y - 0.3, z));
+  /** A pendant lamp, its dome's rim at `y`, its chain hung from `top`. */
+  const places: PendantPlace[] = [];
+  const lamp = (x: number, z: number, y: number, top: number, size: number) => {
+    places.push({ x, z, y, top, size });
+    lamps.push(new Vector3(x, y, z));
   };
 
   // ---- The floor ---------------------------------------------------------
@@ -225,10 +221,40 @@ export function createIndustrialHall(
     length: number,
     height: number,
     outward: number,
+    windowed: (bay: number) => boolean = () => false,
   ) => {
     const face = at - outward * 0.3;
-    if (alongX) batch.box(walls, length, height, 0.6, 0, height / 2, at);
-    else batch.box(walls, 0.6, height, length, at, height / 2, 0);
+    // The wall in 7.5 m bays between pilasters; a windowed bay has tall
+    // glass from sill to head, with solid wall below and above.
+    const bays = Math.round(length / 7.5);
+    const step = length / bays;
+    const sill = 2.6;
+    const head = Math.min(height - 1.6, 8.6);
+    const piece = (along: number, w: number, y0: number, y1: number) => {
+      if (alongX) batch.box(walls, w, y1 - y0, 0.6, along, (y0 + y1) / 2, at);
+      else batch.box(walls, 0.6, y1 - y0, w, at, (y0 + y1) / 2, along);
+    };
+    for (let i = 0; i < bays; i++) {
+      const start = -length / 2 + i * step;
+      const mid = start + step / 2;
+      if (!windowed(i)) {
+        piece(mid, step, 0, height);
+        continue;
+      }
+      piece(mid, step, 0, sill);
+      piece(mid, step, head, height);
+      // Solid jambs either side of the glass, behind the pilasters.
+      for (const end of [start + 0.6, start + step - 0.6])
+        piece(end, 1.2, sill, head);
+      windowBand(
+        alongX,
+        at - outward * 0.05,
+        sill,
+        head,
+        start + 1.2,
+        start + step - 1.2,
+      );
+    }
     for (let t = -length / 2 + 7.5; t < length / 2 - 1; t += 7.5) {
       if (alongX)
         batch.box(
@@ -269,11 +295,13 @@ export function createIndustrialHall(
           },
     );
   };
-  outer(true, -W / 2 - 0.3, L, low + 1.4, -1);
-  outer(true, W / 2 + 0.3, L, low + 1.4, 1);
+  // Windows in every other bay of the side halls' long walls, and in the
+  // low end walls, for daylight at eye level and for the floor to reflect.
+  outer(true, -W / 2 - 0.3, L, low + 1.4, -1, (i) => i % 2 === 1);
+  outer(true, W / 2 + 0.3, L, low + 1.4, 1, (i) => i % 2 === 1);
   for (const sx of [-1, 1]) {
     const x = sx * (L / 2 + 0.3);
-    outer(false, x, W, low + 1.4, sx);
+    outer(false, x, W, low + 1.4, sx, (i) => i % 2 === 0);
     // The nave's end wall rises high above the side halls, with tall windows.
     clerestory(
       false,
@@ -324,8 +352,7 @@ export function createIndustrialHall(
       });
     }
     for (let x = -L / 2 + 6; x < L / 2; x += 12)
-      for (let z = z0 + 6; z < z1 - 3; z += 12)
-        lamp(x, z, low - 1.8, low - 1.1);
+      for (let z = z0 + 6; z < z1 - 3; z += 12) lamp(x, z, low - 2.4, low, 0.6);
   }
 
   // ---- The nave's waffle slab, with skylights in some coffers -----------
@@ -347,19 +374,24 @@ export function createIndustrialHall(
           batch.box(sky, pitch - 0.5, 0.05, pitch - 0.5, x, y + rib, z);
     }
     for (let x = -L / 2 + 6; x < L / 2; x += 12)
-      for (let z = -nave / 2 + 6; z < nave / 2; z += 12) lamp(x, z, 15, high);
+      for (let z = -nave / 2 + 6; z < nave / 2; z += 12)
+        lamp(x, z, 15, high, 0.8);
   }
 
   batch.build(group);
+  const pendants = createPendantLamps(places, lampGlow);
+  group.add(pendants.group);
   return {
     group,
     solids,
     lamps,
     sky,
     lampGlow,
+    lampLining: pendants.lining,
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials) m.dispose();
+      pendants.dispose();
     },
   };
 }

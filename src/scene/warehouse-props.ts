@@ -518,6 +518,423 @@ export function createProps() {
       cylinder(can, paint('#53595c', 0.7), 0.31, 0.04, 0, 0.7, 0, 'y', 20);
       return g;
     },
+    /**
+     * A slab scissor lift, about a 19 ft machine: a 1.83 × 0.76 m chassis
+     * on solid tyres, the crossed arms of its scissor stack, and a railed
+     * platform raised `lift` metres (0 stowed, up to about 5.8).
+     */
+    scissorLift(lift = 0, colour = '#2a5fa8') {
+      const g = new Group();
+      const body = paint(colour, 0.5, 0.2);
+      const L = 1.83;
+      const Wd = 0.76;
+      box(g, body, L, 0.35, Wd, 0, 0.3, 0);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          cylinder(
+            g,
+            black,
+            0.15,
+            0.12,
+            sx * 0.65,
+            0.15,
+            sz * (Wd / 2 - 0.02),
+            'z',
+            14,
+          );
+      // The scissor stack: pairs of crossed arms, enough to reach the platform.
+      const top = 0.55 + Math.max(0.25, lift);
+      const stages = Math.max(1, Math.round((top - 0.5) / 1.1));
+      const stageH = (top - 0.5) / stages;
+      const armL = L * 0.9;
+      const angle = Math.atan2(stageH, armL);
+      const armLen = Math.hypot(armL, stageH);
+      for (let i = 0; i < stages; i++)
+        for (const sz of [-1, 1])
+          for (const dir of [-1, 1]) {
+            const arm = box(
+              g,
+              body,
+              armLen,
+              0.05,
+              0.04,
+              0,
+              0.5 + (i + 0.5) * stageH,
+              sz * (Wd / 2 - 0.08),
+            );
+            arm.rotation.z = dir * angle;
+          }
+      // The platform, its railings and the control box.
+      box(g, body, L - 0.1, 0.1, Wd, 0, top + 0.05, 0);
+      const rail = paint('#e1a915', 0.5);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          box(
+            g,
+            rail,
+            0.04,
+            1.1,
+            0.04,
+            sx * (L / 2 - 0.08),
+            top + 0.65,
+            sz * (Wd / 2 - 0.03),
+          );
+      for (const y of [top + 0.6, top + 1.2]) {
+        for (const sz of [-1, 1])
+          box(g, rail, L - 0.1, 0.04, 0.04, 0, y, sz * (Wd / 2 - 0.03));
+        for (const sx of [-1, 1])
+          box(g, rail, 0.04, 0.04, Wd - 0.06, sx * (L / 2 - 0.08), y, 0);
+      }
+      box(g, black, 0.25, 0.2, 0.15, L / 2 - 0.25, top + 1.1, 0);
+      return g;
+    },
+    /**
+     * An articulating boom lift, a "cherry picker": a 2.3 m wide chassis on
+     * four big tyres with a turntable and counterweight, a riser, a main
+     * boom and a jib, and the railed basket up at about `reach` metres.
+     */
+    boomLift(reach = 9, colour = '#e07a12') {
+      const g = new Group();
+      const body = paint(colour, 0.5, 0.2);
+      box(g, body, 3.6, 0.6, 2.0, 0, 0.75, 0);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          cylinder(g, black, 0.42, 0.35, sx * 1.35, 0.42, sz * 1.0, 'z', 18);
+      // The turntable, engine housing and counterweight.
+      cylinder(g, steel, 0.8, 0.15, 0, 1.12, 0, 'y', 24);
+      box(g, body, 2.1, 1.0, 1.6, -0.5, 1.7, 0);
+      box(g, black, 0.4, 0.9, 1.5, -1.6, 1.65, 0);
+      // The riser, the main boom and the jib, each a box beam.
+      const pivot = { x: 0.6, y: 2.2 };
+      const riserTop = { x: 0.9, y: 4.0 };
+      const end = { x: 4.2, y: Math.max(5, reach - 1.2) };
+      const beam = (
+        a: { x: number; y: number },
+        b: { x: number; y: number },
+        size: number,
+      ) => {
+        const length = Math.hypot(b.x - a.x, b.y - a.y);
+        const mesh = box(
+          g,
+          body,
+          length,
+          size,
+          size,
+          (a.x + b.x) / 2,
+          (a.y + b.y) / 2,
+          0,
+        );
+        mesh.rotation.z = Math.atan2(b.y - a.y, b.x - a.x);
+      };
+      beam(pivot, riserTop, 0.35);
+      beam(riserTop, end, 0.3);
+      const jib = { x: end.x + 1.2, y: end.y + 0.6 };
+      beam(end, jib, 0.18);
+      // The basket, square to the ground.
+      const rail = paint('#e1a915', 0.5);
+      box(g, steel, 1.5, 0.08, 0.9, jib.x + 0.6, jib.y, 0);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          box(
+            g,
+            rail,
+            0.04,
+            1.1,
+            0.04,
+            jib.x + 0.6 + sx * 0.72,
+            jib.y + 0.55,
+            sz * 0.43,
+          );
+      for (const y of [jib.y + 0.55, jib.y + 1.1]) {
+        for (const sz of [-1, 1])
+          box(g, rail, 1.5, 0.04, 0.04, jib.x + 0.6, y, sz * 0.43);
+        for (const sx of [-1, 1])
+          box(g, rail, 0.04, 0.04, 0.9, jib.x + 0.6 + sx * 0.72, y, 0);
+      }
+      return g;
+    },
+    /**
+     * A run of selective pallet racking: blue upright frames 1.07 m deep
+     * and orange beams 2.74 m long, `levels` beam levels high, `bays`
+     * bays long, loaded with pallets of cartons here and there.
+     */
+    racking(bays = 3, levels = 3, seed = 1) {
+      const g = new Group();
+      const upright = paint('#2f5a9a', 0.5, 0.3);
+      const beamPaint = paint('#e0631a', 0.45, 0.3);
+      const bayW = 2.74;
+      const depth = 1.07;
+      const levelH = 1.6;
+      const height = levels * levelH + 0.6;
+      let a = seed * 104729;
+      const random = () => (a = (a * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i <= bays; i++) {
+        const x = -((bays * bayW) / 2) + i * bayW;
+        for (const z of [-depth / 2, depth / 2])
+          box(g, upright, 0.08, height, 0.08, x, height / 2, z);
+        for (let y = 0.4; y < height; y += 0.6)
+          box(g, upright, 0.03, 0.03, depth, x, y, 0);
+      }
+      for (let i = 0; i < bays; i++) {
+        const x = -((bays * bayW) / 2) + (i + 0.5) * bayW;
+        for (let l = 1; l <= levels; l++) {
+          const y = l * levelH;
+          for (const z of [-depth / 2, depth / 2])
+            box(g, beamPaint, bayW - 0.08, 0.12, 0.05, x, y, z);
+          for (const dx of [-0.65, 0.65])
+            if (random() < 0.75) {
+              const load = this.cartons(
+                1 + Math.floor(random() * 3),
+                Math.floor(random() * 100),
+              );
+              load.position.set(x + dx, y + 0.06, 0);
+              load.rotation.y = Math.PI / 2;
+              g.add(load);
+            }
+        }
+        for (const dx of [-0.65, 0.65])
+          if (random() < 0.6) {
+            const load = this.cartons(
+              2 + Math.floor(random() * 2),
+              Math.floor(random() * 100),
+            );
+            load.position.set(x + dx, 0, 0);
+            load.rotation.y = Math.PI / 2;
+            g.add(load);
+          }
+      }
+      return g;
+    },
+    /** A tank-mounted air compressor: a horizontal receiver on feet, its motor and pump on top. */
+    compressor() {
+      const g = new Group();
+      const grey = paint('#5d6669', 0.5, 0.3);
+      cylinder(g, grey, 0.32, 1.8, 0, 0.55, 0, 'x', 20);
+      for (const x of [-0.65, 0.65]) box(g, grey, 0.12, 0.3, 0.6, x, 0.15, 0);
+      cylinder(
+        g,
+        paint('#2c5e2c', 0.5, 0.3),
+        0.18,
+        0.45,
+        -0.3,
+        1.1,
+        0,
+        'x',
+        16,
+      );
+      box(g, paint('#a8261b', 0.5, 0.3), 0.45, 0.4, 0.35, 0.35, 1.1, 0);
+      cylinder(g, black, 0.22, 0.05, 0.05, 1.1, 0.2, 'z', 20);
+      cylinder(g, steel, 0.05, 0.05, 0.6, 0.9, 0.1, 'y', 10);
+      return g;
+    },
+    /**
+     * A line-up of low-voltage switchgear: `sections` grey cabinets, 2.3 m
+     * tall, with handles, a meter window and engraved labels' plates.
+     */
+    switchgear(sections = 5) {
+      const g = new Group();
+      const grey = paint('#b6bab6', 0.55, 0.2);
+      const w = 0.9;
+      for (let i = 0; i < sections; i++) {
+        const x = (i - (sections - 1) / 2) * w;
+        box(g, grey, w - 0.01, 2.3, 0.9, x, 1.15, 0);
+        box(g, paint('#9fa39f', 0.5, 0.2), w - 0.08, 1.0, 0.02, x, 1.45, 0.46);
+        box(g, paint('#9fa39f', 0.5, 0.2), w - 0.08, 0.7, 0.02, x, 0.55, 0.46);
+        box(g, black, 0.03, 0.18, 0.04, x + w / 2 - 0.12, 1.3, 0.48);
+        box(g, paint('#141414', 0.4), 0.18, 0.05, 0.01, x, 2.05, 0.46);
+        if (i % 2 === 0)
+          box(g, paint('#d8e0d8', 0.2), 0.16, 0.12, 0.02, x - 0.2, 1.75, 0.47);
+      }
+      box(g, grey, sections * w + 0.02, 0.1, 0.95, 0, 2.35, 0);
+      return g;
+    },
+    /** A dry-type transformer in its louvred enclosure. */
+    transformer() {
+      const g = new Group();
+      const grey = paint('#9ea39f', 0.55, 0.2);
+      box(g, grey, 1.6, 1.9, 1.1, 0, 0.95, 0);
+      for (let y = 0.4; y < 1.7; y += 0.12)
+        box(g, paint('#7c807c', 0.6), 1.3, 0.04, 0.03, 0, y, 0.56);
+      box(g, paint('#e1a915', 0.5), 0.3, 0.2, 0.01, 0, 1.75, 0.56);
+      return g;
+    },
+    /** A cage of gas cylinders: a mesh pen with tall cylinders chained inside. */
+    gasCage() {
+      const g = new Group();
+      const mesh = paint('#3f4a3f', 0.6, 0.3, {
+        transparent: true,
+        opacity: 0.55,
+      } as Partial<MeshStandardMaterial>);
+      const frame = paint('#e1a915', 0.5);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          box(g, frame, 0.06, 1.9, 0.06, sx * 0.9, 0.95, sz * 0.45);
+      box(g, mesh, 1.8, 1.8, 0.02, 0, 0.95, 0.45);
+      box(g, mesh, 1.8, 1.8, 0.02, 0, 0.95, -0.45);
+      box(g, mesh, 0.02, 1.8, 0.9, 0.9, 0.95, 0);
+      box(g, mesh, 0.02, 1.8, 0.9, -0.9, 0.95, 0);
+      [
+        '#2c5e2c',
+        '#2c5e2c',
+        '#3a3a3a',
+        '#7a1f1f',
+        '#d8d8d0',
+        '#2c5e2c',
+      ].forEach((colour, i) => {
+        cylinder(
+          g,
+          paint(colour, 0.4, 0.4),
+          0.115,
+          1.45,
+          -0.7 + i * 0.28,
+          0.73,
+          -0.15 + (i % 2) * 0.25,
+          'y',
+          14,
+        );
+        cylinder(
+          g,
+          steel,
+          0.04,
+          0.12,
+          -0.7 + i * 0.28,
+          1.5,
+          -0.15 + (i % 2) * 0.25,
+          'y',
+          8,
+        );
+      });
+      return g;
+    },
+    /** A workbench with a vise, a red roll-away tool chest beside it, and a pegboard behind. */
+    workshop() {
+      const g = new Group();
+      const top = paint('#7a5a36', 0.8);
+      box(g, top, 2.4, 0.06, 0.75, 0, 0.9, 0);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          box(g, steel, 0.05, 0.87, 0.05, sx * 1.15, 0.435, sz * 0.33);
+      box(g, steel, 2.3, 0.03, 0.7, 0, 0.2, 0);
+      box(g, paint('#3a5a8a', 0.5, 0.4), 0.2, 0.15, 0.25, 0.9, 1.0, 0.25);
+      box(g, paint('#c7b88f', 0.85), 2.4, 1.0, 0.03, 0, 1.6, -0.38);
+      const red = paint('#b22a1f', 0.4, 0.3);
+      box(g, red, 0.7, 1.0, 0.45, 1.7, 0.55, 0);
+      box(g, red, 0.7, 0.45, 0.45, 1.7, 1.3, 0);
+      for (let y = 0.2; y < 1.5; y += 0.14)
+        box(g, steel, 0.6, 0.015, 0.01, 1.7, y, 0.23);
+      for (const sx of [-1, 1])
+        cylinder(g, black, 0.05, 0.04, 1.7 + sx * 0.28, 0.05, 0.15, 'x', 10);
+      return g;
+    },
+    /** A hand pallet truck, its forks 1.22 m long, handle up. */
+    palletJack() {
+      const g = new Group();
+      const red = paint('#c0291d', 0.5, 0.3);
+      for (const sx of [-1, 1])
+        box(g, red, 0.16, 0.08, 1.22, sx * 0.27, 0.06, 0.61);
+      box(g, red, 0.7, 0.2, 0.2, 0, 0.15, -0.05);
+      cylinder(g, black, 0.1, 0.06, 0, 0.1, -0.15, 'x', 14);
+      const handle = box(g, red, 0.04, 1.1, 0.04, 0, 0.7, -0.25);
+      handle.rotation.x = -0.25;
+      box(g, black, 0.35, 0.05, 0.05, 0, 1.22, -0.39);
+      return g;
+    },
+    /** A line of yellow steel bollards. */
+    bollards(count = 4, spacing = 1.2) {
+      const g = new Group();
+      for (let i = 0; i < count; i++) {
+        cylinder(
+          g,
+          yellow,
+          0.085,
+          1.1,
+          (i - (count - 1) / 2) * spacing,
+          0.55,
+          0,
+          'y',
+          14,
+        );
+        cylinder(
+          g,
+          black,
+          0.087,
+          0.06,
+          (i - (count - 1) / 2) * spacing,
+          0.9,
+          0,
+          'y',
+          14,
+        );
+      }
+      return g;
+    },
+    /** A rolling warehouse ladder: steps up to a railed top, on castors. */
+    rollingLadder(steps = 8) {
+      const g = new Group();
+      const frame = paint('#d9d2b8', 0.5, 0.3);
+      const rise = 0.25;
+      const run = 0.22;
+      for (let i = 0; i < steps; i++)
+        box(g, steel, 0.6, 0.03, 0.2, 0, 0.25 + i * rise, -i * run);
+      const len = Math.hypot(steps * rise, steps * run);
+      for (const sx of [-1, 1]) {
+        const side = box(
+          g,
+          frame,
+          0.05,
+          0.05,
+          len,
+          sx * 0.32,
+          (steps * rise) / 2 + 0.1,
+          (-steps * run) / 2,
+        );
+        side.rotation.x = Math.atan2(steps * rise, steps * run);
+        box(
+          g,
+          frame,
+          0.05,
+          steps * rise + 0.2,
+          0.05,
+          sx * 0.32,
+          (steps * rise + 0.2) / 2,
+          -steps * run,
+        );
+        box(
+          g,
+          frame,
+          0.05,
+          1.0,
+          0.05,
+          sx * 0.32,
+          steps * rise + 0.5,
+          -steps * run + 0.2,
+        );
+      }
+      box(
+        g,
+        frame,
+        0.69,
+        0.05,
+        0.05,
+        0,
+        steps * rise + 1.0,
+        -steps * run + 0.2,
+      );
+      return g;
+    },
+    /** A front-load dumpster, green, lids shut. */
+    dumpster() {
+      const g = new Group();
+      const green = paint('#2f5a3a', 0.6, 0.3);
+      box(g, green, 1.9, 1.2, 1.25, 0, 0.7, 0);
+      box(g, black, 1.92, 0.06, 1.3, 0, 1.33, 0);
+      for (const sx of [-1, 1])
+        box(g, green, 0.15, 0.25, 0.1, sx * 0.95, 0.9, 0.68);
+      for (const sx of [-1, 1])
+        for (const sz of [-1, 1])
+          cylinder(g, black, 0.06, 0.05, sx * 0.8, 0.06, sz * 0.5, 'x', 10);
+      return g;
+    },
     dispose() {
       for (const g of geometries) g.dispose();
       for (const m of materials.values()) m.dispose();

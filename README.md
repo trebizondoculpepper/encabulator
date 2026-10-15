@@ -7,7 +7,7 @@ The machine is not built yet. The game is currently a row of development rooms:
 - `/?room=dev0` Controls and Displays: 30 mm pilot devices, plant displays, and the working parts of a motor control unit on test pedestals (a breaker and its door, a contactor, an overload relay, a fuse, a drive's capacitors, a motor), every one working and able to fail.
 - `/?room=dev1` Effects: end-state effects carried over from the VX3 Simulator.
 - `/?room=dev2` Hallucinations: apparitions, ghosting and geometric patterns.
-- `/?room=dev4` The Hall: the vast concrete hall the game will take place in, with a door station to every other room and a panel to change its materials and light.
+- `/?room=dev4` The Hall: the vast concrete hall the game will take place in, with a door station to every other room and a console desk to change its materials and light.
 - `/?room=dev3` Racks: rack cabinets and rack-mount units of every kind, built to catalogue dimensions.
 
 Walk into the coloured patch on a wall to go to the room it names.

@@ -68,21 +68,29 @@ function mottle(
 const polished: Finish = {
   name: 'Polished concrete',
   tile: 6,
-  colour: '#a9a8a3',
-  roughness: 0.16,
+  colour: '#9d9c97',
+  roughness: 0.12,
   metalness: 0,
   draw(c, s) {
-    // Polished, the mottling is faint: the trowel's swirl, not clouds.
-    mottle(c, s, '#e6e5e0', 7, 900, 22);
-    const random = seeded(11);
-    for (let i = 0; i < 3000; i++) {
-      const shade = 140 + random() * 115;
-      c.fillStyle = `rgba(${shade},${shade - 4},${shade - 10},0.35)`;
-      c.fillRect(random() * s, random() * s, 1.2, 1.2);
+    // Ground and polished, concrete shows little: a faint cloud from the
+    // trowel, a fine salt of exposed aggregate, and the saw-cut joints.
+    c.fillStyle = '#e4e3de';
+    c.fillRect(0, 0, s, s);
+    const random = seeded(7);
+    for (let i = 0; i < 260; i++) {
+      const shade = 225 + random() * 30;
+      c.fillStyle = `rgba(${shade},${shade},${shade - 3},0.05)`;
+      c.beginPath();
+      c.arc(random() * s, random() * s, 20 + random() * 60, 0, Math.PI * 2);
+      c.fill();
     }
-    // The saw-cut joint, on the tile's edge.
-    c.strokeStyle = 'rgba(60,60,58,0.4)';
-    c.lineWidth = 1.2;
+    for (let i = 0; i < 1400; i++) {
+      const shade = 150 + random() * 100;
+      c.fillStyle = `rgba(${shade},${shade - 4},${shade - 10},0.25)`;
+      c.fillRect(random() * s, random() * s, 1, 1);
+    }
+    c.strokeStyle = 'rgba(70,70,68,0.35)';
+    c.lineWidth = 1;
     c.strokeRect(0, 0, s, s);
   },
 };
