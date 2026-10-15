@@ -314,7 +314,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   });
   const notes = document.createElement('div');
   notes.textContent =
-    'DEV0 · Controls and Displays: controls and displays on the north wall, working parts on pedestals to the south · Door: dev1 east · WASD: walk · E or click: work a part · Esc: cursor · P: PS1 resolution';
+    'DEV0 · Controls and Displays: controls and displays on the north wall, working parts on pedestals to the south · Door: dev1 east · WASD: walk · E or click: work a part · Esc: cursor';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

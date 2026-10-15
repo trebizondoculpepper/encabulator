@@ -31,12 +31,13 @@ import { traa } from 'three/addons/tsl/display/TRAANode.js';
 const MAX_PIXEL_RATIO = 2;
 
 /**
- * The Hall's renderer: Three's WebGPURenderer, which draws with WebGPU
+ * A renderer for the rooms drawn the modern way (the Hall, the plinths):
+ * Three's WebGPURenderer, which draws with WebGPU
  * where the browser has it and falls back to WebGL 2 where it does not.
  * Neutral tone mapping keeps paint colours as painted. `init` must finish
  * before the first frame.
  */
-export function createHallRenderer(canvas: HTMLCanvasElement) {
+export function createNodeRenderer(canvas: HTMLCanvasElement) {
   const renderer = new WebGPURenderer({ canvas, antialias: false });
   renderer.setPixelRatio(
     Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO),
@@ -49,7 +50,8 @@ export function createHallRenderer(canvas: HTMLCanvasElement) {
 }
 
 /**
- * The Hall's render pipeline, after Three's node-based post-processing:
+ * The render pipeline for those rooms, after Three's node-based
+ * post-processing:
  *
  * 1. The scene is drawn once into several targets at once: its colour,
  *    its unlit diffuse colour, its normals, its metalness and roughness,
@@ -59,13 +61,13 @@ export function createHallRenderer(canvas: HTMLCanvasElement) {
  *    occlusion where they crowd it, from those targets.
  * 3. Screen-space reflections (SSR) trace the polished floor's (and every
  *    shiny surface's) reflection of what is on screen.
- * 4. Bloom makes the windows, skylights and lamps glare.
+ * 4. Bloom makes whatever is brighter than white glare.
  * 5. Temporal reprojection anti-aliasing (TRAA) smooths edges and the
  *    noise of the GI and reflections over frames.
  *
  * `metre` is how many world units make a metre, for the effects' reach.
  */
-export function createHallPipeline(
+export function createNodePipeline(
   renderer: WebGPURenderer,
   scene: Scene,
   camera: PerspectiveCamera,
@@ -167,4 +169,4 @@ export function createHallPipeline(
   };
 }
 
-export type HallPipeline = ReturnType<typeof createHallPipeline>;
+export type NodePipeline = ReturnType<typeof createNodePipeline>;

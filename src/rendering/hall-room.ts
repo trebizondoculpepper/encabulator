@@ -1,4 +1,4 @@
-import { createHallPipeline, createHallRenderer } from './hall-pipeline';
+import { createNodePipeline, createNodeRenderer } from './node-pipeline';
 import { CubeRenderTarget } from 'three/webgpu';
 import {
   Box3,
@@ -73,7 +73,7 @@ import { knobDirection } from '../scene/rotary-knob';
 export function startHallRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
-  const renderer = createHallRenderer(canvas);
+  const renderer = createNodeRenderer(canvas);
   renderer.setClearColor('#d8dadb');
   const fog = new Fog('#d4d7d8', 45 * m, 260 * m);
   scene.fog = fog;
@@ -645,7 +645,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   };
 
   // The render pipeline: global illumination, reflections, bloom, TRAA.
-  const pipeline = createHallPipeline(renderer, scene, camera, m);
+  const pipeline = createNodePipeline(renderer, scene, camera, m);
 
   /** Put the settings into the materials and lights. */
   const apply = (s: HallSettings) => {

@@ -8,7 +8,7 @@ import type { Footprint } from './walk-collision';
  * on its west wall and to the room after it on its east wall.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4' | 'dev5';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: DevRoomId;
@@ -25,6 +25,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev2',
   'dev3',
   'dev4',
+  'dev5',
 ];
 
 export const DEV_ROOM_NAMES: Record<DevRoomId, string> = {
@@ -33,6 +34,7 @@ export const DEV_ROOM_NAMES: Record<DevRoomId, string> = {
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
   dev4: 'DEV4 · THE HALL',
+  dev5: 'DEV5 · PLINTHS',
 };
 /** Each room's portal colour, so a portal says where it goes. */
 export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
@@ -41,6 +43,7 @@ export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
   dev4: '#c9c23a',
+  dev5: '#d8d4c8',
 };
 export const PORTAL_WIDTH = 1.2;
 export const PORTAL_HEIGHT = 2.2;
@@ -50,7 +53,9 @@ export const WALL_THICKNESS = 0.3;
 /** The hall, where the game takes place: every room has a way to it. */
 export const HALL: DevRoomId = 'dev4';
 /** The rooms the hall's door station leads to. */
-export const STATION_ROOMS = DEV_ROOMS.filter((id) => id !== HALL);
+export const STATION_ROOMS: readonly DevRoomId[] = DEV_ROOMS.filter(
+  (id) => id !== HALL,
+);
 
 /**
  * A room's portals, in scene units (`metre` per metre): to the room
@@ -66,12 +71,23 @@ export function devPortals(
 ): Portal[] {
   if (id === HALL) return [];
   const z = bounds.maxZ - 1.1 * metre;
-  const at = DEV_ROOMS.indexOf(id);
+  // Neighbours in order, passing over the hall, which has the station.
+  const at = STATION_ROOMS.indexOf(id);
   const portals: Portal[] = [];
   if (at > 0)
-    portals.push({ to: DEV_ROOMS[at - 1], side: 'west', x: bounds.minX, z });
-  if (at < DEV_ROOMS.length - 1)
-    portals.push({ to: DEV_ROOMS[at + 1], side: 'east', x: bounds.maxX, z });
+    portals.push({
+      to: STATION_ROOMS[at - 1],
+      side: 'west',
+      x: bounds.minX,
+      z,
+    });
+  if (at < STATION_ROOMS.length - 1)
+    portals.push({
+      to: STATION_ROOMS[at + 1],
+      side: 'east',
+      x: bounds.maxX,
+      z,
+    });
   if (!portals.some((p) => p.to === HALL))
     portals.push({
       to: HALL,

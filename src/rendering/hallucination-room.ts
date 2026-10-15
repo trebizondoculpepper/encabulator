@@ -1238,7 +1238,7 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
     'APPARITION: turn up RATE, or press SUMMON, then turn about: they wait at the edge of sight and fade when looked at<br>' +
     'GHOSTING: turn up STRENGTH, hold still a moment, then turn: what you saw stays on your eyes, fading and blurring<br>' +
     'PATTERNS: turn up STRENGTH: kaleidoscopic geometry worked into the room (MODE: XOR, AND or colour BURN), never into apparitions or ghosts<br>' +
-    'Door: dev1 west · <kbd>P</kbd> toggles PS1 resolution · <a href="?room=dev0">controls and displays</a> · <a href="?room=dev1">effects room</a>';
+    'Door: dev1 west · <a href="?room=dev0">controls and displays</a> · <a href="?room=dev1">effects room</a>';
   Object.assign(notes.style, {
     position: 'absolute',
     left: '12px',
