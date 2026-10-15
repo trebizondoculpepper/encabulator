@@ -13,10 +13,10 @@ import { slide } from './walk-collision';
 const bounds = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 };
 describe('development rooms', () => {
   it('link each room to its neighbours, both ways, and to the hall', () => {
-    for (const [i, id] of STATION_ROOMS.entries()) {
+    for (const [i, id] of DEV_ROOMS.entries()) {
       const to = devPortals(id, bounds, 1).map((p) => p.to);
-      for (const next of [STATION_ROOMS[i - 1], STATION_ROOMS[i + 1]].filter(
-        (room) => room && room !== 'rhombus' && id !== 'rhombus',
+      for (const next of [DEV_ROOMS[i - 1], DEV_ROOMS[i + 1]].filter(
+        (room) => room,
       )) {
         expect(to).toContain(next);
         expect(devPortals(next, bounds, 1).map((p) => p.to)).toContain(id);
@@ -34,6 +34,8 @@ describe('development rooms', () => {
     expect(STATION_ROOMS.length).toBe(ROOMS.length - 1);
     expect(DEV_ROOMS).not.toContain('rhombus');
     expect(DEV_ROOMS).not.toContain(HALL);
+    expect(DEV_ROOMS).not.toContain('dev4');
+    expect(DEV_ROOMS).not.toContain('dev5');
   });
 
   it('keeps the old Hall and rhombus URLs as aliases', () => {

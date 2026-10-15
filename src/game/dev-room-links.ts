@@ -8,7 +8,7 @@ import type { Footprint } from './walk-collision';
  * has a single exit to it.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev6';
 export type RoomId = DevRoomId | 'hall' | 'rhombus';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
@@ -20,7 +20,13 @@ export interface Portal {
 }
 
 /** The development rooms, in order. */
-export const DEV_ROOMS: readonly DevRoomId[] = ['dev0', 'dev1', 'dev2', 'dev3'];
+export const DEV_ROOMS: readonly DevRoomId[] = [
+  'dev0',
+  'dev1',
+  'dev2',
+  'dev3',
+  'dev6',
+];
 
 /** The Hall and mini-game have their own public room IDs. */
 export const ROOMS: readonly RoomId[] = [...DEV_ROOMS, 'hall', 'rhombus'];
@@ -37,6 +43,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
+  dev6: 'DEV6 · RETRO ENCABULATOR',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
 };
@@ -46,6 +53,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev1: '#d0732c',
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
+  dev6: '#9a9685',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
 };
@@ -75,21 +83,21 @@ export function devPortals(
 ): Portal[] {
   if (id === HALL) return [];
   const z = bounds.maxZ - 1.1 * metre;
-  // Neighbours in order, passing over the hall, which has the station.
-  const at = STATION_ROOMS.indexOf(id);
+  // Development-room neighbours, with the Hall reached separately.
+  const at = DEV_ROOMS.indexOf(id as DevRoomId);
   const portals: Portal[] = [];
   if (id === 'rhombus')
     return [{ to: HALL, side: 'east', x: bounds.maxX, z: 0 }];
   if (at > 0)
     portals.push({
-      to: STATION_ROOMS[at - 1],
+      to: DEV_ROOMS[at - 1],
       side: 'west',
       x: bounds.minX,
       z,
     });
-  if (at < STATION_ROOMS.length - 1 && id !== 'dev3')
+  if (at < DEV_ROOMS.length - 1)
     portals.push({
-      to: STATION_ROOMS[at + 1],
+      to: DEV_ROOMS[at + 1],
       side: 'east',
       x: bounds.maxX,
       z,
