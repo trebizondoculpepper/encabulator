@@ -4,12 +4,12 @@ import type { Footprint } from './walk-collision';
  * How the development rooms join. They are not one connected world: each
  * is a room of its own, and a portal (a coloured patch on a wall) sends
  * whoever touches it straight to the room it names, arriving in front of
- * that room's portal back. Each room has a portal to the room before it
- * on its west wall and to the room after it on its east wall.
+ * that room's portal back. The Hall is the hub; the Rhombus mini-game
+ * has a single exit to it.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4';
-export type RoomId = DevRoomId | 'rhombus';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3';
+export type RoomId = DevRoomId | 'hall' | 'rhombus';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: RoomId;
@@ -20,23 +20,24 @@ export interface Portal {
 }
 
 /** The development rooms, in order. */
-export const DEV_ROOMS: readonly DevRoomId[] = [
-  'dev0',
-  'dev1',
-  'dev2',
-  'dev3',
-  'dev4',
-];
+export const DEV_ROOMS: readonly DevRoomId[] = ['dev0', 'dev1', 'dev2', 'dev3'];
 
-/** The mini-game has its own public room ID. */
-export const ROOMS: readonly RoomId[] = [...DEV_ROOMS, 'rhombus'];
+/** The Hall and mini-game have their own public room IDs. */
+export const ROOMS: readonly RoomId[] = [...DEV_ROOMS, 'hall', 'rhombus'];
+
+/** Historic URLs remain usable without changing the address bar. */
+export function resolveRoomId(id: string | null): RoomId | undefined {
+  if (id === 'dev4') return 'hall';
+  if (id === 'dev5') return 'rhombus';
+  return ROOMS.includes(id as RoomId) ? (id as RoomId) : undefined;
+}
 
 export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev0: 'DEV0 · CONTROLS AND DISPLAYS',
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
-  dev4: 'DEV4 · THE HALL',
+  hall: 'THE HALL',
   rhombus: 'RHOMBUS',
 };
 /** Each room's portal colour, so a portal says where it goes. */
@@ -45,7 +46,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev1: '#d0732c',
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
-  dev4: '#c9c23a',
+  hall: '#c9c23a',
   rhombus: '#d8d4c8',
 };
 export const PORTAL_WIDTH = 1.2;
@@ -54,7 +55,7 @@ export const PORTAL_HEIGHT = 2.2;
 export const WALL_THICKNESS = 0.3;
 
 /** The hall, where the game takes place: every room has a way to it. */
-export const HALL: DevRoomId = 'dev4';
+export const HALL: RoomId = 'hall';
 /** The rooms the hall's door station leads to. */
 export const STATION_ROOMS: readonly RoomId[] = ROOMS.filter(
   (id) => id !== HALL,

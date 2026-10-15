@@ -6,6 +6,7 @@ import {
   STATION_ROOMS,
   devPortals,
   devWalls,
+  resolveRoomId,
 } from './dev-room-links';
 import { slide } from './walk-collision';
 
@@ -32,6 +33,15 @@ describe('development rooms', () => {
     expect(STATION_ROOMS).not.toContain(HALL);
     expect(STATION_ROOMS.length).toBe(ROOMS.length - 1);
     expect(DEV_ROOMS).not.toContain('rhombus');
+    expect(DEV_ROOMS).not.toContain(HALL);
+  });
+
+  it('keeps the old Hall and rhombus URLs as aliases', () => {
+    expect(resolveRoomId('dev4')).toBe('hall');
+    expect(resolveRoomId('dev5')).toBe('rhombus');
+    expect(resolveRoomId('hall')).toBe('hall');
+    expect(resolveRoomId('rhombus')).toBe('rhombus');
+    expect(resolveRoomId('unknown')).toBeUndefined();
   });
 
   it('have solid walls all round, portals or none', () => {

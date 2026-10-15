@@ -706,7 +706,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.id = 'hall-notes';
   notes.textContent =
-    "DEV4 · The Hall: the door station in the middle of the nave leads to the other dev rooms · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
+    "The Hall: the door station in the middle of the nave leads to the other rooms · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

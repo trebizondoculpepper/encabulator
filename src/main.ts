@@ -1,5 +1,5 @@
 import './styles/main.css';
-import { ROOMS } from './game/dev-room-links';
+import { ROOMS, resolveRoomId } from './game/dev-room-links';
 import type { RoomId } from './game/dev-room-links';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -38,19 +38,11 @@ const resetEffects = async () => {
 const openRoom = async () => {
   const ownRevision = ++revision;
   const params = new URLSearchParams(location.search);
-  const asked = params.get('room') === 'dev5' ? 'rhombus' : params.get('room');
-  if (params.get('room') === 'dev5') {
-    const url = new URL(location.href);
-    url.searchParams.set('room', 'rhombus');
-    history.replaceState(null, '', url);
-  }
-  const room: RoomId = ROOMS.includes(asked as RoomId)
-    ? (asked as RoomId)
-    : 'dev0';
+  const room = resolveRoomId(params.get('room')) ?? 'dev0';
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
   if (room === 'rhombus')
     start = (await import('./rendering/plinth-room')).startPlinthRoom;
-  else if (room === 'dev4')
+  else if (room === 'hall')
     start = (await import('./rendering/hall-room')).startHallRoom;
   else if (room === 'dev3')
     start = (await import('./rendering/racks-room')).startRacksRoom;
@@ -79,7 +71,7 @@ const openRoom = async () => {
     surface.id = 'scene';
     surface.hidden = false;
     surface.style.display = 'block';
-    surface.setAttribute('aria-label', `Development room ${room}`);
+    surface.setAttribute('aria-label', `Room ${room}`);
     canvas.parentElement!.append(root);
     root.append(surface);
     canvas.hidden = true;
