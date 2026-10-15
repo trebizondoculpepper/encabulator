@@ -1,4 +1,5 @@
 import { Color, Group } from 'three';
+import type { Mesh } from 'three';
 import type { Material } from 'three';
 import type { Footprint } from '../game/walk-collision';
 import { createBuildKit } from './build-kit';
@@ -23,10 +24,29 @@ import type { BuildKit } from './build-kit';
  */
 
 const H = 3.05;
+
+/**
+ * A door a click opens and shuts: its hinge (turned about y), its leaf
+ * (what takes the click), how far it swings open (radians, outward), and
+ * whether it is open now. The room animates it and blocks its opening
+ * while it is shut.
+ */
+export interface OpenableDoor {
+  hinge: Group;
+  leaf: Mesh;
+  openAngle: number;
+  open: boolean;
+  width: number;
+}
 const T = 0.12;
 
 /** The partitions every room here is built with. */
-function partitions(kit: BuildKit, group: Group, solids: Footprint[]) {
+function partitions(
+  kit: BuildKit,
+  group: Group,
+  solids: Footprint[],
+  doors: OpenableDoor[] = [],
+) {
   const drywall = kit.paint('#e3dfd4', 0.85);
   const cove = kit.paint('#3b3a38', 0.6);
   return {
@@ -128,7 +148,16 @@ function partitions(kit: BuildKit, group: Group, solids: Footprint[]) {
       hinge.position.set(x - width / 2, 0, z + 0.05);
       hinge.rotation.y = -swing;
       group.add(hinge);
-      kit.box(hinge, leaf, width, 2.12, 0.045, width / 2, 1.06, 0);
+      const leafMesh = kit.box(
+        hinge,
+        leaf,
+        width,
+        2.12,
+        0.045,
+        width / 2,
+        1.06,
+        0,
+      );
       kit.box(
         hinge,
         kit.paint('#b9bec0', 0.3, 0.85),
@@ -149,6 +178,15 @@ function partitions(kit: BuildKit, group: Group, solids: Footprint[]) {
         0.15,
         0,
       );
+      // A door a click opens and shuts: it swings out to `swing`, or 1.6 rad.
+      const door: OpenableDoor = {
+        hinge,
+        leaf: leafMesh,
+        openAngle: swing || 1.6,
+        open: swing > 0,
+        width,
+      };
+      doors.push(door);
       return hinge;
     },
     /** A suspended ceiling at 2.7 m over w × d, with a troffer per `pitch`. */
@@ -177,7 +215,8 @@ export function createAmenityBlock() {
   const group = new Group();
   group.name = 'Amenity block';
   const solids: Footprint[] = [];
-  const p = partitions(kit, group, solids);
+  const openable: OpenableDoor[] = [];
+  const p = partitions(kit, group, solids, openable);
   const w = 12;
   const d = 8;
   // Rooms from west to east: men 3.5 m, women 3.5 m, janitor 1.5 m, first aid 3.5 m.
@@ -196,10 +235,13 @@ export function createAmenityBlock() {
   );
   for (const x of edges.slice(1, -1)) p.wall(false, x, -d / 2, d / 2);
   p.lid(w, d);
-  // The doors: restrooms shut, the janitor's closet and first aid open.
+  // The doors: restrooms shut, the janitor's closet and first aid open;
+  // a click opens or shuts any of them.
   const leaf = kit.paint('#7d8c96', 0.5, 0.3);
   p.door(doors[0], d / 2, leaf);
   p.door(doors[1], d / 2, leaf);
+  restroom(kit, group, edges[0], edges[1], d, 'men');
+  restroom(kit, group, edges[1], edges[2], d, 'women');
   p.door(doors[2], d / 2, kit.paint('#8a8f87', 0.5, 0.3), 1.5);
   p.door(doors[3], d / 2, kit.paint('#e8e6df', 0.5, 0.2), 1.6);
   const signs: [
@@ -395,7 +437,13 @@ export function createAmenityBlock() {
     H + 3.25,
     -d / 2 + 0.5,
   );
-  return { group, solids, size: { w, d }, dispose: kit.dispose };
+  return {
+    group,
+    solids,
+    size: { w, d },
+    doors: openable,
+    dispose: kit.dispose,
+  };
 }
 
 /** A single drivers' toilet, 2.4 m square, door shut, by the truck docks. */
@@ -404,7 +452,8 @@ export function createDriversToilet() {
   const group = new Group();
   group.name = "Drivers' toilet";
   const solids: Footprint[] = [];
-  const p = partitions(kit, group, solids);
+  const openable: OpenableDoor[] = [];
+  const p = partitions(kit, group, solids, openable);
   const s = 2.4;
   p.wall(true, -s / 2, -s / 2, s / 2);
   p.wall(false, -s / 2, -s / 2, s / 2);
@@ -412,6 +461,7 @@ export function createDriversToilet() {
   p.wall(true, s / 2, -s / 2, s / 2, [{ at: 0, width: 0.92 }]);
   p.lid(s, s);
   p.door(0, s / 2, kit.paint('#7d8c96', 0.5, 0.3));
+  restroom(kit, group, -s / 2, s / 2, s, 'single');
   const sign = kit.sign('DRIVERS\nRESTROOM', 0.6, 0.3, '#ffffff', '#1d4f9e');
   sign.position.set(0.85, 1.6, s / 2 + T / 2 + 0.01);
   group.add(sign);
@@ -424,7 +474,172 @@ export function createDriversToilet() {
     H + 3.25,
     -0.6,
   );
-  return { group, solids, dispose: kit.dispose };
+  return { group, solids, doors: openable, dispose: kit.dispose };
+}
+
+/**
+ * A restroom's fittings between x0 and x1, in a room `d` deep whose door
+ * is in the front wall (+z): a tiled floor and wainscot, a suspended
+ * ceiling with a troffer, and for `men` two stalls (one accessible) and
+ * two urinals with a privacy screen, for `women` two stalls (one
+ * accessible), for `single` one toilet with grab bars; and in each, wall
+ * sinks under a mirror, a paper towel dispenser and a waste bin.
+ */
+function restroom(
+  kit: BuildKit,
+  group: Group,
+  x0: number,
+  x1: number,
+  d: number,
+  kind: 'men' | 'women' | 'single',
+) {
+  const w = x1 - x0;
+  const cx = (x0 + x1) / 2;
+  const back = -d / 2 + T / 2;
+  const tile = kit.paint('#d9dee0', 0.25);
+  const floorTile = kit.paint('#8f9a9e', 0.3);
+  const china = kit.paint('#f4f4f0', 0.15);
+  const steel = kit.paint('#b9bec0', 0.3, 0.85);
+  const partition = kit.paint('#7d8c96', 0.4, 0.3);
+  const mirror = kit.paint('#dfe6e8', 0.12, 0.55);
+  // Floor tile and a wainscot of wall tile, 1.2 m high, round the room.
+  kit.box(group, floorTile, w - 2 * T, 0.01, d - 2 * T, cx, 0.006, 0);
+  for (const x of [x0 + T / 2 + 0.006, x1 - T / 2 - 0.006])
+    kit.box(group, tile, 0.01, 1.2, d - 2 * T, x, 0.6, 0);
+  kit.box(group, tile, w - 2 * T, 1.2, 0.01, cx, 0.6, back + 0.006);
+  // The ceiling and a troffer.
+  kit.box(
+    group,
+    kit.paint('#ece9e0', 0.9),
+    w - 2 * T,
+    0.02,
+    d - 2 * T,
+    cx,
+    2.6,
+    0,
+  );
+  kit.box(
+    group,
+    kit.glow(new Color(1.9, 1.95, 1.9)),
+    0.58,
+    0.01,
+    1.2,
+    cx,
+    2.585,
+    -d / 4,
+  );
+  kit.box(
+    group,
+    kit.glow(new Color(1.9, 1.95, 1.9)),
+    0.58,
+    0.01,
+    1.2,
+    cx,
+    2.585,
+    d / 4 - 0.4,
+  );
+  /** A toilet against the back wall at x. */
+  const toilet = (x: number, z = back) => {
+    kit.box(group, china, 0.38, 0.4, 0.2, x, 0.6, z + 0.1);
+    kit.cyl(group, china, 0.19, 0.38, x, 0.2, z + 0.42, 0.21);
+    kit.box(
+      group,
+      kit.paint('#2b2b2b', 0.5),
+      0.38,
+      0.03,
+      0.45,
+      x,
+      0.405,
+      z + 0.42,
+    );
+    kit.box(group, steel, 0.03, 0.03, 0.15, x + 0.12, 0.85, z + 0.12);
+  };
+  /** A stall, `width` wide, its partitions and door, from x along the back. */
+  const stall = (x: number, width: number) => {
+    const depth = 1.5;
+    for (const px of [x, x + width])
+      kit.box(group, partition, 0.025, 1.6, depth, px, 0.98, back + depth / 2);
+    kit.box(
+      group,
+      partition,
+      width - 0.06,
+      1.6,
+      0.025,
+      x + width / 2 + 0.2,
+      0.98,
+      back + depth,
+    );
+    toilet(x + width / 2);
+    kit.box(
+      group,
+      kit.paint('#c9c6bb', 0.5),
+      0.15,
+      0.15,
+      0.12,
+      x + width - 0.12,
+      0.75,
+      back + 0.6,
+    );
+  };
+  /** Wall sinks along a side wall at `x`, facing into the room, under a mirror. */
+  const sinks = (x: number, facing: 1 | -1, count: number, z0: number) => {
+    for (let i = 0; i < count; i++) {
+      const z = z0 + i * 0.7;
+      kit.box(group, china, 0.45, 0.18, 0.5, x + facing * 0.25, 0.8, z);
+      kit.box(group, steel, 0.04, 0.12, 0.04, x + facing * 0.06, 0.95, z);
+    }
+    kit.box(
+      group,
+      mirror,
+      0.01,
+      0.9,
+      count * 0.7,
+      x + facing * 0.012,
+      1.55,
+      z0 + ((count - 1) * 0.7) / 2,
+    );
+    kit.box(
+      group,
+      steel,
+      0.12,
+      0.35,
+      0.28,
+      x + facing * 0.07,
+      1.3,
+      z0 + count * 0.7,
+    );
+    kit.cyl(
+      group,
+      kit.paint('#5a5f63', 0.6),
+      0.16,
+      0.6,
+      x + facing * 0.25,
+      0.3,
+      z0 + count * 0.7 + 0.4,
+      0.17,
+    );
+  };
+  if (kind === 'single') {
+    toilet(cx - 0.3);
+    kit.box(group, steel, 0.8, 0.04, 0.04, cx - 0.3, 0.85, back + 0.05);
+    kit.box(group, steel, 0.04, 0.04, 0.9, x0 + T / 2 + 0.05, 0.85, back + 0.6);
+    sinks(x1 - T / 2, -1, 1, -0.7);
+    return;
+  }
+  if (kind === 'men') {
+    stall(x0 + T / 2, 1.5);
+    for (let i = 0; i < 2; i++) {
+      const ux = x0 + 1.95 + i * 0.6;
+      kit.box(group, china, 0.36, 0.6, 0.3, ux, 1.0, back + 0.15);
+      kit.box(group, steel, 0.03, 0.2, 0.03, ux, 1.45, back + 0.06);
+    }
+    kit.box(group, partition, 0.025, 1.2, 0.5, x0 + 2.25, 1.1, back + 0.3);
+    sinks(x1 - T / 2, -1, 2, -0.5);
+    return;
+  }
+  stall(x0 + T / 2, 1.5);
+  stall(x0 + T / 2 + 1.5, 0.9);
+  sinks(x1 - T / 2, -1, 2, -0.5);
 }
 
 /**

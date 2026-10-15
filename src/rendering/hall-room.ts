@@ -13,6 +13,7 @@ import {
   Raycaster,
   Scene,
   Vector2,
+  Vector3,
   WebGLCubeRenderTarget,
 } from 'three';
 import type { Mesh, Object3D } from 'three';
@@ -284,7 +285,28 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     northWall - 0.4 + amenities.size.d / 2,
   );
   // The drivers' toilet by the docks, its door toward the nave.
-  stand(createDriversToilet(), 71, southWall - 1.6, -Math.PI / 2);
+  const driversToilet = createDriversToilet();
+  stand(driversToilet, 71, southWall - 1.6, -Math.PI / 2);
+  // The doors a click opens and shuts, and the footprint of each one's
+  // opening, which is solid while it is shut.
+  const openable = [...amenities.doors, ...driversToilet.doors].map((door) => {
+    propGroup.updateMatrixWorld(true);
+    const turned = door.hinge.rotation.y;
+    door.hinge.rotation.y = 0;
+    door.hinge.updateMatrixWorld(true);
+    const a = door.hinge.localToWorld(new Vector3(0, 0, -0.15)).divideScalar(m);
+    const b = door.hinge
+      .localToWorld(new Vector3(door.width, 0, 0.15))
+      .divideScalar(m);
+    door.hinge.rotation.y = turned;
+    const footprint: Footprint = {
+      minX: Math.min(a.x, b.x),
+      maxX: Math.max(a.x, b.x),
+      minZ: Math.min(a.z, b.z),
+      maxZ: Math.max(a.z, b.z),
+    };
+    return { door, footprint };
+  });
   // The security booth overlooking the east personnel door and the docks.
   stand(createSecurityBooth(), 69.5, 26.5, Math.PI);
   // The emergency shower and eyewash by the chemical store.
@@ -610,8 +632,10 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   // the hall's instanced batches are already tiled. Then detail too small
   // or too far to see is hidden.
   const culler = createDetailCuller(camera);
+  // Doors that open and shut are left out of the merge.
+  const moving = new Set<Object3D>(openable.map((o) => o.door.hinge));
   const merged = [...propGroup.children, ...doorGroup.children].flatMap(
-    (piece) => mergeStatic(piece, 3),
+    (piece) => mergeStatic(piece, 3, moving),
   );
   for (const mesh of merged) culler.add(mesh, { minSize: 0.012 });
   for (const { mesh, detail } of [...services.built, ...hall.pendants]) {
@@ -705,10 +729,19 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     pointer.set(x, y);
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(
-      [...desk.uses.keys(), ...station.uses.keys()],
+      [
+        ...desk.uses.keys(),
+        ...station.uses.keys(),
+        ...openable.map((o) => o.door.leaf),
+      ],
       true,
     )[0];
     if (!hit) return;
+    const swing = openable.find((o) => o.door.leaf === hit.object);
+    if (swing) {
+      swing.door.open = !swing.door.open;
+      return;
+    }
     const doorway = station.uses.get(hit.object as Mesh);
     if (doorway) return doorway();
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
@@ -747,7 +780,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       pitch: 0.05,
     },
     solids: () => [
-      ...[...hall.solids, ...propSolids, deskSolid].map((s) => ({
+      ...[
+        ...hall.solids,
+        ...propSolids,
+        deskSolid,
+        ...openable.filter((o) => !o.door.open).map((o) => o.footprint),
+      ].map((s) => ({
         minX: s.minX * m,
         maxX: s.maxX * m,
         minZ: s.minZ * m,
@@ -817,6 +855,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     walk.update(delta);
     station.update(delta, walk.walker.x, walk.walker.z);
     desk.update(delta);
+    // Doors swing to where they have been put.
+    for (const { door } of openable) {
+      const target = door.open ? -door.openAngle : 0;
+      door.hinge.rotation.y +=
+        (target - door.hinge.rotation.y) * Math.min(1, delta * 5);
+    }
     culler.update();
     // Count the whole frame (reflection, scene, bloom), not the last pass.
     renderer.info.reset();
