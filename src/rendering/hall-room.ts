@@ -57,6 +57,8 @@ import type { HallSurface, Surface } from '../scene/hall-surfaces';
 import { CONTAINER, createProps } from '../scene/warehouse-props';
 import { createCompliance } from '../scene/code-compliance';
 import { createFirstPerson } from './first-person';
+import { createDetailCuller } from './detail-culling';
+import { mergeStatic } from '../scene/merge-static';
 import { ps1Uniforms } from './ps1-material';
 import { createHallConsole, loadHallSettings } from './hall-console';
 import type { HallSettings } from './hall-console';
@@ -603,6 +605,21 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   }
   marks.finish();
 
+  // ---- Performance: merge static pieces, cull small and distant detail ---
+  // Every prop, set piece and door becomes a few meshes, chunked by 3 m;
+  // the hall's instanced batches are already tiled. Then detail too small
+  // or too far to see is hidden.
+  const culler = createDetailCuller(camera);
+  const merged = [
+    ...[...propGroup.children, ...doorGroup.children].flatMap((piece) =>
+      mergeStatic(piece, 3),
+    ),
+  ];
+  for (const mesh of merged) culler.add(mesh, { minSize: 0.012 });
+  for (const { mesh, detail } of [...services.built, ...hall.pendants]) {
+    if (detail) culler.add(mesh, { minSize: 0, maxDistance: detail * m });
+  }
+
   // ---- Reflections: the hall seen from its middle, for the floor ---------
   const pmrem = new PMREMGenerator(renderer);
   let environment: ReturnType<PMREMGenerator['fromCubemap']> | null = null;
@@ -611,6 +628,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     const cube = new CubeCamera(0.1 * m, 400 * m, target);
     cube.position.set(0, 1.6 * m, 12 * m);
     scene.environment = null;
+    culler.showAll();
     shine.mesh.visible = false;
     cube.update(renderer, scene);
     shine.mesh.visible = settings.floorShine > 0.001;
@@ -775,7 +793,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     },
     settings: () => structuredClone(settings),
     /** What the last frame cost: draw calls, triangles, geometries, textures. */
-    stats: () => ({ ...renderer.info.render, ...renderer.info.memory }),
+    stats: () => ({
+      ...renderer.info.render,
+      ...renderer.info.memory,
+      culled: culler.hidden(),
+      cullable: culler.count(),
+    }),
     /** Show a great door in style `n`, 1 to 6 (see hall-doors.ts). */
     door(n: number, end: 'east' | 'west' = 'east') {
       setDoor(n, end);
@@ -796,6 +819,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     walk.update(delta);
     station.update(delta, walk.walker.x, walk.walker.z);
     desk.update(delta);
+    culler.update();
     // Count the whole frame (reflection, scene, bloom), not the last pass.
     renderer.info.reset();
     composer.render();

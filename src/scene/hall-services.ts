@@ -49,13 +49,13 @@ export function createHallServices() {
   const it = createInstancer();
   const box = it.part(new BoxGeometry(1, 1, 1), galvanised);
   const boxDark = it.part(new BoxGeometry(1, 1, 1), dark);
-  const boxHanger = it.part(new BoxGeometry(1, 1, 1), hanger);
-  const boxGrille = it.part(new BoxGeometry(1, 1, 1), grille);
+  const boxHanger = it.part(new BoxGeometry(1, 1, 1), hanger, 45);
+  const boxGrille = it.part(new BoxGeometry(1, 1, 1), grille, 45);
   const boxHeater = it.part(new BoxGeometry(1, 1, 1), heaterPaint);
   const boxAhu = it.part(new BoxGeometry(1, 1, 1), ahuPaint);
   const boxRed = it.part(new BoxGeometry(1, 1, 1), red);
   const tube = it.part(new CylinderGeometry(1, 1, 1, 24, 1, true), galvanised);
-  const ring = it.part(new TorusGeometry(1, 0.025, 4, 24), seam);
+  const ring = it.part(new TorusGeometry(1, 0.025, 4, 24), seam, 45);
   const pipe = it.part(new CylinderGeometry(1, 1, 1, 10), red);
   const flue = it.part(new CylinderGeometry(1, 1, 1, 12), dark);
   const cone = it.part(
@@ -237,6 +237,8 @@ export function createHallServices() {
   it.build(group);
   return {
     group,
+    /** The instanced meshes, and the distance (metres) beyond which each is hidden. */
+    built: it.built(),
     dispose() {
       it.dispose();
       for (const m of materials) m.dispose();

@@ -15,6 +15,7 @@ import {
   Vector3,
 } from 'three';
 import type { Material } from 'three';
+import { buildTiled } from './instancer';
 
 /**
  * Industrial pendant lamps after Lamp Copper's "Astra Vintage Industrial
@@ -235,20 +236,29 @@ export function createPendantLamps(
     );
   }
 
+  // Tiled for culling; the chain, the cage and the bulb are fine details,
+  // not drawn from far off.
+  const details = new Map<object, number>([
+    [link, 35],
+    [hook, 35],
+    [cageRing, 40],
+    [rib, 40],
+  ]);
+  const built: { mesh: InstancedMesh; detail?: number }[] = [];
   for (const entry of parts) {
     if (!entry.matrices.length) continue;
-    const mesh = new InstancedMesh(
+    for (const mesh of buildTiled(
+      group,
       entry.geometry,
       entry.material,
-      entry.matrices.length,
-    );
-    entry.matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix));
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    group.add(mesh);
+      entry.matrices,
+    ))
+      built.push({ mesh, detail: details.get(entry) });
   }
   return {
     group,
+    /** The instanced meshes, and the distance (metres) beyond which each is hidden. */
+    built,
     /** The dome's lining, to colour and brighten with the lamps. */
     lining,
     dispose() {

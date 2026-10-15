@@ -2,7 +2,6 @@ import {
   BoxGeometry,
   Color,
   Group,
-  InstancedMesh,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -11,8 +10,9 @@ import {
   Quaternion,
   Vector3,
 } from 'three';
-import type { BufferGeometry, Material } from 'three';
+import type { BufferGeometry, InstancedMesh, Material } from 'three';
 import type { Footprint } from '../game/walk-collision';
+import { buildTiled } from './instancer';
 import type { HallSurface, Surface } from './hall-surfaces';
 import { createPendantLamps } from './pendant-lamps';
 import type { PendantPlace } from './pendant-lamps';
@@ -67,13 +67,9 @@ function createBatcher() {
       );
     },
     build(group: Group) {
-      for (const [material, list] of batches) {
-        const mesh = new InstancedMesh(geometry, material, list.length);
-        list.forEach((matrix, i) => mesh.setMatrixAt(i, matrix));
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-        group.add(mesh);
-      }
+      // Tiled, so the parts of the hall out of view are not drawn.
+      for (const [material, list] of batches)
+        buildTiled(group, geometry, material, list);
     },
     geometry,
   };
@@ -103,6 +99,8 @@ export interface Hall {
   lampGlow: MeshBasicMaterial;
   /** The copper lining of the lamps' domes, lit by their bulbs. */
   lampLining: MeshBasicMaterial;
+  /** The lamps' instanced parts, and the distance (metres) beyond which fine ones are hidden. */
+  pendants: { mesh: InstancedMesh; detail?: number }[];
   /** The openings in the end walls: great doors, personnel doors and dock doors. */
   doorways: Doorway[];
   dispose(): void;
@@ -534,6 +532,7 @@ export function createIndustrialHall(
     sky,
     lampGlow,
     lampLining: pendants.lining,
+    pendants: pendants.built,
     doorways,
     dispose() {
       for (const g of geometries) g.dispose();
