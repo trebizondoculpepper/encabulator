@@ -43,7 +43,9 @@ const openRoom = async () => {
     ? (asked as DevRoomId)
     : 'dev0';
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
-  if (room === 'dev3')
+  if (room === 'dev4')
+    start = (await import('./rendering/hall-room')).startHallRoom;
+  else if (room === 'dev3')
     start = (await import('./rendering/racks-room')).startRacksRoom;
   else if (room === 'dev2')
     start = (await import('./rendering/hallucination-room'))

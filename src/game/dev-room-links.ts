@@ -8,7 +8,7 @@ import type { Footprint } from './walk-collision';
  * on its west wall and to the room after it on its east wall.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: DevRoomId;
@@ -19,13 +19,20 @@ export interface Portal {
 }
 
 /** The development rooms, in order. */
-export const DEV_ROOMS: readonly DevRoomId[] = ['dev0', 'dev1', 'dev2', 'dev3'];
+export const DEV_ROOMS: readonly DevRoomId[] = [
+  'dev0',
+  'dev1',
+  'dev2',
+  'dev3',
+  'dev4',
+];
 
 export const DEV_ROOM_NAMES: Record<DevRoomId, string> = {
   dev0: 'DEV0 · CONTROLS AND DISPLAYS',
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
+  dev4: 'DEV4 · THE HALL',
 };
 /** Each room's portal colour, so a portal says where it goes. */
 export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
@@ -33,6 +40,7 @@ export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
   dev1: '#d0732c',
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
+  dev4: '#c9c23a',
 };
 export const PORTAL_WIDTH = 1.2;
 export const PORTAL_HEIGHT = 2.2;
