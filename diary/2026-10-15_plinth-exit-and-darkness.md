@@ -19,3 +19,5 @@ Glowing yellow tape now marks a south-side route to the east exit, with arrows a
 Four illuminated green EXIT signs on steel poles now face approaching visitors along that route. Up arrows mark straight sections; a left arrow marks the turn north and a right arrow marks the final turn east. The poles stand outside the taped walking lane.
 
 The owner also heard “everyone” clipped at the end of sphere clip 19. The word ends around 716.40 seconds in the master, after the old 716.298-second cut. Extended the working WAV to 717.0 seconds, regenerated its game MP3, and corrected `clips.csv`.
+
+The owner heard “message” clipped at the end of sphere clip 20. The old cut ended at 771.903 seconds in the local master, while the word continued to about 774.16. Extended the working WAV and game MP3 through 774.650 seconds and corrected `clips.csv`, leaving the next take out. Removed the top-left development instructions from the plinth room at the owner's request.

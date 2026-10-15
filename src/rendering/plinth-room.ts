@@ -458,22 +458,6 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     },
   });
 
-  const notes = document.createElement('div');
-  notes.id = 'plinth-notes';
-  notes.textContent =
-    'DEV5 · Plinths: walk within 4 m to light and hear one · EXIT: green door on east wall · WASD: walk · Esc: cursor';
-  Object.assign(notes.style, {
-    position: 'absolute',
-    top: '12px',
-    left: '12px',
-    maxWidth: 'calc(100% - 24px)',
-    padding: '10px',
-    background: '#20302bdd',
-    color: '#e8e2cc',
-    font: '13px monospace',
-  });
-  canvas.parentElement?.append(notes);
-
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
@@ -596,7 +580,6 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     observer.disconnect();
     walk.dispose();
     portals.dispose();
-    notes.remove();
     soundTarget.removeEventListener('pointerdown', unlockSound);
     window.removeEventListener('keydown', unlockSound);
     drones.dispose();
