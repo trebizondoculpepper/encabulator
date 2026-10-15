@@ -9,6 +9,7 @@ import {
   MeshStandardMaterial,
   RepeatWrapping,
   SRGBColorSpace,
+  TorusGeometry,
 } from 'three';
 import type { BufferGeometry, Material, Texture } from 'three';
 
@@ -90,6 +91,22 @@ export function createProps() {
     mesh.position.set(x, y, z);
     if (axis === 'x') mesh.rotation.z = Math.PI / 2;
     if (axis === 'z') mesh.rotation.x = Math.PI / 2;
+    parent.add(mesh);
+    return mesh;
+  };
+  const torus = (
+    parent: Group,
+    material: Material,
+    r: number,
+    tube: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const geometry = new TorusGeometry(r, tube, 4, 32);
+    geometries.push(geometry);
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x, y, z);
     parent.add(mesh);
     return mesh;
   };
@@ -948,6 +965,122 @@ export function createProps() {
       box(g, yellow, width - 0.2, 0.05, 0.1, 0, 0.03, 2.4);
       box(g, steel, 0.06, 0.06, 1.2, width / 2 + 0.6, 3.2, 0.6);
       box(g, black, 0.25, 0.2, 0.25, width / 2 + 0.6, 3.1, 1.2);
+      return g;
+    },
+    /**
+     * A 36-inch drum fan on its wheeled cradle: a steel barrel about 1 m
+     * across and 0.4 m deep, wire guards front and back with concentric
+     * rings and spokes, three broad blades on the motor's hub, the motor
+     * behind, a carrying handle on top and two wheels at the foot. Off.
+     */
+    drumFan(colour = '#3d5a7a', tilt = 0.1) {
+      const g = new Group();
+      const body = paint(colour, 0.45, 0.4);
+      const wire = paint('#c9cccd', 0.35, 0.85);
+      const r = 0.49;
+      const head = new Group();
+      head.position.y = 0.62;
+      head.rotation.x = -tilt;
+      g.add(head);
+      cylinder(
+        head,
+        paint(colour, 0.45, 0.4, {
+          side: DoubleSide,
+        } as Partial<MeshStandardMaterial>),
+        r,
+        0.38,
+        0,
+        0,
+        0,
+        'z',
+        32,
+        r,
+        true,
+      );
+      torus(head, body, r, 0.02, 0, 0, 0.19);
+      torus(head, body, r, 0.02, 0, 0, -0.19);
+      for (const z of [0.2, -0.2]) {
+        for (const k of [0.2, 0.4, 0.6, 0.8, 1])
+          torus(head, wire, r * k, 0.004, 0, 0, z);
+        for (let a = 0; a < 12; a++) {
+          const spoke = box(head, wire, 0.006, r * 2, 0.006, 0, 0, z);
+          spoke.rotation.z = (a / 12) * Math.PI;
+        }
+      }
+      // Three blades on the hub, still.
+      cylinder(head, black, 0.07, 0.08, 0, 0, 0.02, 'z', 16);
+      for (let b = 0; b < 3; b++) {
+        const blade = box(
+          head,
+          paint('#9aa3a8', 0.35, 0.7),
+          0.24,
+          0.38,
+          0.01,
+          0,
+          0,
+          0.02,
+        );
+        blade.geometry.translate(0, 0.24, 0);
+        blade.rotation.set(0, 0.35, (b / 3) * Math.PI * 2);
+      }
+      cylinder(head, black, 0.12, 0.2, 0, 0, -0.12, 'z', 20);
+      // The cradle: a yoke on the axle, a base frame, wheels and a handle.
+      for (const sx of [-1, 1])
+        box(g, body, 0.04, 0.6, 0.06, sx * (r + 0.05), 0.33, 0);
+      box(g, body, 2 * r + 0.14, 0.05, 0.06, 0, 0.05, 0.12);
+      box(g, body, 2 * r + 0.14, 0.05, 0.06, 0, 0.05, -0.18);
+      for (const sx of [-1, 1])
+        cylinder(g, black, 0.08, 0.05, sx * (r + 0.05), 0.08, -0.22, 'x', 14);
+      box(g, body, 0.3, 0.04, 0.04, 0, 0.62 + r + 0.08, 0);
+      for (const sx of [-1, 1])
+        box(g, body, 0.04, 0.1, 0.04, sx * 0.14, 0.62 + r + 0.03, 0);
+      return g;
+    },
+    /**
+     * A 30-inch pedestal fan: a cross-legged base, a telescoping column
+     * about 1.7 m tall, the motor and a round guard with three blades
+     * inside. Off.
+     */
+    pedestalFan(colour = '#2b2b2b') {
+      const g = new Group();
+      const body = paint(colour, 0.45, 0.5);
+      const wire = paint('#c9cccd', 0.35, 0.85);
+      for (const a of [0, Math.PI / 2]) {
+        const leg = box(g, body, 0.75, 0.04, 0.06, 0, 0.03, 0);
+        leg.rotation.y = a + Math.PI / 4;
+      }
+      cylinder(g, body, 0.03, 1.1, 0, 0.6, 0, 'y', 10);
+      cylinder(g, steel, 0.022, 0.5, 0, 1.4, 0, 'y', 10);
+      const head = new Group();
+      head.position.set(0, 1.7, 0);
+      head.rotation.x = -0.15;
+      g.add(head);
+      cylinder(head, body, 0.11, 0.22, 0, 0, -0.17, 'z', 18);
+      const r = 0.39;
+      for (const z of [0.04, -0.06]) {
+        for (const k of [0.25, 0.5, 0.75, 1])
+          torus(head, wire, r * k, 0.003, 0, 0, z);
+        for (let a = 0; a < 16; a++) {
+          const spoke = box(head, wire, 0.004, r * 2, 0.004, 0, 0, z);
+          spoke.rotation.z = (a / 16) * Math.PI;
+        }
+      }
+      torus(head, body, r, 0.018, 0, 0, -0.01);
+      cylinder(head, black, 0.05, 0.05, 0, 0, -0.01, 'z', 14);
+      for (let b = 0; b < 3; b++) {
+        const blade = box(
+          head,
+          paint('#b8bec2', 0.35, 0.7),
+          0.2,
+          0.3,
+          0.008,
+          0,
+          0,
+          -0.01,
+        );
+        blade.geometry.translate(0, 0.18, 0);
+        blade.rotation.set(0, 0.35, (b / 3) * Math.PI * 2 + 0.4);
+      }
       return g;
     },
     dispose() {

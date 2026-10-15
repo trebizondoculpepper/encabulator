@@ -214,6 +214,16 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.palletJack(), 25, southWall - 3.5, 0.6);
   put(props.bollards(3, 1.3), -46, southWall - 2.2);
 
+  // Industrial fans standing about, switched off.
+  put(props.drumFan('#3d5a7a'), 12, northWall + 4.5, 0.5);
+  put(props.drumFan('#c8a21b'), 42, southWall - 3.5, Math.PI - 0.4);
+  put(props.drumFan('#3d5a7a', 0.25), -33, southWall - 3, Math.PI + 0.3);
+  put(props.drumFan('#5c6166'), 58, northWall + 5, -0.3);
+  put(props.pedestalFan(), -36.5, southWall - 2.6, Math.PI);
+  put(props.pedestalFan('#4a5a4a'), 20, northWall + 2.6, 0.2);
+  put(props.pedestalFan(), -24.5, -NAVE_WIDTH / 2 - 1.6, 0.4);
+  put(props.drumFan('#3d5a7a'), 30.5, NAVE_WIDTH / 2 + 1.8, Math.PI + 0.8);
+
   // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
   const services = createHallServices();
   services.group.scale.setScalar(m);
