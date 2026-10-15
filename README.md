@@ -1,5 +1,7 @@
 # Encabulator
 
+Play it at https://trebizondoculpepper.github.io/encabulator/ (the Hall: https://trebizondoculpepper.github.io/encabulator/?room=dev4). Every push to `main` that passes CI is deployed there.
+
 A browser game about a mysterious machine whose operation is stupid, opaque and profoundly unsafe, after Rockwell Automation's Retro Encabulator film. It is set in an American plant in the late 1990s.
 
 The machine is not built yet. The game is currently a row of development rooms:

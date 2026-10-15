@@ -9,7 +9,7 @@ For now the game is a series of development rooms that test the concepts the mac
 ## Rules
 
 - Work on `main`. Do not create branches or worktrees unless the owner asks.
-- Before committing, run `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test` and `npm run build`. CI (`.github/workflows/ci.yml`) runs the same five.
+- Before committing, run `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test` and `npm run build`. CI (`.github/workflows/ci.yml`) runs the same five, and on a push to `main` that passes them it deploys the build to GitHub Pages: https://trebizondoculpepper.github.io/encabulator/. Vite's `base: './'` keeps every asset path relative, so the site works under `/encabulator/`; keep links relative too (`?room=dev4`, never `/?room=dev4`).
 - Markdown is one paragraph per line, never hard-wrapped.
 - Record significant sessions in `diary/`.
 - Never commit `agent-mailbox.toml` or `agent-inbox.toml`.
