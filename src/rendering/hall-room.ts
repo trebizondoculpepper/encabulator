@@ -33,6 +33,12 @@ import {
 import { createHallServices } from '../scene/hall-services';
 import { createFloorMarkings } from '../scene/floor-markings';
 import { OFFICE, createPlantOffice } from '../scene/plant-office';
+import {
+  createAmenityBlock,
+  createDriversToilet,
+  createSafetyShower,
+  createSecurityBooth,
+} from '../scene/plant-amenities';
 import { createFloorReflection } from '../scene/floor-reflection';
 import {
   HALL_LENGTH,
@@ -156,7 +162,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   for (let i = 0; i < 10; i++)
     put(
       props.cartons(2 + (i % 3), i + 1),
-      4 + (i % 5) * 1.5,
+      5.5 + (i % 5) * 1.5,
       northWall + 0.7 + Math.floor(i / 5) * 1.3,
     );
   // Drums and IBC totes: a chemical store at the west end of the south hall.
@@ -202,7 +208,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.switchgear(6), 62, northWall + 0.3);
   put(props.transformer(), 68.6, northWall + 0.4);
   put(props.bollards(5, 1.3), 62, northWall + 2.2);
-  put(props.dumpster(), -6, northWall + 0.5);
+  put(props.dumpster(), 8, southWall - 0.7, Math.PI);
   put(props.rollingLadder(8), 44, northWall + 3.2, Math.PI);
   for (let i = 0; i < 3; i++)
     put(props.racking(3, 3, i + 7), 34 + i * 8.6, southWall - 0.35, Math.PI);
@@ -238,6 +244,47 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       minZ: s.minZ + officeAt.z,
       maxZ: s.maxZ + officeAt.z,
     });
+
+  /** Stand a built piece at (x, z) turned by `yaw` (a quarter turn or two), its walls solid. */
+  const disposers: (() => void)[] = [];
+  const stand = (
+    piece: { group: Group; solids: Footprint[]; dispose(): void },
+    x: number,
+    z: number,
+    yaw = 0,
+  ) => {
+    piece.group.position.set(x, 0, z);
+    piece.group.rotation.y = yaw;
+    propGroup.add(piece.group);
+    disposers.push(piece.dispose);
+    const c = Math.round(Math.cos(yaw));
+    const s = Math.round(Math.sin(yaw));
+    for (const f of piece.solids) {
+      // Turn the footprint's corners as the group turns them.
+      const xs = [f.minX, f.maxX].flatMap((px) =>
+        [f.minZ, f.maxZ].map((pz) => [px * c + pz * s, -px * s + pz * c]),
+      );
+      propSolids.push({
+        minX: x + Math.min(...xs.map((p) => p[0])),
+        maxX: x + Math.max(...xs.map((p) => p[0])),
+        minZ: z + Math.min(...xs.map((p) => p[1])),
+        maxZ: z + Math.max(...xs.map((p) => p[1])),
+      });
+    }
+  };
+  // The amenity block beside the office: restrooms, janitor, first aid.
+  const amenities = createAmenityBlock();
+  stand(
+    amenities,
+    -8.8 + amenities.size.w / 2,
+    northWall - 0.4 + amenities.size.d / 2,
+  );
+  // The drivers' toilet by the docks, its door toward the nave.
+  stand(createDriversToilet(), 71, southWall - 1.6, -Math.PI / 2);
+  // The security booth overlooking the east personnel door and the docks.
+  stand(createSecurityBooth(), 69.5, 26.5, Math.PI);
+  // The emergency shower and eyewash by the chemical store.
+  stand(createSafetyShower(), -60, southWall - 4, Math.PI);
 
   // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
   const services = createHallServices();
@@ -361,8 +408,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     marks.line(-13, -34, -13, -22.6, 0.1);
     marks.line(-11.4, -34, -11.4, -22.6, 0.1);
     marks.stencil('OFFICE', -12.2, -27, 0.5, 0, '#e1a915');
-    marks.outline(7, north + 1.4, 8, 3.2, 'white');
-    marks.stencil('A1', 7, north + 3.6, 0.6, 0, '#ecebe6');
+    marks.outline(8.5, north + 1.4, 8, 3.2, 'white');
+    marks.stencil('A1', 8.5, north + 3.6, 0.6, 0, '#ecebe6');
     for (let i = 0; i < 3; i++) {
       marks.outline(18 + i * 8.6, north + 0.35, 8.4, 1.4, 'white');
       marks.stencil(
@@ -615,6 +662,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     notes.remove();
     hall.dispose();
     office.dispose();
+    for (const d of disposers) d();
     shine.dispose();
     services.dispose();
     marks.dispose();
