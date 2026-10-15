@@ -8,6 +8,4 @@ The five project checks passed: typecheck, lint, format check, 199 tests and bui
 
 After listening, the owner heard the end of “helix” clipped in looking line 39. The old cut ended at 74.84 seconds while the word lasts to about 74.98; extended the source cut to 75.45 seconds and moved the fade after the word, then regenerated the browser MP3 and corrected the manifest.
 
-The owner then heard “lives” clipped in helix line 40. The old cut ended at 84.04 seconds while the word lasts to about 84.16; recut 78.70–84.70 seconds to retain both the opening and ending, regenerated the game MP3, and corrected the manifest.
-
-An audit of the remaining 16 cuts found other words within the old fade windows. Recut each with 0.65 seconds more room tone at the start and 0.70 seconds at the end, keeping the two source passages of clip 46 joined by a short pause. Regenerated all game MP3s and updated the manifest so fades now land after complete words.
+The owner then heard “lives” clipped in helix line 40. The old cut ended at 84.04 seconds while the word lasts to about 84.16. An initial correction added room tone across every new clip and was pushed; the owner rejected that approach. The corrective cut restores all original tight starts and all unaffected endings. Only clips 35, 36, 38, 40, 41, 42, 45, 46, 48 and 49 have their ends extended enough to put the fade after the final word. The unchanged MP3s were verified byte-for-byte against the earlier commit.
