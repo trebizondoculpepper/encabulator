@@ -1,6 +1,6 @@
 # Narration: from script to game audio
 
-How the narrator's lines get from the owner's improvisation into the game. Written so the work can be resumed in a later session. The plinth room (dev5) is the first scene done this way.
+How the narrator's lines get from the owner's improvisation into the game. Written so the work can be resumed in a later session. The rhombus mini-game is the first scene done this way.
 
 ## The files
 

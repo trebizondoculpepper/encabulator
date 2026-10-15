@@ -8,7 +8,7 @@ import {
   WALL_THICKNESS,
   enterDevRoom,
 } from '../game/dev-room-links';
-import type { DevRoomId, Portal } from '../game/dev-room-links';
+import type { RoomId, Portal } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { createPs1Material } from '../rendering/ps1-material';
 import { createLabelTexture } from './screens';
@@ -34,7 +34,7 @@ const INWARD: Record<Portal['side'], { x: number; z: number; yaw: number }> = {
  * room. Built in scene units, `metre` per metre, on a floor at `floorY`.
  */
 export function createPortals(
-  from: DevRoomId,
+  from: RoomId,
   portals: readonly Portal[],
   floorY: number,
   metre: number,
@@ -48,7 +48,7 @@ export function createPortals(
   const face = (WALL_THICKNESS / 2) * metre + 0.01 * metre;
   let leaving = false;
   const uses = new Map<Mesh, () => void>();
-  const travel = (to: DevRoomId) => {
+  const travel = (to: RoomId) => {
     if (leaving) return;
     leaving = true;
     enterDevRoom(to, from);
@@ -64,7 +64,7 @@ export function createPortals(
     // Planes face +z; turn each to face into the room.
     frame.rotation.y = Math.atan2(inward.x, inward.z);
     group.add(frame);
-    if (from === 'dev5') {
+    if (from === 'rhombus') {
       const steel = createPs1Material({
         color: '#777e7d',
         metalness: 0.75,

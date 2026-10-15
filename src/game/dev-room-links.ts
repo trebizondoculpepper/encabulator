@@ -8,10 +8,11 @@ import type { Footprint } from './walk-collision';
  * on its west wall and to the room after it on its east wall.
  */
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4' | 'dev5';
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev4';
+export type RoomId = DevRoomId | 'rhombus';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
-  to: DevRoomId;
+  to: RoomId;
   side: PortalSide;
   /** The middle of the patch, on the wall's centre line. */
   x: number;
@@ -25,25 +26,27 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev2',
   'dev3',
   'dev4',
-  'dev5',
 ];
 
-export const DEV_ROOM_NAMES: Record<DevRoomId, string> = {
+/** The mini-game has its own public room ID. */
+export const ROOMS: readonly RoomId[] = [...DEV_ROOMS, 'rhombus'];
+
+export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev0: 'DEV0 · CONTROLS AND DISPLAYS',
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
   dev4: 'DEV4 · THE HALL',
-  dev5: 'DEV5 · PLINTHS',
+  rhombus: 'RHOMBUS',
 };
 /** Each room's portal colour, so a portal says where it goes. */
-export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
+export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev0: '#2fb3a5',
   dev1: '#d0732c',
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
   dev4: '#c9c23a',
-  dev5: '#d8d4c8',
+  rhombus: '#d8d4c8',
 };
 export const PORTAL_WIDTH = 1.2;
 export const PORTAL_HEIGHT = 2.2;
@@ -53,7 +56,7 @@ export const WALL_THICKNESS = 0.3;
 /** The hall, where the game takes place: every room has a way to it. */
 export const HALL: DevRoomId = 'dev4';
 /** The rooms the hall's door station leads to. */
-export const STATION_ROOMS: readonly DevRoomId[] = DEV_ROOMS.filter(
+export const STATION_ROOMS: readonly RoomId[] = ROOMS.filter(
   (id) => id !== HALL,
 );
 
@@ -65,7 +68,7 @@ export const STATION_ROOMS: readonly DevRoomId[] = DEV_ROOMS.filter(
  * wall portals: its door station leads everywhere.
  */
 export function devPortals(
-  id: DevRoomId,
+  id: RoomId,
   bounds: Footprint,
   metre: number,
 ): Portal[] {
@@ -74,7 +77,8 @@ export function devPortals(
   // Neighbours in order, passing over the hall, which has the station.
   const at = STATION_ROOMS.indexOf(id);
   const portals: Portal[] = [];
-  if (id === 'dev5') return [{ to: HALL, side: 'east', x: bounds.maxX, z: 0 }];
+  if (id === 'rhombus')
+    return [{ to: HALL, side: 'east', x: bounds.maxX, z: 0 }];
   if (at > 0)
     portals.push({
       to: STATION_ROOMS[at - 1],
@@ -145,6 +149,6 @@ export function devWalls(
 }
 
 /** Travel is handled by the app, without reloading the browser. */
-export function enterDevRoom(to: DevRoomId, from: DevRoomId) {
+export function enterDevRoom(to: RoomId, from: RoomId) {
   window.dispatchEvent(new CustomEvent('dev-room', { detail: { to, from } }));
 }

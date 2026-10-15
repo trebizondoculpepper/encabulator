@@ -1,6 +1,6 @@
 # The plinth room: recording script
 
-The narrator's lines for dev5, the plinth room (`src/rendering/plinth-room.ts`). Each clip is one recording, played at one moment of the visit. File names are what each recording is saved as (`.wav` or `.flac` from the microphone; they will be compressed for the game).
+The narrator's lines for the rhombus mini-game (`src/rendering/plinth-room.ts`). Each clip is one recording, played at one moment of the visit. File names are what each recording is saved as (`.wav` or `.flac` from the microphone; they will be compressed for the game).
 
 Where the moment a clip plays is my guess from its content rather than something the owner said, it is marked _(guess)_. Small wording tidies for performance are marked _(tidied)_, with what was said in the note.
 

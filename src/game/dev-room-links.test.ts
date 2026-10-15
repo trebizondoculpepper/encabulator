@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
   DEV_ROOMS,
+  ROOMS,
   HALL,
   STATION_ROOMS,
   devPortals,
@@ -14,14 +15,14 @@ describe('development rooms', () => {
     for (const [i, id] of STATION_ROOMS.entries()) {
       const to = devPortals(id, bounds, 1).map((p) => p.to);
       for (const next of [STATION_ROOMS[i - 1], STATION_ROOMS[i + 1]].filter(
-        (room) => room && room !== 'dev5' && id !== 'dev5',
+        (room) => room && room !== 'rhombus' && id !== 'rhombus',
       )) {
         expect(to).toContain(next);
         expect(devPortals(next, bounds, 1).map((p) => p.to)).toContain(id);
       }
       expect(to).toContain(HALL);
     }
-    expect(devPortals('dev5', bounds, 1)).toEqual([
+    expect(devPortals('rhombus', bounds, 1)).toEqual([
       { to: HALL, side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
@@ -29,7 +30,8 @@ describe('development rooms', () => {
   it('leaves the hall to its door station, with no wall portals', () => {
     expect(devPortals(HALL, bounds, 1)).toEqual([]);
     expect(STATION_ROOMS).not.toContain(HALL);
-    expect(STATION_ROOMS.length).toBe(DEV_ROOMS.length - 1);
+    expect(STATION_ROOMS.length).toBe(ROOMS.length - 1);
+    expect(DEV_ROOMS).not.toContain('rhombus');
   });
 
   it('have solid walls all round, portals or none', () => {

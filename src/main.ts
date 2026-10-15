@@ -1,6 +1,6 @@
 import './styles/main.css';
-import { DEV_ROOMS } from './game/dev-room-links';
-import type { DevRoomId } from './game/dev-room-links';
+import { ROOMS } from './game/dev-room-links';
+import type { RoomId } from './game/dev-room-links';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene');
 if (!canvas) throw new Error('Scene canvas is missing.');
@@ -38,12 +38,17 @@ const resetEffects = async () => {
 const openRoom = async () => {
   const ownRevision = ++revision;
   const params = new URLSearchParams(location.search);
-  const asked = params.get('room');
-  const room: DevRoomId = DEV_ROOMS.includes(asked as DevRoomId)
-    ? (asked as DevRoomId)
+  const asked = params.get('room') === 'dev5' ? 'rhombus' : params.get('room');
+  if (params.get('room') === 'dev5') {
+    const url = new URL(location.href);
+    url.searchParams.set('room', 'rhombus');
+    history.replaceState(null, '', url);
+  }
+  const room: RoomId = ROOMS.includes(asked as RoomId)
+    ? (asked as RoomId)
     : 'dev0';
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
-  if (room === 'dev5')
+  if (room === 'rhombus')
     start = (await import('./rendering/plinth-room')).startPlinthRoom;
   else if (room === 'dev4')
     start = (await import('./rendering/hall-room')).startHallRoom;
@@ -95,7 +100,7 @@ const openRoom = async () => {
 const travel = (event: Event) => {
   const { to, from } = (event as CustomEvent<{ to: string; from: string }>)
     .detail;
-  if (!DEV_ROOMS.includes(to as DevRoomId)) return;
+  if (!ROOMS.includes(to as RoomId)) return;
   const url = new URL(location.href);
   url.search = '';
   url.searchParams.set('room', to);

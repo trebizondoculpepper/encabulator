@@ -1,7 +1,7 @@
 import { Texture } from 'three';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
 import {
-  DEV_ROOMS,
+  ROOMS,
   HALL,
   STATION_ROOMS,
   devPortals,
@@ -37,7 +37,7 @@ const WALKER_RADIUS = 0.25;
  * from where a player arrives in front of each door.
  */
 describe('the portal network', () => {
-  for (const id of DEV_ROOMS.filter((r) => r !== HALL))
+  for (const id of ROOMS.filter((r) => r !== HALL))
     for (const portal of devPortals(id, bounds, 1)) {
       it(`${id}: the portal to ${portal.to} can be walked into`, () => {
         const went = journeys();
@@ -112,6 +112,6 @@ describe('the portal network', () => {
   }
 
   it('reaches every room from the Hall', () => {
-    expect([...STATION_ROOMS, HALL].sort()).toEqual([...DEV_ROOMS].sort());
+    expect([...STATION_ROOMS, HALL].sort()).toEqual([...ROOMS].sort());
   });
 });

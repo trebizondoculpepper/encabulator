@@ -14,7 +14,7 @@ import {
   DEV_ROOM_NAMES,
   enterDevRoom,
 } from '../game/dev-room-links';
-import type { DevRoomId } from '../game/dev-room-links';
+import type { RoomId } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { createLabelTexture } from './screens';
 
@@ -34,8 +34,8 @@ export const DOOR_PITCH = 4;
  * `metre` per metre, on the floor at y = 0.
  */
 export function createDoorStation(
-  from: DevRoomId,
-  rooms: readonly DevRoomId[],
+  from: RoomId,
+  rooms: readonly RoomId[],
   metre: number,
 ) {
   const group = new Group();
@@ -81,7 +81,7 @@ export function createDoorStation(
   const span = (rooms.length - 1) * DOOR_PITCH;
   let leaving = false;
   const uses = new Map<Mesh, () => void>();
-  const travel = (to: DevRoomId) => {
+  const travel = (to: RoomId) => {
     if (leaving) return;
     leaving = true;
     enterDevRoom(to, from);

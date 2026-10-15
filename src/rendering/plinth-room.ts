@@ -121,7 +121,12 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     scene.add(mesh);
     roomMeshes.push(mesh);
   }
-  const portals = createPortals('dev5', devPortals('dev5', bounds, m), 0, m);
+  const portals = createPortals(
+    'rhombus',
+    devPortals('rhombus', bounds, m),
+    0,
+    m,
+  );
   scene.add(portals.group);
 
   // Two luminous tape edges lead from the gallery's south approach round
