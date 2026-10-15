@@ -88,6 +88,9 @@ export function createFirstPerson(options: FirstPersonOptions) {
     zoom: 1,
   };
   const keys = new Set<string>();
+  // Keys pressed since the last frame: a tap shorter than a frame still
+  // takes a step, however slowly the room draws.
+  const tapped = new Set<string>();
   const nudge = { forward: 0, right: 0 };
   let lockRefused = false;
 
@@ -157,6 +160,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (WALK_KEYS.has(event.code)) {
       keys.add(event.code);
+      tapped.add(event.code);
       if (event.code.startsWith('Arrow')) event.preventDefault();
     }
     if (event.repeat) return;
@@ -171,7 +175,10 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (event.code === 'KeyE') options.use(0, 0);
   };
   const keyup = (event: KeyboardEvent) => keys.delete(event.code);
-  const forget = () => keys.clear();
+  const forget = () => {
+    keys.clear();
+    tapped.clear();
+  };
   const look = (event: MouseEvent) => {
     if (!locked()) return;
     // Looking slows as the view zooms in, so small controls stay easy to aim at.
@@ -181,7 +188,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
   };
   const lockChange = () => {
     crosshair.hidden = !locked();
-    if (!locked()) keys.clear();
+    if (!locked()) forget();
   };
   const refuseLock = () => {
     lockRefused = true;
@@ -281,7 +288,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
     },
     /** Walk and look for `delta` seconds, then place the camera. */
     update(delta: number) {
-      const held = (...codes: string[]) => codes.some((code) => keys.has(code));
+      const held = (...codes: string[]) =>
+        codes.some((code) => keys.has(code) || tapped.has(code));
       const ahead =
         (held('KeyW', 'ArrowUp') ? 1 : 0) - (held('KeyS', 'ArrowDown') ? 1 : 0);
       const aside =
@@ -295,6 +303,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
         metre *
         (walker.lowCrouched ? 0.3 : walker.crouched ? 0.5 : 1) *
         delta;
+      tapped.clear();
       const forward = (ahead / length) * speed + nudge.forward;
       const right = (aside / length) * speed + nudge.right;
       nudge.forward = 0;

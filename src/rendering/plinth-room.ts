@@ -49,6 +49,10 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
   const renderer = createNodeRenderer(canvas);
+  // At the screen's own resolution, not twice it: the room is dark and
+  // soft, and at twice it a large display drew it at a few frames a
+  // second, too slow to walk in.
+  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 1));
   renderer.setClearColor('#050506');
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(60, 1, 0.05, 200 * m);
@@ -241,6 +245,12 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
         y * m,
       );
     },
+    /** Where the visitor stands, metres, and which way they face. */
+    where: () => ({
+      x: walk.walker.x / m,
+      z: walk.walker.z / m,
+      yaw: walk.walker.yaw,
+    }),
     /** The plinth the visitor is at, and the one visited before it. */
     active: () => tracker.active(),
     previous: () => tracker.previous(),
