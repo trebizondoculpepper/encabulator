@@ -1,4 +1,5 @@
-import { createRenderer } from './render-style';
+import { createHallPipeline, createHallRenderer } from './hall-pipeline';
+import { CubeRenderTarget } from 'three/webgpu';
 import {
   Box3,
   Color,
@@ -6,21 +7,14 @@ import {
   DirectionalLight,
   Fog,
   Group,
-  HalfFloatType,
   HemisphereLight,
   PerspectiveCamera,
-  PMREMGenerator,
   Raycaster,
   Scene,
   Vector2,
   Vector3,
-  WebGLCubeRenderTarget,
 } from 'three';
 import type { Mesh, Object3D } from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { N8AOPass } from 'n8ao';
 import { kelvinToRgb } from '../game/colour-temperature';
 import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
@@ -40,7 +34,6 @@ import {
   createSafetyShower,
   createSecurityBooth,
 } from '../scene/plant-amenities';
-import { createFloorReflection } from '../scene/floor-reflection';
 import {
   HALL_LENGTH,
   HALL_WIDTH,
@@ -80,8 +73,7 @@ import { knobDirection } from '../scene/rotary-knob';
 export function startHallRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
-  const renderer = createRenderer(canvas);
-  renderer.info.autoReset = false;
+  const renderer = createHallRenderer(canvas);
   renderer.setClearColor('#d8dadb');
   const fog = new Fog('#d4d7d8', 45 * m, 260 * m);
   scene.fog = fog;
@@ -104,12 +96,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   hall.group.scale.setScalar(m);
   scene.add(hall.group);
 
-  // The polished floor's shine: the hall reflected in it.
-  const shine = createFloorReflection(HALL_LENGTH * m, HALL_WIDTH * m);
-  shine.mesh.position.y = 0.004 * m;
-  scene.add(shine.mesh);
-  // The planar reflection gives the floor its shine; the environment map
-  // only its soft fill.
+  // Screen-space reflections give the floor its shine (hall-pipeline.ts);
+  // the environment map only its soft fill.
   surfaces.floor.material.envMapIntensity = 0.35;
 
   // The door station in the middle of the nave.
@@ -642,41 +630,22 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     if (detail) culler.add(mesh, { minSize: 0, maxDistance: detail * m });
   }
 
-  // ---- Reflections: the hall seen from its middle, for the floor ---------
-  const pmrem = new PMREMGenerator(renderer);
-  let environment: ReturnType<PMREMGenerator['fromCubemap']> | null = null;
+  // ---- The environment: the hall seen from its middle, for image light --
+  let environment: CubeRenderTarget | null = null;
   const reflect = () => {
-    const target = new WebGLCubeRenderTarget(256, { type: HalfFloatType });
+    const target = new CubeRenderTarget(256);
     const cube = new CubeCamera(0.1 * m, 400 * m, target);
     cube.position.set(0, 1.6 * m, 12 * m);
     scene.environment = null;
     culler.showAll();
-    shine.mesh.visible = false;
     cube.update(renderer, scene);
-    shine.mesh.visible = settings.floorShine > 0.001;
     environment?.dispose();
-    environment = pmrem.fromCubemap(target.texture);
-    target.dispose();
-    scene.environment = environment.texture;
+    environment = target;
+    scene.environment = target.texture;
   };
 
-  // Bloom, so the skylights, windows and lamps glare.
-  const composer = new EffectComposer(renderer);
-  // Ambient occlusion: the soft darkening where things meet the floor and
-  // walls, under desks and inside racking (N8AO). It renders the scene
-  // itself and finds the occlusion in that same depth, so the hall is not
-  // drawn twice for it. Its radius is in world units: 1.6 m.
-  const ao = new N8AOPass(scene, camera, 256, 256);
-  ao.configuration.aoRadius = 1.6 * m;
-  ao.configuration.distanceFalloff = 0.6 * m;
-  ao.configuration.halfRes = true;
-  ao.configuration.depthAwareUpsampling = true;
-  ao.configuration.gammaCorrection = false;
-  ao.setQualityMode('Medium');
-  composer.addPass(ao);
-  const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.55, 0.6, 0.92);
-  composer.addPass(bloom);
-  composer.addPass(new OutputPass());
+  // The render pipeline: global illumination, reflections, bloom, TRAA.
+  const pipeline = createHallPipeline(renderer, scene, camera, m);
 
   /** Put the settings into the materials and lights. */
   const apply = (s: HallSettings) => {
@@ -707,16 +676,14 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     lampFill.intensity = 0.9 * s.lampIntensity;
     lampKey.color.copy(lampColour);
     lampKey.intensity = 0.6 * s.lampIntensity;
-    shine.setStrength(s.floorShine);
-    shine.setBlur(s.floorBlur);
-    bloom.strength = s.bloom;
-    // The AO pass also draws the scene, so it stays on; zero is no shading.
-    ao.configuration.intensity = s.occlusion;
+    pipeline.setReflections(s.floorShine);
+    pipeline.setGlobalIllumination(s.bounce);
+    pipeline.setOcclusion(s.occlusion);
+    pipeline.setBloom(s.bloom);
     fog.near = (90 - 70 * s.haze) * m;
     fog.far = (520 - 420 * s.haze) * m;
   };
   apply(settings);
-  reflect();
   let reflectTimer = 0;
   // The console desk, a few metres from the door station, its panel
   // facing the doors.
@@ -812,8 +779,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
     renderer.setSize(Math.round(width), Math.round(height), false);
-    composer.setSize(Math.round(width), Math.round(height));
-    shine.setSize(Math.round(width * 0.75), Math.round(height * 0.75));
     ps1Uniforms.resolution.value.set(Math.round(width), Math.round(height));
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -843,7 +808,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     settings: () => structuredClone(settings),
     /** What the last frame cost: draw calls, triangles, geometries, textures. */
     stats: () => ({
-      ...renderer.info.render,
+      calls: renderer.info.render.drawCalls,
+      triangles: renderer.info.render.triangles,
       ...renderer.info.memory,
       culled: culler.hidden(),
       cullable: culler.count(),
@@ -857,7 +823,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   };
 
   let last = 0;
-  renderer.setAnimationLoop((time) => {
+  const frame = (time: number) => {
     if (canvas.parentElement?.hidden) {
       last = 0;
       return;
@@ -875,12 +841,19 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
         (target - door.hinge.rotation.y) * Math.min(1, delta * 5);
     }
     culler.update();
-    // Count the whole frame (reflection, scene, bloom), not the last pass.
-    renderer.info.reset();
-    composer.render();
+    pipeline.render();
+  };
+  // The renderer starts asynchronously (it may be opening WebGPU); the
+  // environment is captured and the frames begin once it is ready.
+  let running = true;
+  void renderer.init().then(() => {
+    if (!running) return;
+    reflect();
+    void renderer.setAnimationLoop(frame);
   });
   const dispose = () => {
-    renderer.setAnimationLoop(null);
+    running = false;
+    void renderer.setAnimationLoop(null);
     observer.disconnect();
     window.clearTimeout(reflectTimer);
     walk.dispose();
@@ -890,7 +863,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     hall.dispose();
     office.dispose();
     for (const d of disposers) d();
-    shine.dispose();
     services.dispose();
     marks.dispose();
     for (const d of [...bigDoors, ...personDoors]) d.dispose();
@@ -899,9 +871,8 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     for (const s of Object.values(surfaces)) s.material.dispose();
     disposeFinishTextures();
     environment?.dispose();
-    pmrem.dispose();
-    composer.dispose();
-    renderer.dispose();
+    pipeline.dispose();
+    void renderer.dispose();
   };
   return Object.assign(dispose, {
     enter(previous: string | null) {

@@ -1,9 +1,4 @@
-import {
-  createRenderer,
-  realistic,
-  renderScale,
-  useEnvironment,
-} from './render-style';
+import { createRenderer, useEnvironment } from './render-style';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import { createPortals } from '../scene/portals';
 import {
@@ -1276,17 +1271,14 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
   };
 
   // ---- Running ------------------------------------------------------------
-  // The PS1 resolution, on P; the realistic style starts without it.
-  let ps1 = !realistic;
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
-    const scale = ps1 ? renderScale(width, height, true) : 1;
+    const scale = 1;
     const rw = Math.max(1, Math.round(width * scale));
     const rh = Math.max(1, Math.round(height * scale));
     renderer.setSize(rw, rh, false);
     ps1Uniforms.resolution.value.set(rw, rh);
-    ps1Uniforms.snapStrength.value = ps1 ? 0.35 : 0;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
   };
@@ -1294,15 +1286,6 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
-  const onKey = (event: KeyboardEvent) => {
-    if (canvas.parentElement?.hidden) return;
-    if (event.target instanceof HTMLInputElement) return;
-    if (event.key === 'p' || event.key === 'P') {
-      ps1 = !ps1;
-      resize();
-    }
-  };
-  window.addEventListener('keydown', onKey);
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const walk = createFirstPerson({
@@ -1381,10 +1364,6 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
     },
     freeze(value: boolean) {
       frozen = value;
-    },
-    setPs1(value: boolean) {
-      ps1 = value;
-      resize();
     },
   };
 
@@ -1479,7 +1458,6 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
   const dispose = () => {
     renderer.setAnimationLoop(null);
     observer.disconnect();
-    window.removeEventListener('keydown', onKey);
     walk.dispose();
     passages.dispose();
     notes.remove();

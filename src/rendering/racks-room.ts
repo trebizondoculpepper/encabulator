@@ -1,9 +1,4 @@
-import {
-  createRenderer,
-  realistic,
-  renderScale,
-  useEnvironment,
-} from './render-style';
+import { createRenderer, useEnvironment } from './render-style';
 import {
   AmbientLight,
   BoxGeometry,
@@ -499,11 +494,10 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     font: '13px monospace',
   });
   canvas.parentElement?.append(notes);
-  let ps1 = !realistic;
   const resize = () => {
     const { width, height: tall } = canvas.getBoundingClientRect();
     if (!width || !tall) return;
-    const scale = ps1 ? renderScale(width, tall, true) : 1;
+    const scale = 1;
     const w = Math.round(width * scale);
     const h = Math.round(tall * scale);
     renderer.setSize(w, h, false);
@@ -514,14 +508,6 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
-  const onKey = (event: KeyboardEvent) => {
-    if (canvas.parentElement?.hidden) return;
-    if (event.key === 'p' || event.key === 'P') {
-      ps1 = !ps1;
-      resize();
-    }
-  };
-  window.addEventListener('keydown', onKey);
   (window as unknown as { devRacks: unknown }).devRacks = {
     /** Stand with the eye at (x, y, z), looking at (tx, ty, tz), in metres. */
     view(x: number, y: number, z: number, tx: number, ty: number, tz: number) {
@@ -534,10 +520,6 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
         Math.atan2(ty - y, Math.hypot(dx, dz)),
         y * m,
       );
-    },
-    setPs1(value: boolean) {
-      ps1 = value;
-      resize();
     },
   };
 
@@ -557,7 +539,6 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
   const dispose = () => {
     renderer.setAnimationLoop(null);
     observer.disconnect();
-    window.removeEventListener('keydown', onKey);
     walk.dispose();
     portals.dispose();
     notes.remove();

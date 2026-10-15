@@ -25,11 +25,12 @@ export interface HallSettings {
   /** The overcast daylight through the skylights and windows. */
   skyIntensity: number;
   skyKelvin: number;
-  /** How strongly the polished floor reflects, and how softly. */
+  /** How strongly the polished floor (and every shiny surface) reflects. */
   floorShine: number;
-  floorBlur: number;
+  /** How much light bounces from surface to surface (global illumination), 0 to 3. */
+  bounce: number;
   bloom: number;
-  /** How strongly corners and contacts are shaded (ambient occlusion), 0 to 6. */
+  /** How strongly corners and contacts are shaded (ambient occlusion), 0 to 2. */
   occlusion: number;
   /** How thick the haze is, 0 to 1. */
   haze: number;
@@ -52,10 +53,10 @@ export function defaultHallSettings(): HallSettings {
     lampKelvin: 4000,
     skyIntensity: 0.6,
     skyKelvin: 7000,
-    floorShine: 0.55,
-    floorBlur: 0.45,
+    floorShine: 1,
+    bounce: 1,
     bloom: 0.5,
-    occlusion: 2.5,
+    occlusion: 1,
     haze: 0.35,
   };
 }
@@ -94,7 +95,8 @@ export function saveHallSettings(settings: HallSettings) {
  * and rows for the light, with a display naming the last knob touched.
  * FINISH steps through a surface's finishes; SHADE darkens or lightens
  * the finish's own colour; ROUGH and METAL set how it takes the light.
- * The floor's row also sets its SHINE and how SOFT the reflection is.
+ * The floor's row also sets SHINE, the strength of reflections, and
+ * BOUNCE, how much light bounces between surfaces.
  * LAMPS and SKY set brightness and colour temperature in kelvin. Every
  * change is heard by `changed`; the settings are kept in this browser.
  * Built in metres, standing on the floor, its panel facing +z.
@@ -179,12 +181,12 @@ export function createHallConsole(
                 { steps: 40 },
               ),
               dial(
-                'SOFT',
+                'BOUNCE',
                 0,
-                1,
-                () => settings.floorBlur,
-                (v) => (settings.floorBlur = v),
-                { steps: 20 },
+                3,
+                () => settings.bounce,
+                (v) => (settings.bounce = v),
+                { steps: 30 },
               ),
             ]
           : [
@@ -251,10 +253,10 @@ export function createHallConsole(
         dial(
           'AO',
           0,
-          6,
+          2,
           () => settings.occlusion,
           (v) => (settings.occlusion = v),
-          { steps: 24 },
+          { steps: 20 },
         ),
         dial(
           'BLOOM',

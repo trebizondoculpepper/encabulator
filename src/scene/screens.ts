@@ -1,21 +1,14 @@
-import { realistic } from '../rendering/render-style';
-import { CanvasTexture, NearestFilter, SRGBColorSpace } from 'three';
+import { CanvasTexture, SRGBColorSpace } from 'three';
 
-/** A small canvas texture, sampled without smoothing for the PS1 look. */
+/** A small canvas texture for lettering and screens. */
 export function createCanvasTexture(width: number, height: number) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d')!;
   const texture = new CanvasTexture(canvas);
-  if (realistic) {
-    // Smooth, sharp lettering at any distance and angle.
-    texture.anisotropy = 8;
-  } else {
-    texture.magFilter = NearestFilter;
-    texture.minFilter = NearestFilter;
-    texture.generateMipmaps = false;
-  }
+  // Smooth, sharp lettering at any distance and angle.
+  texture.anisotropy = 8;
   texture.colorSpace = SRGBColorSpace;
   return { canvas, context, texture };
 }

@@ -1,9 +1,4 @@
-import {
-  createRenderer,
-  realistic,
-  renderScale,
-  useEnvironment,
-} from './render-style';
+import { createRenderer, useEnvironment } from './render-style';
 import {
   AmbientLight,
   BoxGeometry,
@@ -331,11 +326,10 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     font: '13px monospace',
   });
   canvas.parentElement?.append(notes);
-  let ps1 = !realistic;
   const resize = () => {
     const { width, height: tall } = canvas.getBoundingClientRect();
     if (!width || !tall) return;
-    const scale = ps1 ? renderScale(width, tall, true) : 1;
+    const scale = 1;
     const w = Math.round(width * scale),
       h = Math.round(tall * scale);
     renderer.setSize(w, h, false);
@@ -347,14 +341,6 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   observer.observe(canvas);
   resize();
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-  const onKey = (event: KeyboardEvent) => {
-    if (canvas.parentElement?.hidden) return;
-    if (event.key === 'p' || event.key === 'P') {
-      ps1 = !ps1;
-      resize();
-    }
-  };
-  window.addEventListener('keydown', onKey);
 
   // A handle for scripted views and checks.
   (window as unknown as { devControls: unknown }).devControls = {
@@ -369,10 +355,6 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
         Math.atan2(ty - y, Math.hypot(dx, dz)),
         y * m,
       );
-    },
-    setPs1(value: boolean) {
-      ps1 = value;
-      resize();
     },
     /** Work a part by its name, as a click would; returns whether found. */
     work(name: string, direction = 1) {
@@ -406,7 +388,6 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   const dispose = () => {
     renderer.setAnimationLoop(null);
     observer.disconnect();
-    window.removeEventListener('keydown', onKey);
     walk.dispose();
     passages.dispose();
     notes.remove();

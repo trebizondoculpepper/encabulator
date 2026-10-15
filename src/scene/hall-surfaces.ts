@@ -1,11 +1,13 @@
-import {
-  CanvasTexture,
-  Color,
-  MeshStandardMaterial,
-  RepeatWrapping,
-  SRGBColorSpace,
-} from 'three';
+import { CanvasTexture, Color, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Texture } from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import {
+  normalWorld,
+  positionWorld,
+  texture,
+  triplanarTexture,
+  uniform,
+} from 'three/tsl';
 
 /**
  * The hall's building materials: each surface (floor, walls, columns,
@@ -349,7 +351,7 @@ function finishTexture(finish: Finish) {
 
 export interface Surface {
   surface: HallSurface;
-  material: MeshStandardMaterial;
+  material: MeshStandardNodeMaterial;
   finish: Finish;
   setFinish(name: string): void;
   setColour(colour: string): void;
@@ -362,46 +364,22 @@ export interface Surface {
  * world units make a metre, so tile sizes stay in metres.
  */
 export function createSurface(surface: HallSurface, metre: number): Surface {
-  const material = new MeshStandardMaterial({ color: '#ffffff' });
-  const uniforms = {
-    triMap: { value: null as Texture | null },
-    triTile: { value: 1 },
-  };
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.triMap = uniforms.triMap;
-    shader.uniforms.triTile = uniforms.triTile;
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nvarying vec3 vTriPos;\nvarying vec3 vTriNormal;',
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-        vec4 triWorld = vec4(transformed, 1.0);
-        vec3 triNormal = objectNormal;
-        #ifdef USE_INSTANCING
-          triWorld = instanceMatrix * triWorld;
-          triNormal = mat3(instanceMatrix) * triNormal;
-        #endif
-        triWorld = modelMatrix * triWorld;
-        vTriPos = triWorld.xyz;
-        vTriNormal = normalize(mat3(modelMatrix) * triNormal);`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        '#include <common>\nuniform sampler2D triMap;\nuniform float triTile;\nvarying vec3 vTriPos;\nvarying vec3 vTriNormal;',
-      )
-      .replace(
-        '#include <map_fragment>',
-        `vec3 triN = abs(vTriNormal);
-        vec2 triUv = triN.y > max(triN.x, triN.z)
-          ? vTriPos.xz
-          : (triN.x > triN.z ? vTriPos.zy : vTriPos.xy);
-        diffuseColor *= texture2D(triMap, triUv / triTile);`,
-      );
-  };
+  // A node material (for WebGPURenderer): the finish's texture sampled
+  // three ways from world position and blended by the surface's facing,
+  // tinted by the finish's colour.
+  const first = FINISHES[surface][0];
+  const map = texture(finishTexture(first));
+  const scale = uniform(1 / (first.tile * metre));
+  const tint = uniform(new Color(first.colour));
+  const material = new MeshStandardNodeMaterial();
+  material.colorNode = triplanarTexture(
+    map,
+    null,
+    null,
+    scale,
+    positionWorld,
+    normalWorld,
+  ).mul(tint);
   const made: Surface = {
     surface,
     material,
@@ -410,14 +388,14 @@ export function createSurface(surface: HallSurface, metre: number): Surface {
       const finish =
         FINISHES[surface].find((f) => f.name === name) ?? FINISHES[surface][0];
       made.finish = finish;
-      uniforms.triMap.value = finishTexture(finish);
-      uniforms.triTile.value = finish.tile * metre;
-      material.color = new Color(finish.colour);
+      map.value = finishTexture(finish);
+      scale.value = 1 / (finish.tile * metre);
+      tint.value.set(finish.colour);
       material.roughness = finish.roughness;
       material.metalness = finish.metalness;
     },
     setColour(colour) {
-      material.color.set(colour);
+      tint.value.set(colour);
     },
     setRoughness(roughness) {
       material.roughness = roughness;
