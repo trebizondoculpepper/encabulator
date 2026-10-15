@@ -1266,8 +1266,6 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
     const hit = raycaster.intersectObjects([...controls.keys()], true)[0];
     for (let o: Object3D | null = hit?.object ?? null; o; o = o.parent) {
       const use = controls.get(o);
-      if (passages.uses.has(o as Mesh) && hit && hit.distance > 2.8 * m)
-        return undefined;
       if (use && hit) return { object: o, use, point: hit.point };
     }
     return undefined;

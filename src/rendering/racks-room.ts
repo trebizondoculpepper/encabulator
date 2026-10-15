@@ -11,7 +11,9 @@ import {
   Group,
   Mesh,
   PerspectiveCamera,
+  Raycaster,
   Scene,
+  Vector2,
 } from 'three';
 import type { Object3D } from 'three';
 import { devPortals, devWalls } from '../game/dev-room-links';
@@ -465,6 +467,8 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     racks: { x: -1 * m, z: 0.4 * m, yaw: 0, pitch: 0.05 },
     plinths: { x: 0, z: -1.6 * m, yaw: Math.PI, pitch: -0.25 },
   };
+  const raycaster = new Raycaster();
+  const pointer = new Vector2();
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
     canvas,
@@ -474,7 +478,12 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     start: views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ?? { x: 0, z: 5 * m, yaw: 0 },
     solids: () => [...walls, ...footprints],
-    use: () => {},
+    // A click on a portal travels, as walking into it does.
+    use: (x, y) => {
+      raycaster.setFromCamera(pointer.set(x, y), camera);
+      const hit = raycaster.intersectObjects([...portals.uses.keys()], true)[0];
+      if (hit) portals.uses.get(hit.object as Mesh)?.();
+    },
   });
   const notes = document.createElement('div');
   notes.textContent =

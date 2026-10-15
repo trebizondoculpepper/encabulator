@@ -28,8 +28,8 @@ const INWARD: Record<Portal['side'], { x: number; z: number; yaw: number }> = {
 
 /**
  * A room's portals: each a glowing patch on the wall in the colour of the
- * room it leads to, with that room's name over it. Walk into one and you
- * are in that room, standing in front of its portal back. `update` takes
+ * room it leads to, with that room's name over it. Walk into one, or click
+ * it, and you are in that room, standing in front of its portal back. `update` takes
  * where the walker is; `arrival` says where to stand having come from a
  * room. Built in scene units, `metre` per metre, on a floor at `floorY`.
  */
@@ -46,6 +46,13 @@ export function createPortals(
   const width = PORTAL_WIDTH * metre;
   const height = PORTAL_HEIGHT * metre;
   const face = (WALL_THICKNESS / 2) * metre + 0.01 * metre;
+  let leaving = false;
+  const uses = new Map<Mesh, () => void>();
+  const travel = (to: DevRoomId) => {
+    if (leaving) return;
+    leaving = true;
+    enterDevRoom(to, from);
+  };
   for (const portal of portals) {
     const inward = INWARD[portal.side];
     const frame = new Group();
@@ -68,6 +75,8 @@ export function createPortals(
     patch.name = `Portal to ${portal.to}`;
     patch.userData.noCollision = true;
     frame.add(patch);
+    // A click on the patch, from anywhere it can be seen, goes too.
+    uses.set(patch, () => travel(portal.to));
     const label = createLabelTexture(DEV_ROOM_NAMES[portal.to], {
       ink: '#f2efe4',
       plate: '#1c2422',
@@ -86,11 +95,10 @@ export function createPortals(
     plate.position.set(0, height + 0.2 * metre, 0.002 * metre);
     frame.add(plate);
   }
-  let leaving = false;
   return {
     group,
-    /** Portals take no click: they are walked into. */
-    uses: new Map<Mesh, () => void>(),
+    /** A click on a portal travels, as walking into it does. */
+    uses,
     /** Portals are walked into, so they block nothing. */
     solids: (): Footprint[] => [],
     /** Where to stand, having come from `previous`: in front of its portal. */
@@ -115,8 +123,7 @@ export function createPortals(
         const off = across ? Math.abs(x - portal.x) : Math.abs(z - portal.z);
         const along = across ? Math.abs(z - portal.z) : Math.abs(x - portal.x);
         if (off <= PORTAL_REACH * metre && along <= width / 2) {
-          leaving = true;
-          enterDevRoom(portal.to, from);
+          travel(portal.to);
           return;
         }
       }

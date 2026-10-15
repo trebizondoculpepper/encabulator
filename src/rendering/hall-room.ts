@@ -15,7 +15,7 @@ import {
   Vector2,
   WebGLCubeRenderTarget,
 } from 'three';
-import type { Object3D } from 'three';
+import type { Mesh, Object3D } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -688,8 +688,13 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const use = (x: number, y: number) => {
     pointer.set(x, y);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects([...desk.uses.keys()], true)[0];
+    const hit = raycaster.intersectObjects(
+      [...desk.uses.keys(), ...station.uses.keys()],
+      true,
+    )[0];
     if (!hit) return;
+    const doorway = station.uses.get(hit.object as Mesh);
+    if (doorway) return doorway();
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
       const work = desk.uses.get(o);
       if (work) return work(knobDirection(o, hit.point, camera));

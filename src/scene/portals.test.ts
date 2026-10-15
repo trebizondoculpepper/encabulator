@@ -37,6 +37,23 @@ describe('portals', () => {
     portals.dispose();
   });
 
+  it('send a walker who clicks one to its room, once', () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('window', { dispatchEvent });
+    const links = devPortals('dev1', bounds, 1);
+    const portals = createPortals('dev1', links, 0, 1);
+    const [westPatch, eastPatch] = [...portals.uses.entries()];
+    expect(westPatch[0].name).toBe('Portal to dev0');
+    eastPatch[1]();
+    westPatch[1]();
+    expect(dispatchEvent).toHaveBeenCalledOnce();
+    expect(dispatchEvent.mock.calls[0][0].detail).toEqual({
+      to: 'dev2',
+      from: 'dev1',
+    });
+    portals.dispose();
+  });
+
   it('do nothing beside the patch, along the same wall', () => {
     const dispatchEvent = vi.fn();
     vi.stubGlobal('window', { dispatchEvent });

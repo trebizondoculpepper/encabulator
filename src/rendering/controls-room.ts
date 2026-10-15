@@ -271,7 +271,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     )[0];
     if (!hit) return;
     if (passages.uses.has(hit.object as Mesh)) {
-      if (hit.distance < 2.8 * m) passages.uses.get(hit.object as Mesh)?.();
+      passages.uses.get(hit.object as Mesh)?.();
       return;
     }
     for (let o: Object3D | null = hit.object; o; o = o.parent) {

@@ -79,6 +79,13 @@ export function createDoorStation(
     '#e67e22',
   ];
   const span = (rooms.length - 1) * DOOR_PITCH;
+  let leaving = false;
+  const uses = new Map<Mesh, () => void>();
+  const travel = (to: DevRoomId) => {
+    if (leaving) return;
+    leaving = true;
+    enterDevRoom(to, from);
+  };
   // The overhead track the doors' docks hang from, on two portal frames.
   const trackY = DOOR_HEIGHT + 1.4;
   box(group, steel, span + 3, 0.3, 0.3, 0, trackY, 0);
@@ -157,7 +164,7 @@ export function createDoorStation(
     });
     glow.toneMapped = false;
     materials.push(glow);
-    box(
+    const doorway = box(
       dock,
       glow,
       DOOR_WIDTH,
@@ -167,6 +174,8 @@ export function createDoorStation(
       0.26 + DOOR_HEIGHT / 2,
       0,
     );
+    doorway.name = `Doorway to ${to}`;
+    uses.set(doorway, () => travel(to));
     // The door itself, swung open on its left hinge, with a brass knob.
     const hinge = new Group();
     hinge.position.set(-(DOOR_WIDTH / 2) * m, 0.26 * m, 0.04 * m);
@@ -237,10 +246,10 @@ export function createDoorStation(
     return { to, x };
   });
 
-  let leaving = false;
   return {
     group,
-    uses: new Map<Mesh, () => void>(),
+    /** A click on a doorway travels, as walking through it does. */
+    uses,
     /** The frames' posts and the gantry's legs. */
     solids(): Footprint[] {
       const posts: Footprint[] = [];
@@ -271,8 +280,7 @@ export function createDoorStation(
           Math.abs(x - door.x * m) < (DOOR_WIDTH / 2 - 0.1) * m &&
           Math.abs(z) < 0.2 * m
         ) {
-          leaving = true;
-          enterDevRoom(door.to, from);
+          travel(door.to);
           return;
         }
     },
