@@ -4,8 +4,8 @@ import {
   renderScale,
   useEnvironment,
 } from './render-style';
-import { devDoors, devWallPieces } from '../game/dev-room-links';
-import { createDevDoorways } from '../scene/dev-doorways';
+import { devPortals, devWalls } from '../game/dev-room-links';
+import { createPortals } from '../scene/portals';
 import {
   AmbientLight,
   BoxGeometry,
@@ -175,8 +175,8 @@ export function startEffectsRoom(canvas: HTMLCanvasElement) {
   ceiling.rotation.x = Math.PI / 2;
   // Subdivided masonry with genuine openings in the east and west walls.
   const bounds = { minX: -half, maxX: half, minZ: -half, maxZ: half };
-  const doors = devDoors('dev1', bounds, m);
-  const wallPieces = devWallPieces(bounds, doors, m, HEIGHT * m);
+  const doors = devPortals('dev1', bounds, m);
+  const wallPieces = devWalls(bounds, m, HEIGHT * m);
   const walls: Mesh[] = [];
   for (const piece of wallPieces) {
     const wall = new Mesh(
@@ -199,7 +199,7 @@ export function startEffectsRoom(canvas: HTMLCanvasElement) {
     walls.push(wall);
     if (piece.bottom === 0) solids.push(piece);
   }
-  const passages = createDevDoorways('dev1', doors, 0, m);
+  const passages = createPortals('dev1', doors, 0, m);
   scene.add(passages.group);
 
   // A printed card on a wall: canvas art, unlit, facing into the room.

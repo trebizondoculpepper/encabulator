@@ -15,11 +15,11 @@ import {
   Vector2,
 } from 'three';
 import type { Object3D } from 'three';
-import { devDoors, devWallPieces } from '../game/dev-room-links';
+import { devPortals, devWalls } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import type { PartEvent } from '../game/world/components';
 import { METRE } from '../game/units';
-import { createDevDoorways } from '../scene/dev-doorways';
+import { createPortals } from '../scene/portals';
 import { createPanelKit, disposeKit } from '../scene/eighties-controls';
 import { knobDirection } from '../scene/rotary-knob';
 import { createControlSounds } from '../audio/control-sounds';
@@ -118,8 +118,8 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     0,
     true,
   );
-  const doors = devDoors('dev0', bounds, m);
-  const walls = devWallPieces(bounds, doors, m, height * m);
+  const doors = devPortals('dev0', bounds, m);
+  const walls = devWalls(bounds, m, height * m);
   for (const wall of walls)
     slab(
       wall.maxX - wall.minX,
@@ -130,7 +130,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
       (wall.minZ + wall.maxZ) / 2,
       true,
     );
-  const passages = createDevDoorways('dev0', doors, 0, m);
+  const passages = createPortals('dev0', doors, 0, m);
   scene.add(passages.group);
 
   // The boards on the north wall and the pedestals along the south.

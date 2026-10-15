@@ -1,49 +1,58 @@
 import type { Footprint } from './walk-collision';
 
-export type DevRoomId = 'dev0' | 'dev1' | 'dev2';
-export type DoorSide = 'north' | 'south' | 'east' | 'west';
-export interface DevDoor {
+/**
+ * How the development rooms join. They are not one connected world: each
+ * is a room of its own, and a portal (a coloured patch on a wall) sends
+ * whoever touches it straight to the room it names, arriving in front of
+ * that room's portal back. Each room has a portal to the room before it
+ * on its west wall and to the room after it on its east wall.
+ */
+
+export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3';
+export type PortalSide = 'north' | 'south' | 'east' | 'west';
+export interface Portal {
   to: DevRoomId;
-  side: DoorSide;
+  side: PortalSide;
+  /** The middle of the patch, on the wall's centre line. */
   x: number;
   z: number;
 }
 
-/** The development wing, in order from west to east. */
-export const DEV_ROOMS: readonly DevRoomId[] = ['dev0', 'dev1', 'dev2'];
+/** The development rooms, in order. */
+export const DEV_ROOMS: readonly DevRoomId[] = ['dev0', 'dev1', 'dev2', 'dev3'];
 
 export const DEV_ROOM_NAMES: Record<DevRoomId, string> = {
   dev0: 'DEV0 · CONTROLS AND DISPLAYS',
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
+  dev3: 'DEV3 · RACKS',
 };
-export const DEV_DOOR_WIDTH = 1.2;
-export const DEV_DOOR_HEIGHT = 2.2;
+/** Each room's portal colour, so a portal says where it goes. */
+export const DEV_ROOM_COLOURS: Record<DevRoomId, string> = {
+  dev0: '#2fb3a5',
+  dev1: '#d0732c',
+  dev2: '#8a4fd6',
+  dev3: '#3f7fe0',
+};
+export const PORTAL_WIDTH = 1.2;
+export const PORTAL_HEIGHT = 2.2;
+/** How thick a room's walls are, metres. */
+export const WALL_THICKNESS = 0.3;
 
-/** A row of adjacent rooms, each opening onto the next by its south wall. */
-export function devDoors(
+/** A room's portals, in scene units (`metre` per metre). */
+export function devPortals(
   id: DevRoomId,
   bounds: Footprint,
   metre: number,
-): DevDoor[] {
-  const laneZ = bounds.maxZ - 1.1 * metre;
+): Portal[] {
+  const z = bounds.maxZ - 1.1 * metre;
   const at = DEV_ROOMS.indexOf(id);
-  const doors: DevDoor[] = [];
+  const portals: Portal[] = [];
   if (at > 0)
-    doors.push({
-      to: DEV_ROOMS[at - 1],
-      side: 'west',
-      x: bounds.minX,
-      z: laneZ,
-    });
+    portals.push({ to: DEV_ROOMS[at - 1], side: 'west', x: bounds.minX, z });
   if (at < DEV_ROOMS.length - 1)
-    doors.push({
-      to: DEV_ROOMS[at + 1],
-      side: 'east',
-      x: bounds.maxX,
-      z: laneZ,
-    });
-  return doors;
+    portals.push({ to: DEV_ROOMS[at + 1], side: 'east', x: bounds.maxX, z });
+  return portals;
 }
 
 export interface WallPiece extends Footprint {
@@ -51,64 +60,47 @@ export interface WallPiece extends Footprint {
   top: number;
 }
 
-/** Masonry stops at each jamb; only the lintel spans the opening. */
-export function devWallPieces(
+/** A room's four walls, solid, `height` tall, on its bounds' edges. */
+export function devWalls(
   bounds: Footprint,
-  doors: readonly DevDoor[],
   metre: number,
   height: number,
 ): WallPiece[] {
-  const pieces: WallPiece[] = [];
-  const thick = 0.3 * metre;
-  for (const side of ['north', 'south', 'west', 'east'] as const) {
-    const horizontal = side === 'north' || side === 'south';
-    const edge =
-      side === 'north'
-        ? bounds.minZ
-        : side === 'south'
-          ? bounds.maxZ
-          : side === 'west'
-            ? bounds.minX
-            : bounds.maxX;
-    const start = horizontal ? bounds.minX : bounds.minZ;
-    const end = horizontal ? bounds.maxX : bounds.maxZ;
-    const door = doors.find((d) => d.side === side);
-    const add = (a: number, b: number, bottom = 0) => {
-      if (b <= a) return;
-      pieces.push(
-        horizontal
-          ? {
-              minX: a,
-              maxX: b,
-              minZ: edge - thick / 2,
-              maxZ: edge + thick / 2,
-              bottom,
-              top: height,
-            }
-          : {
-              minX: edge - thick / 2,
-              maxX: edge + thick / 2,
-              minZ: a,
-              maxZ: b,
-              bottom,
-              top: height,
-            },
-      );
-    };
-    if (!door) {
-      add(start, end);
-      continue;
-    }
-    const at = horizontal ? door.x : door.z;
-    const half = (DEV_DOOR_WIDTH * metre) / 2;
-    add(start, at - half);
-    add(at + half, end);
-    add(at - half, at + half, DEV_DOOR_HEIGHT * metre);
-  }
-  return pieces;
+  const t = (WALL_THICKNESS * metre) / 2;
+  const wall = (piece: Footprint): WallPiece => ({
+    ...piece,
+    bottom: 0,
+    top: height,
+  });
+  return [
+    wall({
+      minX: bounds.minX - t,
+      maxX: bounds.maxX + t,
+      minZ: bounds.minZ - t,
+      maxZ: bounds.minZ + t,
+    }),
+    wall({
+      minX: bounds.minX - t,
+      maxX: bounds.maxX + t,
+      minZ: bounds.maxZ - t,
+      maxZ: bounds.maxZ + t,
+    }),
+    wall({
+      minX: bounds.minX - t,
+      maxX: bounds.minX + t,
+      minZ: bounds.minZ - t,
+      maxZ: bounds.maxZ + t,
+    }),
+    wall({
+      minX: bounds.maxX - t,
+      maxX: bounds.maxX + t,
+      minZ: bounds.minZ - t,
+      maxZ: bounds.maxZ + t,
+    }),
+  ];
 }
 
-/** Door transitions are handled by the app, without reloading the browser. */
+/** Travel is handled by the app, without reloading the browser. */
 export function enterDevRoom(to: DevRoomId, from: DevRoomId) {
   window.dispatchEvent(new CustomEvent('dev-room', { detail: { to, from } }));
 }
