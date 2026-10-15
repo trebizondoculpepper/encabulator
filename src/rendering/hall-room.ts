@@ -25,7 +25,11 @@ import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { createDoorStation } from '../scene/door-station';
-import { DOOR_STYLES, createBigDoor } from '../scene/hall-doors';
+import {
+  DOOR_STYLES,
+  createBigDoor,
+  createPersonnelDoor,
+} from '../scene/hall-doors';
 import { createHallServices } from '../scene/hall-services';
 import { createFloorMarkings } from '../scene/floor-markings';
 import { createFloorReflection } from '../scene/floor-reflection';
@@ -219,21 +223,39 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const doorGroup = new Group();
   doorGroup.scale.setScalar(m);
   scene.add(doorGroup);
-  const main = hall.doorways.find((d) => d.kind === 'main')!;
-  let bigDoor = createBigDoor(1, main.width, main.height);
-  const hang = (door: { group: Group }, at: typeof main) => {
-    // Doors are built facing +z; the east wall's inside faces -x.
-    door.group.position.set(at.x - 0.05, 0, at.z);
-    door.group.rotation.y = -Math.PI / 2;
+  type Doorway = (typeof hall.doorways)[number];
+  const hang = (door: { group: Group }, at: Doorway) => {
+    // Doors are built facing +z; turn each to face into the hall.
+    door.group.position.set(at.x + at.inward * 0.05, 0, at.z);
+    door.group.rotation.y = (at.inward * Math.PI) / 2;
     doorGroup.add(door.group);
   };
-  hang(bigDoor, main);
-  const setDoor = (style: number) => {
-    doorGroup.remove(bigDoor.group);
-    bigDoor.dispose();
-    bigDoor = createBigDoor(style, main.width, main.height);
-    hang(bigDoor, main);
+  // The great doors: the yellow high-speed door at the east end, the blue
+  // vertical lift fabric door at the west.
+  const mains = hall.doorways.filter((d) => d.kind === 'main');
+  const styleFor = (d: Doorway) => (d.inward < 0 ? 3 : 6);
+  const bigDoors = mains.map((d) => {
+    const door = createBigDoor(styleFor(d), d.width, d.height);
+    hang(door, d);
+    return door;
+  });
+  const setDoor = (style: number, end: 'east' | 'west' = 'east') => {
+    const i = mains.findIndex((d) =>
+      end === 'east' ? d.inward < 0 : d.inward > 0,
+    );
+    doorGroup.remove(bigDoors[i].group);
+    bigDoors[i].dispose();
+    bigDoors[i] = createBigDoor(style, mains[i].width, mains[i].height);
+    hang(bigDoors[i], mains[i]);
   };
+  // Beside each, a personnel door standing open on the day outside.
+  const personDoors = hall.doorways
+    .filter((d) => d.kind === 'person')
+    .map((d) => {
+      const door = createPersonnelDoor(hall.sky);
+      hang(door, d);
+      return door;
+    });
   const docks = hall.doorways
     .filter((d) => d.kind === 'dock')
     .map((d) => {
@@ -352,6 +374,11 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     }
     // In front of the great door and the dock doors: striped, keep clear.
     marks.striped(L / 2 - 2.2, 0, 3.6, 24, 'hazard');
+    marks.striped(-L / 2 + 2.2, 0, 3.6, 24, 'hazard');
+    marks.stencil('DOOR · KEEP CLEAR', -L / 2 + 6, 0, 0.9, Math.PI / 2);
+    // Walkways to the personnel doors.
+    marks.outline(L / 2 - 3, 15, 6, 1.6, 'yellow');
+    marks.outline(-L / 2 + 3, -15, 6, 1.6, 'yellow');
     marks.stencil('DOOR · KEEP CLEAR', L / 2 - 6, 0, 0.9, -Math.PI / 2);
     for (const sz of [-1, 1]) {
       const z = sz * (nave / 2 + (W / 2 - nave / 2) / 2);
@@ -527,9 +554,9 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       reflect();
     },
     settings: () => structuredClone(settings),
-    /** Show the great door in style `n`, 1 to 6 (see hall-doors.ts). */
-    door(n: number) {
-      setDoor(n);
+    /** Show a great door in style `n`, 1 to 6 (see hall-doors.ts). */
+    door(n: number, end: 'east' | 'west' = 'east') {
+      setDoor(n, end);
       reflect();
       return DOOR_STYLES[n - 1];
     },
@@ -561,7 +588,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     shine.dispose();
     services.dispose();
     marks.dispose();
-    bigDoor.dispose();
+    for (const d of [...bigDoors, ...personDoors]) d.dispose();
     for (const d of docks) d.dispose();
     props.dispose();
     for (const s of Object.values(surfaces)) s.material.dispose();

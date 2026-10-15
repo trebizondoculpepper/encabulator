@@ -76,13 +76,15 @@ function createBatcher() {
   };
 }
 
-/** An opening in the hall's east end wall, for a door; its inside face's middle at (x, z). */
+/** An opening in an end wall, for a door; the middle of its inside face at (x, z). */
 export interface Doorway {
   x: number;
   z: number;
   width: number;
   height: number;
-  kind: 'main' | 'dock';
+  kind: 'main' | 'dock' | 'person';
+  /** Which way along x is into the hall: -1 at the east end, +1 at the west. */
+  inward: number;
 }
 
 export interface Hall {
@@ -96,7 +98,7 @@ export interface Hall {
   lampGlow: MeshBasicMaterial;
   /** The copper lining of the lamps' domes, lit by their bulbs. */
   lampLining: MeshBasicMaterial;
-  /** The openings in the east end wall: the great door and the dock doors. */
+  /** The openings in the end walls: great doors, personnel doors and dock doors. */
   doorways: Doorway[];
   dispose(): void;
 }
@@ -308,30 +310,17 @@ export function createIndustrialHall(
   // low end walls, for daylight at eye level and for the floor to reflect.
   outer(true, -W / 2 - 0.3, L, low + 1.4, -1, (i) => i % 2 === 1);
   outer(true, W / 2 + 0.3, L, low + 1.4, 1, (i) => i % 2 === 1);
-  // The west end wall: windows low across the side halls, and the nave's
-  // end rising high with tall windows.
-  {
-    const x = -(L / 2 + 0.3);
-    outer(false, x, W, low + 1.4, -1, (i) => i % 2 === 0);
-    clerestory(
-      false,
-      x,
-      -nave / 2,
-      nave / 2,
-      low + 1.4,
-      low + 3,
-      high - 1,
-      high + 1.6,
-      7.33,
-      1.6,
-    );
-  }
-  // The east end wall: solid, with the great door in the nave's end and a
-  // truck dock door in each side hall.
-  {
-    const x = L / 2 + 0.3;
+  /**
+   * An end wall, solid board-formed concrete: a great door's opening in
+   * the nave's end with a personnel door beside it, and, if `docks`, a
+   * truck dock door in each side hall. `sx` is +1 for the east end.
+   */
+  const endWall = (sx: number, docks: boolean) => {
+    const x = sx * (L / 2 + 0.3);
+    const face = x - sx * 0.3;
     const top = high + 1.6;
     const main = { width: 24, height: 14 };
+    const person = { width: 1.0, height: 2.2, z: sx * (main.width / 2 + 3) };
     const dock = {
       width: 3.66,
       height: 4.27,
@@ -341,48 +330,76 @@ export function createIndustrialHall(
       if (z1 <= z0 || y1 <= y0) return;
       batch.box(walls, 0.6, y1 - y0, z1 - z0, x, (y0 + y1) / 2, (z0 + z1) / 2);
     };
-    // The nave's end, round the great door.
-    piece(-nave / 2, -main.width / 2, 0, top);
-    piece(main.width / 2, nave / 2, 0, top);
-    piece(-main.width / 2, main.width / 2, main.height, top);
-    // The side halls' ends, round their dock doors.
+    /** A run of wall from z0 to z1, up to `height`, with openings cut. */
+    const run = (
+      z0: number,
+      z1: number,
+      height: number,
+      openings: { z: number; width: number; height: number }[],
+    ) => {
+      let z = z0;
+      for (const o of [...openings].sort((p, q) => p.z - q.z)) {
+        piece(z, o.z - o.width / 2, 0, height);
+        piece(o.z - o.width / 2, o.z + o.width / 2, o.height, height);
+        z = o.z + o.width / 2;
+      }
+      piece(z, z1, 0, height);
+    };
+    run(-nave / 2, nave / 2, top, [{ z: 0, ...main }, person]);
     for (const sz of [-1, 1]) {
-      const [a, b] =
+      const [z0, z1] =
         sz > 0 ? [nave / 2, W / 2 + 0.6] : [-W / 2 - 0.6, -nave / 2];
-      const d0 = sz * dock.z - dock.width / 2;
-      const d1 = sz * dock.z + dock.width / 2;
-      piece(a, d0, 0, low + 1.4);
-      piece(d1, b, 0, low + 1.4);
-      piece(d0, d1, dock.height, low + 1.4);
-      doorways.push({
-        x: x - 0.3,
-        z: sz * dock.z,
-        width: dock.width,
-        height: dock.height,
-        kind: 'dock',
-      });
+      run(
+        z0,
+        z1,
+        low + 1.4,
+        docks
+          ? [{ z: sz * dock.z, width: dock.width, height: dock.height }]
+          : [],
+      );
+      if (docks)
+        doorways.push({
+          x: face,
+          z: sz * dock.z,
+          width: dock.width,
+          height: dock.height,
+          kind: 'dock',
+          inward: -sx,
+        });
     }
     // Pilasters on the inside face, clear of the openings.
+    const openings = [
+      { z: 0, width: main.width },
+      { z: person.z, width: person.width },
+      ...(docks
+        ? [dock.z, -dock.z].map((z) => ({ z, width: dock.width }))
+        : []),
+    ];
     for (let z = -W / 2 + 7.5; z < W / 2 - 1; z += 7.5) {
-      const clear = (z0: number, z1: number) => z < z0 - 1 || z > z1 + 1;
-      if (!clear(-main.width / 2, main.width / 2)) continue;
-      if (
-        !clear(dock.z - dock.width / 2, dock.z + dock.width / 2) ||
-        !clear(-dock.z - dock.width / 2, -dock.z + dock.width / 2)
-      )
-        continue;
+      if (openings.some((o) => Math.abs(z - o.z) < o.width / 2 + 1.2)) continue;
       const h = Math.abs(z) < nave / 2 ? top : low + 1.4;
-      batch.box(walls, 0.5, h, 1.4, x - 0.55, h / 2, z);
+      batch.box(walls, 0.5, h, 1.4, face - sx * 0.25, h / 2, z);
     }
     doorways.push({
-      x: x - 0.3,
+      x: face,
       z: 0,
       width: main.width,
       height: main.height,
       kind: 'main',
+      inward: -sx,
+    });
+    doorways.push({
+      x: face,
+      z: person.z,
+      width: person.width,
+      height: person.height,
+      kind: 'person',
+      inward: -sx,
     });
     solids.push({ minX: x - 0.9, maxX: x + 0.9, minZ: -W / 2, maxZ: W / 2 });
-  }
+  };
+  endWall(-1, false);
+  endWall(1, true);
 
   // ---- The side halls: thick slabs, balcony edges, columns, lamps --------
   for (const sz of [-1, 1]) {

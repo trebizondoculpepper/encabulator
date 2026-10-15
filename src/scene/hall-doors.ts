@@ -394,3 +394,104 @@ export function createBigDoor(style: number, width: number, height: number) {
     },
   };
 }
+
+/**
+ * A personnel door beside a great door: a hollow-metal door, 3 ft by
+ * 7 ft, in a pressed steel frame, standing open into the hall, with a
+ * push bar, a kick plate, a closer arm and a lit red EXIT sign over it.
+ * Through it, `outside`: the overcast day, a flat white glare. Built
+ * facing +z, its opening's bottom middle at the origin.
+ */
+export function createPersonnelDoor(
+  outside: Material,
+  width = 0.92,
+  height = 2.13,
+) {
+  const group = new Group();
+  group.name = 'Personnel door';
+  const geometries: BufferGeometry[] = [];
+  const materials: Material[] = [];
+  const box = (
+    parent: Group,
+    material: Material,
+    w: number,
+    h: number,
+    d: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const geometry = new BoxGeometry(w, h, d);
+    geometries.push(geometry);
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    parent.add(mesh);
+    return mesh;
+  };
+  const paint = (color: string, roughness = 0.5, metalness = 0.3) => {
+    const m = new MeshStandardMaterial({ color, roughness, metalness });
+    materials.push(m);
+    return m;
+  };
+  const frame = paint('#5b6266', 0.45, 0.5);
+  const leafPaint = paint('#7a8a6e', 0.5, 0.3);
+  const steel = paint('#b9bec0', 0.3, 0.85);
+  // The day outside, just beyond the frame.
+  box(group, outside, width + 0.1, height + 0.05, 0.02, 0, height / 2, -0.4);
+  // The frame: jambs and head.
+  for (const sx of [-1, 1])
+    box(
+      group,
+      frame,
+      0.06,
+      height + 0.06,
+      0.2,
+      sx * (width / 2 + 0.03),
+      (height + 0.06) / 2,
+      0,
+    );
+  box(group, frame, width + 0.12, 0.06, 0.2, 0, height + 0.03, 0);
+  // The leaf, open into the hall on its left hinge.
+  const hinge = new Group();
+  hinge.position.set(-width / 2, 0, 0.08);
+  hinge.rotation.y = -1.75;
+  group.add(hinge);
+  box(hinge, leafPaint, width, height - 0.01, 0.045, width / 2, height / 2, 0);
+  box(hinge, steel, width - 0.1, 0.25, 0.05, width / 2, 0.15, 0);
+  box(hinge, steel, width - 0.25, 0.04, 0.08, width / 2 + 0.05, 1.0, 0.05);
+  box(
+    hinge,
+    paint('#303436', 0.5, 0.5),
+    0.4,
+    0.04,
+    0.05,
+    width / 2 - 0.15,
+    height - 0.12,
+    0.05,
+  );
+  // The EXIT sign: red letters lit from within.
+  const sign = new MeshStandardMaterial({
+    color: '#2a0c0a',
+    emissive: '#ff2a1a',
+    emissiveIntensity: 2.2,
+  });
+  materials.push(sign);
+  box(
+    group,
+    paint('#e9e6dc', 0.4, 0.1),
+    0.34,
+    0.2,
+    0.06,
+    0,
+    height + 0.3,
+    0.05,
+  );
+  box(group, sign, 0.26, 0.09, 0.065, 0, height + 0.3, 0.05);
+  return {
+    group,
+    dispose() {
+      for (const g of geometries) g.dispose();
+      for (const m of materials) m.dispose();
+    },
+  };
+}
