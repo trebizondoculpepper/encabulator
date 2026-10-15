@@ -68,6 +68,27 @@ Short lines for stepping out of a plinth's light. Each moment has several versio
 | 16  | `rhombus-leave-3.wav` | Leaving the rhombus | Let's put that rhombus behind us.                                             |
 | 17  | `rhombus-leave-4.wav` | Leaving the rhombus | Of that rhombus, we'll have none.                                             |
 
+## Looking
+
+Short lines for standing at a plinth and looking, played one at a time in turn between the longer lines while the visitor stays, so a long stay is never silent and never repeats. Recorded from the second teleprompter, `plinth-teleprompter-looking.md`, without slates. Game files 32 and 33 already hold parts of clip 29, so these start at 34.
+
+| #   | File                 | Plays when             | Line                                                                                                                    |
+| --- | -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 34  | `sphere-look-1.wav`  | Looking at the sphere  | What a wonderful sphere. We could look at it for hours. _(tidied: said as "I could look at it for hours")_              |
+| 35  | `sphere-look-2.wav`  | Looking at the sphere  | It's so unpredictable, isn't it?                                                                                        |
+| 36  | `sphere-look-3.wav`  | Looking at the sphere  | Looking at it just makes us feel happy. _(tidied: said as "makes me feel happy")_                                       |
+| 37  | `sphere-look-4.wav`  | Looking at the sphere  | I don't think we've ever known joy like looking at this sphere. _(tidied: said as "I don't think I've ever known joy")_ |
+| 38  | `sphere-look-5.wav`  | Looking at the sphere  | Let's stay looking at this sphere forever. We can be happy here.                                                        |
+| 39  | `helix-look-1.wav`   | Looking at the helix   | It's so painful, staring into the abyss of this helix.                                                                  |
+| 40  | `helix-look-2.wav`   | Looking at the helix   | This helix is reminding us of everything we've ever done wrong in our lives.                                            |
+| 41  | `helix-look-3.wav`   | Looking at the helix   | Is there a more painful way to confront our failures than looking at this helix?                                        |
+| 42  | `helix-look-4.wav`   | Looking at the helix   | Looking at this helix makes our head hurt. _(tidied: said twice, "makes my... makes our head hurt"; the later kept)_    |
+| 43  | `rhombus-look-1.wav` | Looking at the rhombus | This rhombus is just so wrong. Like some Lovecraftian nightmare.                                                        |
+| 44  | `rhombus-look-2.wav` | Looking at the rhombus | A fearful geometry. It's unholy.                                                                                        |
+| 45  | `rhombus-look-3.wav` | Looking at the rhombus | We should just put it out of its misery.                                                                                |
+| 46  | `rhombus-look-4.wav` | Looking at the rhombus | This is a truly horrible thing. Do not suffer the rhombus to live.                                                      |
+| 47  | `rhombus-look-5.wav` | Looking at the rhombus | What on earth is this place coming to? Allowing rhombuses in here?                                                      |
+
 ## Open moments
 
-When two clips fit one moment (a first arrival at the sphere straight from the helix fits clips 1 and 7), the more specific one should win, and the other can wait for a later moment or be skipped. Every moment now has at least one clip. Clip 29 says the door is on the other side of the room: the room's portals are all on its west wall, beside where the visitor arrives, so either an exit goes on the far (east) wall or the line changes.
+When two clips fit one moment (a first arrival at the sphere straight from the helix fits clips 1 and 7), the more specific one should win, and the other can wait for a later moment or be skipped. Every moment now has at least one clip. Clip 29 is played as three passages (game files 29, 32 and 33), using the clean second take of its ending and omitting the Nutmeg interruption. The exit it names is the single green door on the east wall.

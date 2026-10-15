@@ -33,7 +33,29 @@ const clips = [
   new URL('./assets/narration/plinths/clip_29.mp3', import.meta.url),
   new URL('./assets/narration/plinths/clip_30.mp3', import.meta.url),
   new URL('./assets/narration/plinths/clip_31.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_32.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_33.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_34.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_35.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_36.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_37.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_38.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_39.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_40.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_41.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_42.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_43.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_44.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_45.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_46.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_47.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_48.mp3', import.meta.url),
+  new URL('./assets/narration/plinths/clip_49.mp3', import.meta.url),
 ];
+
+const INTRO_PARTS = [29, 32, 33];
+const INTRO_PAUSE_MS = 4500;
+const SAME_SHAPE_PAUSE_MS = 5000;
 
 /** One narrator voice. New arrivals can interrupt less immediate lines. */
 export function createPlinthNarrationPlayer() {
@@ -43,6 +65,28 @@ export function createPlinthNarrationPlayer() {
   let currentCue: NarrationCue | null = null;
   let pending: NarrationCue | null = null;
   let disposed = false;
+  let introRemaining: number[] = [];
+  let introTimer: ReturnType<typeof setTimeout> | null = null;
+  let shapeTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearShapePause = () => {
+    if (shapeTimer !== null) clearTimeout(shapeTimer);
+    shapeTimer = null;
+  };
+  const clearIntro = () => {
+    if (introTimer !== null) clearTimeout(introTimer);
+    introTimer = null;
+    introRemaining = [];
+  };
+  const scheduleIntro = () => {
+    if (!visible || !unlocked || introTimer !== null || !introRemaining.length)
+      return;
+    introTimer = setTimeout(() => {
+      introTimer = null;
+      if (!visible || disposed) return;
+      const clip = introRemaining.shift();
+      if (clip) start({ clip, priority: 4 });
+    }, INTRO_PAUSE_MS);
+  };
   const start = (cue: NarrationCue) => {
     const url = clips[cue.clip - 1];
     if (!url || disposed) return;
@@ -53,11 +97,24 @@ export function createPlinthNarrationPlayer() {
       if (current !== audio) return;
       current = null;
       currentCue = null;
-      if (pending && unlocked && visible) {
-        const next = pending;
-        pending = null;
-        start(next);
-      }
+      if (pending) {
+        clearIntro();
+        if (unlocked && visible) {
+          if (cue.shape && pending.shape === cue.shape) {
+            shapeTimer = setTimeout(() => {
+              shapeTimer = null;
+              if (!visible || disposed || !pending) return;
+              const next = pending;
+              pending = null;
+              start(next);
+            }, SAME_SHAPE_PAUSE_MS);
+            return;
+          }
+          const next = pending;
+          pending = null;
+          start(next);
+        }
+      } else if (INTRO_PARTS.includes(cue.clip)) scheduleIntro();
     };
     current = audio;
     currentCue = cue;
@@ -74,6 +131,14 @@ export function createPlinthNarrationPlayer() {
   return {
     offer(cue: NarrationCue | null) {
       if (!cue || disposed) return;
+      if (shapeTimer !== null) {
+        if (pending && cue.shape === pending.shape) {
+          if (cue.priority >= pending.priority) pending = cue;
+          return;
+        }
+        clearShapePause();
+        pending = null;
+      }
       if (!unlocked || !visible) {
         if (!pending || cue.priority >= pending.priority) pending = cue;
         return;
@@ -89,6 +154,8 @@ export function createPlinthNarrationPlayer() {
         currentCue = null;
         if (pending && pending.priority <= cue.priority) pending = null;
       }
+      if (cue.clip === 29) introRemaining = INTRO_PARTS.slice(1);
+      else if (introRemaining.length || introTimer !== null) clearIntro();
       start(cue);
     },
     unlock() {
@@ -100,7 +167,7 @@ export function createPlinthNarrationPlayer() {
           .catch((error: unknown) =>
             console.warn('Plinth narration could not resume:', error),
           );
-      else if (!current && pending) {
+      else if (!current && pending && shapeTimer === null) {
         const next = pending;
         pending = null;
         start(next);
@@ -115,13 +182,24 @@ export function createPlinthNarrationPlayer() {
           .catch((error: unknown) =>
             console.warn('Plinth narration could not resume:', error),
           );
+      else if (value && !current && pending && shapeTimer === null) {
+        const next = pending;
+        pending = null;
+        start(next);
+      } else if (value && !current) scheduleIntro();
     },
     state: () => ({
       playing: currentCue?.clip ?? null,
       queued: pending?.clip ?? null,
+      introActive:
+        INTRO_PARTS.includes(currentCue?.clip ?? 0) ||
+        pending?.clip === 29 ||
+        introRemaining.length > 0,
     }),
     dispose() {
       disposed = true;
+      clearIntro();
+      clearShapePause();
       current?.pause();
       if (current) current.onended = null;
       current = null;

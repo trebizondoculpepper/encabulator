@@ -74,6 +74,7 @@ export function devPortals(
   // Neighbours in order, passing over the hall, which has the station.
   const at = STATION_ROOMS.indexOf(id);
   const portals: Portal[] = [];
+  if (id === 'dev5') return [{ to: HALL, side: 'east', x: bounds.maxX, z: 0 }];
   if (at > 0)
     portals.push({
       to: STATION_ROOMS[at - 1],
@@ -81,7 +82,7 @@ export function devPortals(
       x: bounds.minX,
       z,
     });
-  if (at < STATION_ROOMS.length - 1)
+  if (at < STATION_ROOMS.length - 1 && id !== 'dev3')
     portals.push({
       to: STATION_ROOMS[at + 1],
       side: 'east',
@@ -95,9 +96,6 @@ export function devPortals(
       x: bounds.minX,
       z: bounds.minZ + 1.6 * metre,
     });
-  // The plinth story's exit stands across the gallery from its entrance.
-  if (id === 'dev5')
-    portals.push({ to: HALL, side: 'east', x: bounds.maxX, z: 0 });
   return portals;
 }
 

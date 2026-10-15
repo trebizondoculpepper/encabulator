@@ -1,4 +1,4 @@
-import { Group, Mesh, PlaneGeometry } from 'three';
+import { BoxGeometry, Group, Mesh, PlaneGeometry } from 'three';
 import type { Material, Texture } from 'three';
 import {
   DEV_ROOM_COLOURS,
@@ -64,6 +64,73 @@ export function createPortals(
     // Planes face +z; turn each to face into the room.
     frame.rotation.y = Math.atan2(inward.x, inward.z);
     group.add(frame);
+    if (from === 'dev5') {
+      const steel = createPs1Material({
+        color: '#777e7d',
+        metalness: 0.75,
+        roughness: 0.35,
+      });
+      const leaf = createPs1Material({
+        color: '#31554d',
+        metalness: 0.3,
+        roughness: 0.45,
+      });
+      const hardware = createPs1Material({
+        color: '#d5d9d1',
+        metalness: 0.85,
+        roughness: 0.25,
+      });
+      materials.push(steel, leaf, hardware);
+      const part = (
+        w: number,
+        h: number,
+        d: number,
+        x: number,
+        y: number,
+        z: number,
+        material: Material,
+      ) => {
+        const mesh = new Mesh(
+          new BoxGeometry(w * metre, h * metre, d * metre),
+          material,
+        );
+        mesh.position.set(x * metre, y * metre, z * metre);
+        mesh.userData.noCollision = true;
+        frame.add(mesh);
+        return mesh;
+      };
+      // A recessed steel frame, solid leaf, kick plate and horizontal panic bar.
+      part(1.52, 0.11, 0.12, 0, 2.31, 0.04, steel);
+      for (const side of [-1, 1])
+        part(0.11, 2.35, 0.12, side * 0.705, 1.175, 0.04, steel);
+      const door = part(1.29, 2.2, 0.055, 0, 1.1, 0.095, leaf);
+      door.name = `Portal to ${portal.to}`;
+      uses.set(door, () => travel(portal.to));
+      part(1.05, 0.32, 0.012, 0, 0.24, 0.132, steel);
+      part(0.92, 0.065, 0.075, 0, 1.05, 0.18, hardware);
+      for (const side of [-1, 1])
+        part(0.045, 0.17, 0.12, side * 0.43, 1.05, 0.15, steel);
+      const exitLabel = createLabelTexture('EXIT', {
+        ink: '#f8fff0',
+        plate: '#0d8147',
+        size: 72,
+      });
+      textures.push(exitLabel.texture);
+      const exitFace = createPs1Material(
+        { map: exitLabel.texture },
+        true,
+        true,
+      );
+      materials.push(exitFace);
+      part(1.42, 0.48, 0.12, 0, 2.78, 0.08, steel);
+      const sign = new Mesh(
+        new PlaneGeometry(1.3 * metre, 0.37 * metre),
+        exitFace,
+      );
+      sign.position.set(0, 2.78 * metre, 0.148 * metre);
+      frame.add(sign);
+      continue;
+    }
     const glow = createPs1Material(
       { color: DEV_ROOM_COLOURS[portal.to] },
       true,

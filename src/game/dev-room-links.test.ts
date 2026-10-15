@@ -14,13 +14,16 @@ describe('development rooms', () => {
     for (const [i, id] of STATION_ROOMS.entries()) {
       const to = devPortals(id, bounds, 1).map((p) => p.to);
       for (const next of [STATION_ROOMS[i - 1], STATION_ROOMS[i + 1]].filter(
-        Boolean,
+        (room) => room && room !== 'dev5' && id !== 'dev5',
       )) {
         expect(to).toContain(next);
         expect(devPortals(next, bounds, 1).map((p) => p.to)).toContain(id);
       }
       expect(to).toContain(HALL);
     }
+    expect(devPortals('dev5', bounds, 1)).toEqual([
+      { to: HALL, side: 'east', x: bounds.maxX, z: 0 },
+    ]);
   });
 
   it('leaves the hall to its door station, with no wall portals', () => {

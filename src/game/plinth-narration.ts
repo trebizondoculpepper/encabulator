@@ -4,6 +4,8 @@ export interface NarrationCue {
   clip: number;
   /** A more immediate moment may interrupt an earlier line. */
   priority: number;
+  /** Used to leave a breath between lines about the same exhibit. */
+  shape?: ExhibitId;
 }
 
 /** Choose the recorded line for each moment in the plinth room. */
@@ -46,7 +48,7 @@ export function createPlinthNarration() {
   };
 
   return {
-    enter: () => unique(29, 2),
+    enter: () => unique(29, 4),
     update(
       delta: number,
       now: ExhibitId | null,
@@ -55,7 +57,7 @@ export function createPlinthNarration() {
     ): NarrationCue | null {
       if (nearExit && !nearExitBefore) {
         nearExitBefore = true;
-        const exit = unique(visits ? 31 : 30, 4);
+        const exit = unique(visits ? 31 : 30, 5);
         if (exit) return exit;
       }
       if (!nearExit) nearExitBefore = false;
@@ -65,7 +67,7 @@ export function createPlinthNarration() {
         atSeconds = 0;
         darkSeconds = 0;
         lingerCount = 0;
-        return arriving(arrival);
+        return { ...arriving(arrival), shape: arrival.at };
       }
       if (active && !now) {
         const left = active;
@@ -92,16 +94,20 @@ export function createPlinthNarration() {
           lingerCount < thresholds.length &&
           atSeconds >= thresholds[lingerCount]
         ) {
-          const clips = { sphere: [21, 22], rhombus: [23], helix: [5, 24] }[
-            now
-          ];
-          const clip = clips[lingerCount];
+          const clips = {
+            sphere: [21, 34, 22, 35, 36, 37, 38, 48, 49],
+            rhombus: [23, 43, 44, 45, 46, 47],
+            helix: [5, 39, 24, 40, 41, 42],
+          }[now];
+          const clip = rotate(`linger-${now}`, clips);
           lingerCount++;
-          return clip ? { clip, priority: 1 } : null;
+          return clip ? { clip, priority: 1, shape: now } : null;
         }
       } else {
         darkSeconds += delta;
-        if (darkSeconds >= 42) return unique(11, 1);
+        // Clip 10 runs for about 25 seconds. Leave a long stretch of quiet
+        // after it before the second darkness line.
+        if (darkSeconds >= 70) return unique(11, 1);
         if (darkSeconds >= 14) return unique(10, 1);
       }
       return null;

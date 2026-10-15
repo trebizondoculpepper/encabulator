@@ -8,7 +8,7 @@ clip_number,file,script_file,source_start_seconds,source_end_seconds,duration_se
 7,clip_07.wav,helix-to-sphere.wav,837.380,867.480,30.100,last retake
 8,clip_08.wav,helix-leave.wav,554.388,560.128,5.740,spoken slate
 9,clip_09.wav,rhombus-return.wav,325.834,344.054,18.220,spoken slate
-10,clip_10.wav,dark-first.wav,901.309,926.009,24.700,spoken slate
+10,clip_10.wav,dark-first.wav,901.309,926.550,25.241,spoken slate; extended to preserve final us
 11,clip_11.wav,dark-rhombus-plot.wav,937.390,948.890,11.500,spoken slate
 12,clip_12.wav,sphere-leave-1.wav,274.900,277.980,3.080,last retake
 13,clip_13.wav,sphere-leave-2.wav,282.300,287.160,4.860,spoken slate
@@ -17,7 +17,7 @@ clip_number,file,script_file,source_start_seconds,source_end_seconds,duration_se
 16,clip_16.wav,rhombus-leave-3.wav,397.117,399.477,2.360,spoken slate
 17,clip_17.wav,rhombus-leave-4.wav,403.823,406.573,2.750,spoken slate
 18,clip_18.wav,sphere-to-rhombus.wav,581.992,619.772,37.780,spoken slate
-19,clip_19.wav,rhombus-to-sphere-1.wav,690.598,716.298,25.700,spoken slate
+19,clip_19.wav,rhombus-to-sphere-1.wav,690.598,717.000,26.402,spoken slate; extended to preserve final everyone
 20,clip_20.wav,rhombus-to-sphere-2.wav,723.243,771.903,48.660,spoken slate
 21,clip_21.wav,sphere-linger-1.wav,228.886,236.466,7.580,spoken slate
 22,clip_22.wav,sphere-linger-2.wav,242.500,264.380,21.880,spoken slate

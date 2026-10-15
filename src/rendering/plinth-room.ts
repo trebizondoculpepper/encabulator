@@ -14,7 +14,7 @@ import {
   Vector2,
   Vector3,
 } from 'three';
-import type { Material } from 'three';
+import type { Material, Texture } from 'three';
 import { MeshStandardNodeMaterial, PMREMGenerator } from 'three/webgpu';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { devPortals, devWalls } from '../game/dev-room-links';
@@ -28,6 +28,7 @@ import { createPlinthNarrationPlayer } from '../audio/plinth-narration';
 import type { DroneKind } from '../audio/plinth-drones';
 import { createPortals } from '../scene/portals';
 import { EXHIBIT_CENTRE, createExhibit } from '../scene/plinth-exhibits';
+import { createLabelTexture } from '../scene/screens';
 import { createFirstPerson } from './first-person';
 import { createNodePipeline, createNodeRenderer } from './node-pipeline';
 
@@ -123,6 +124,110 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   const portals = createPortals('dev5', devPortals('dev5', bounds, m), 0, m);
   scene.add(portals.group);
 
+  // Two luminous tape edges lead from the gallery's south approach round
+  // the helix, then turn towards the exit. The nearest edge stays over
+  // seven metres from every plinth, outside the four-metre story trigger.
+  const exitTape = new MeshStandardNodeMaterial({
+    color: '#e4bd21',
+    emissive: '#ffcc18',
+    emissiveIntensity: 3,
+    metalness: 0,
+    roughness: 0.32,
+  });
+  materials.push(exitTape);
+  const tapeLine = (
+    x1: number,
+    z1: number,
+    x2: number,
+    z2: number,
+    width = 0.09,
+  ) => {
+    const length = Math.hypot(x2 - x1, z2 - z1);
+    const strip = new Mesh(
+      new BoxGeometry(length * m, 0.008 * m, width * m),
+      exitTape,
+    );
+    strip.position.set(((x1 + x2) / 2) * m, 0.012 * m, ((z1 + z2) / 2) * m);
+    strip.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
+    strip.userData.noCollision = true;
+    scene.add(strip);
+    roomMeshes.push(strip);
+  };
+  for (const z of [13.2, 15]) tapeLine(0, z, 18, z);
+  for (const x of [17.1, 18.9]) tapeLine(x, 14.1, x, 0);
+  for (const z of [-0.9, 0.9]) tapeLine(18, z, 21.8, z);
+  const tapeArrow = (x: number, z: number, dx: number, dz: number) => {
+    const tipX = x + dx * 0.65;
+    const tipZ = z + dz * 0.65;
+    tapeLine(x - dx * 0.65, z - dz * 0.65, tipX, tipZ, 0.12);
+    for (const side of [-1, 1])
+      tapeLine(
+        tipX,
+        tipZ,
+        x - dx * 0.04 + side * dz * 0.4,
+        z - dz * 0.04 - side * dx * 0.4,
+        0.12,
+      );
+  };
+  for (const x of [3, 8, 13]) tapeArrow(x, 14.1, 1, 0);
+  for (const z of [10, 5]) tapeArrow(18, z, 0, -1);
+  tapeArrow(20.2, 0, 1, 0);
+
+  // Signs face the visitor approaching each leg of the marked route.
+  // The corner signs show the turn from east to north, then north to east.
+  const signTextures: Texture[] = [];
+  const signSteel = new MeshStandardNodeMaterial({
+    color: '#60766c',
+    metalness: 0.7,
+    roughness: 0.35,
+  });
+  materials.push(signSteel);
+  const poleSign = (x: number, z: number, yaw: number, words: string) => {
+    const sign = new Group();
+    sign.position.set(x * m, 0, z * m);
+    sign.rotation.y = yaw;
+    scene.add(sign);
+    const part = (
+      geometry: BoxGeometry | CylinderGeometry | PlaneGeometry,
+      material: Material,
+      y: number,
+      front = 0,
+    ) => {
+      const mesh = new Mesh(geometry, material);
+      mesh.position.set(0, y * m, front * m);
+      mesh.userData.noCollision = true;
+      sign.add(mesh);
+      roomMeshes.push(mesh);
+    };
+    part(new CylinderGeometry(0.2 * m, 0.24 * m, 0.1 * m, 12), signSteel, 0.05);
+    part(
+      new CylinderGeometry(0.04 * m, 0.05 * m, 2.55 * m, 10),
+      signSteel,
+      1.32,
+    );
+    part(new BoxGeometry(1.58 * m, 0.58 * m, 0.1 * m), signSteel, 2.63);
+    const label = createLabelTexture(words, {
+      ink: '#edfff1',
+      plate: '#087a42',
+      size: 64,
+    });
+    signTextures.push(label.texture);
+    const glow = new MeshStandardNodeMaterial({
+      color: '#ffffff',
+      map: label.texture,
+      emissive: '#ffffff',
+      emissiveMap: label.texture,
+      emissiveIntensity: 3,
+      roughness: 0.4,
+    });
+    materials.push(glow);
+    part(new PlaneGeometry(1.44 * m, 0.44 * m), glow, 2.63, 0.056);
+  };
+  poleSign(4, 16, -Math.PI / 2, 'EXIT ↑');
+  poleSign(19.8, 15.8, -Math.PI / 2, 'EXIT ←');
+  poleSign(20.1, 9, 0, 'EXIT ↑');
+  poleSign(20.1, 2.2, 0, 'EXIT →');
+
   // The light sources need a physical place in the gallery. Each suspended
   // theatre can is aimed with its spotlight, so the lens faces the exhibit.
   const lampBody = new MeshStandardNodeMaterial({
@@ -215,6 +320,58 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
       new CylinderGeometry(0.22 * m, 0.29 * m, 0.62 * m, 24),
       lampBody,
     );
+    // Yoke, pivot pins, rear heat sink and barn doors give the light the
+    // silhouette of a real theatre fixture, even against the dark ceiling.
+    for (const side of [-1, 1]) {
+      fixturePart(
+        barrel,
+        new BoxGeometry(0.035 * m, 0.54 * m, 0.055 * m),
+        lampTrim,
+        side * 0.34,
+        0.08,
+      );
+      fixturePart(
+        barrel,
+        new CylinderGeometry(0.07 * m, 0.07 * m, 0.055 * m, 12),
+        lampTrim,
+        side * 0.36,
+        0,
+      ).rotation.z = Math.PI / 2;
+      const door = fixturePart(
+        barrel,
+        new BoxGeometry(0.29 * m, 0.025 * m, 0.48 * m),
+        lampBody,
+        side * 0.43,
+        -0.39,
+      );
+      door.rotation.z = side * 0.38;
+    }
+    fixturePart(
+      barrel,
+      new BoxGeometry(0.72 * m, 0.035 * m, 0.055 * m),
+      lampTrim,
+      0,
+      0.34,
+    );
+    for (let fin = 0; fin < 4; fin++)
+      fixturePart(
+        barrel,
+        new CylinderGeometry(0.23 * m, 0.23 * m, 0.018 * m, 24),
+        lampTrim,
+        0,
+        0.37 + fin * 0.055,
+      );
+    for (const side of [-1, 1]) {
+      const door = fixturePart(
+        barrel,
+        new BoxGeometry(0.48 * m, 0.025 * m, 0.29 * m),
+        lampBody,
+        0,
+        -0.39,
+        side * 0.43,
+      );
+      door.rotation.x = -side * 0.38;
+    }
     fixturePart(
       barrel,
       new TorusGeometry(0.27 * m, 0.045 * m, 8, 24),
@@ -304,7 +461,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.id = 'plinth-notes';
   notes.textContent =
-    'DEV5 · Plinths: walk within 4 m to light and hear one · Exit: far east wall · Portals: dev3 and Hall west · WASD: walk · Esc: cursor';
+    'DEV5 · Plinths: walk within 4 m to light and hear one · EXIT: green door on east wall · WASD: walk · Esc: cursor';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',
@@ -381,9 +538,10 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
         new CustomEvent('plinth-arrival', { detail: arrival }),
       );
     }
+    const narrationState = narrator.state();
     narrator.offer(
       story.update(
-        delta,
+        narrationState.introActive ? 0 : delta,
         active,
         arrival,
         walk.walker.x / m > HALF - 4 && Math.abs(walk.walker.z / m) < 3,
@@ -446,6 +604,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     for (const { exhibit } of exhibits) exhibit.dispose();
     for (const mesh of roomMeshes) mesh.geometry.dispose();
     for (const material of materials) material.dispose();
+    for (const texture of signTextures) texture.dispose();
     reflection?.dispose();
     pipeline.dispose();
     void renderer.dispose();

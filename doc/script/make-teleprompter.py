@@ -24,6 +24,15 @@ GROUPS = [
 ]
 
 
+# The second teleprompter: short lines for standing and looking, read
+# without slates and split by their pauses and words.
+LOOKING = [
+    ("The sphere", "Warm. Wholesome. Everything good.", [34, 35, 36, 37, 38]),
+    ("The helix", "Wistful. Regret. What might have been.", [39, 40, 41, 42]),
+    ("The rhombus", "Disgust and suspicion. Never fear.", [43, 44, 45, 46, 47]),
+]
+
+
 def spoken(n: int) -> str:
     if n <= 20:
         return WORDS[n]
@@ -38,7 +47,10 @@ def main() -> None:
         if m:
             text = re.sub(r"\s*_\(tidied:.*?\)_\s*$", "", m.group(2).strip())
             clips[int(m.group(1))] = text.strip()
-    placed = sorted(n for _, _, items in GROUPS for n, _ in items)
+    placed = sorted(
+        [n for _, _, items in GROUPS for n, _ in items]
+        + [n for _, _, items in LOOKING for n in items]
+    )
     missing = sorted(set(clips) - set(placed))
     if missing or placed != sorted(set(placed)):
         raise SystemExit(f"Clips not placed exactly once in GROUPS: {missing or placed}")
@@ -56,6 +68,18 @@ def main() -> None:
             out += [f"### Clip {spoken(n)}: {label}", "", clips[n], ""]
     out += ["---", "", "That's all of them. Thank you.", ""]
     (HERE / "plinth-teleprompter.md").write_text("\n".join(out))
+    out = [
+        "# The plinths: looking lines",
+        "",
+        "Short lines for standing at a shape and looking at it. No slates: read each line, then pause about three seconds before the next. To retake a line, just say it again; the last take counts. Improvise freely.",
+        "",
+    ]
+    for title, mood, items in LOOKING:
+        out += ["---", "", f"## {title}", "", f"_{mood}_", ""]
+        for n in items:
+            out += [clips[n], ""]
+    out += ["---", "", "That's all of them. Thank you.", ""]
+    (HERE / "plinth-teleprompter-looking.md").write_text("\n".join(out))
 
 
 if __name__ == "__main__":
