@@ -105,13 +105,15 @@ export function createPlinthTracker(
 /**
  * How bright each plinth's spotlight should be, 0 to 1: the active one
  * full and the others dimmed right down, or, at none, all at a low
- * standing level so the room can be found.
+ * standing level so the room can be found. The standing level is kept
+ * well down (over four stops below full) so that arriving at a plinth
+ * plainly lights it; the exhibits' own glow shows where they stand.
  */
 export function spotlightLevels(
   active: ExhibitId | null,
 ): Record<ExhibitId, number> {
-  const idle = 0.4;
-  const dimmed = 0.04;
+  const idle = 0.05;
+  const dimmed = 0.015;
   const level = (id: ExhibitId) =>
     active === null ? idle : id === active ? 1 : dimmed;
   return {

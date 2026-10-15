@@ -95,4 +95,12 @@ describe('the spotlights', () => {
     expect(levels.rhombus).toBeGreaterThan(0);
     expect(levels.rhombus).toBeLessThan(0.5);
   });
+
+  it('come up plainly when a plinth is reached', () => {
+    // At least four stops between standing and lit, or the change is
+    // lost in the tone mapping.
+    expect(spotlightLevels('helix').helix).toBeGreaterThanOrEqual(
+      16 * spotlightLevels(null).helix,
+    );
+  });
 });

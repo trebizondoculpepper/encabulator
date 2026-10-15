@@ -142,6 +142,8 @@ function plinth(
       Math.cos(a) * 0.502,
     );
     face.rotation.y = a;
+    // In the cap's shadow like the stone round it, or it shows as a patch.
+    face.receiveShadow = true;
     group.add(face);
   }
   return group;
@@ -350,9 +352,13 @@ export function createExhibit(id: ExhibitId): Exhibit {
   const geometries: BufferGeometry[] = [];
   const materials: Material[] = [];
   const textures: Texture[] = [];
+  // The plinth's own materials, kept apart so the exhibit's studio does
+  // not light them: lit by the spotlight alone, the plinth plainly comes
+  // up when the visitor arrives.
+  const stoneMaterials: Material[] = [];
   const group = new Group();
   group.name = `Exhibit ${id}`;
-  group.add(plinth(NAMES[id], geometries, materials, textures));
+  group.add(plinth(NAMES[id], geometries, stoneMaterials, textures));
   const made = BUILDERS[id](geometries, materials);
   made.spinner.position.y = EXHIBIT_CENTRE;
   group.add(made.spinner);
@@ -377,7 +383,7 @@ export function createExhibit(id: ExhibitId): Exhibit {
     },
     dispose() {
       for (const g of geometries) g.dispose();
-      for (const m of materials) m.dispose();
+      for (const m of [...materials, ...stoneMaterials]) m.dispose();
       for (const t of textures) t.dispose();
     },
   };
