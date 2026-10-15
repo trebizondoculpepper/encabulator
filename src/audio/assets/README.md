@@ -1,0 +1,17 @@
+# Audio asset record
+
+All authors, original source URLs and licences are recorded centrally in [CREDITS.md](../../../CREDITS.md).
+
+`printer-line-1.wav` through `printer-line-5.wav` are distinct 0.70-second excerpts beginning at 0.15, 4.05, 7.10, 11.10 and 16.10 seconds in the credited Star LC-10 recording. Delivery format is mono 22,050 Hz, 16-bit PCM WAV. Each uses a 120 Hz high-pass, 8 kHz low-pass, 8 ms fade in, 15 ms fade out and a matched peak of 0.55. The playback gain is 0.035 before spatial and master-volume attenuation. Shuffled sets use every variant and avoid adjacent repeats; the cue fires at a printed line's start rather than repeatedly every frame. Printing and paper feed stop while idle.
+
+`door-open.wav` is 00:00.05–00:01.15 and `door-close.wav` is 00:30.00–00:30.85 of the credited metal-door recording. Both are mono 22,050 Hz, 16-bit PCM WAV, high-passed at 90 Hz, peak-matched to 0.55, with 8 ms fade in and 20 ms fade out. Door playback gain is 0.03 before the master volume, reduced from 0.2 following the owner's loudness feedback. They are hinge textures, not separate original recordings of the game's doors.
+
+`button-press.wav` is mono 22,050 Hz PCM16, 0.14 seconds, a mechanical press isolated from a cassette-key recording with an 80 Hz high-pass, 4,500 Hz low-pass and 5/10 ms fades; playback gain is 0.07 before spatial and master attenuation.
+
+`switch-click.wav` and `rocker-click.wav` are mono 22,050 Hz PCM16 excerpts of the credited StevenBrown rocker recording, 0.15 and 0.20 seconds respectively. All three control recordings are peak-normalised to 0.55. Defaults use gain 0.07 for buttons/switches and 0.08 for rockers, before spatial/master attenuation. Shared control-type defaults apply in both the lab and the development control test.
+
+Rotary detents share the crisp switch recording at gain 0.025; selectors use gain 0.06. Isolators/breakers share the deeper rocker recording at gain 0.12. The defaults are centralised in `control-sound-defaults.ts`; individual mechanical effects such as a valve handwheel, clamp or ram stop retain their own sound definitions.
+
+`key-thock.wav` is the second press/release pair from the MattRuthSound mechanical-keyboard recording, filtered and played at 88% source speed during editing, about 0.25 seconds long. Peak 0.55; keycap playback gain 0.09. Source and licence are in CREDITS.md.
+
+`bakelite-heavy-switch.wav` is a 0.42-second excerpt beginning at 1.70 seconds in the owner-supplied Stanwood Studios video. `fluorescent-ballast-start.wav` is a 1.38-second excerpt beginning at 2.17 seconds. Both are mono 22,050 Hz PCM16 WAV with short fades; the startup is raised 18 dB because it is quiet in the source. Their recording credit and source status are in CREDITS.md.

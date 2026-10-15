@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.idea/
+.venv/
+.DS_Store
+*.local
+
+# Agent mailbox identity
+agent-mailbox.toml
+agent-inbox.toml
