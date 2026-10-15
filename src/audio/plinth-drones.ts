@@ -209,6 +209,13 @@ export function createPlinthDrones(sources: readonly Source[]) {
     ) {
       if (!context) return;
       const l = context.listener;
+      // Firefox has no AudioParams on the listener, only the older setters;
+      // calling the missing params threw every frame and stopped the room.
+      if (!l.positionX) {
+        l.setPosition(x, y, z);
+        l.setOrientation(fx, fy, fz, 0, 1, 0);
+        return;
+      }
       const t = context.currentTime;
       l.positionX.setTargetAtTime(x, t, 0.05);
       l.positionY.setTargetAtTime(y, t, 0.05);

@@ -1,5 +1,7 @@
 import {
   BoxGeometry,
+  CylinderGeometry,
+  Group,
   HemisphereLight,
   Mesh,
   Object3D,
@@ -8,6 +10,7 @@ import {
   Raycaster,
   Scene,
   SpotLight,
+  TorusGeometry,
   Vector2,
   Vector3,
 } from 'three';
@@ -118,6 +121,38 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   const portals = createPortals('dev5', devPortals('dev5', bounds, m), 0, m);
   scene.add(portals.group);
 
+  // The light sources need a physical place in the gallery. Each suspended
+  // theatre can is aimed with its spotlight, so the lens faces the exhibit.
+  const lampBody = new MeshStandardNodeMaterial({
+    color: '#555a5d',
+    metalness: 0.65,
+    roughness: 0.42,
+    emissive: '#25292c',
+    emissiveIntensity: 0.45,
+  });
+  const lampTrim = new MeshStandardNodeMaterial({
+    color: '#9a9182',
+    metalness: 0.7,
+    roughness: 0.33,
+    emissive: '#40382b',
+    emissiveIntensity: 0.35,
+  });
+  materials.push(lampBody, lampTrim);
+  const fixturePart = (
+    parent: Object3D,
+    geometry: BoxGeometry | CylinderGeometry | TorusGeometry,
+    material: Material,
+    x = 0,
+    y = 0,
+    z = 0,
+  ) => {
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x * m, y * m, z * m);
+    parent.add(mesh);
+    roomMeshes.push(mesh);
+    return mesh;
+  };
+
   // The plinths, their exhibits and a spotlight over each.
   const footprints: Footprint[] = [];
   const exhibits = PLINTHS.map((plinth) => {
@@ -149,7 +184,57 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     spot.shadow.camera.near = 1 * m;
     spot.shadow.camera.far = 20 * m;
     scene.add(spot, target);
-    return { id: plinth.id, exhibit, spot, level: 0 };
+    const canopy = new Group();
+    canopy.position.set(spot.position.x, HEIGHT * m, spot.position.z);
+    scene.add(canopy);
+    fixturePart(
+      canopy,
+      new CylinderGeometry(0.36 * m, 0.36 * m, 0.08 * m, 20),
+      lampTrim,
+      0,
+      -0.04,
+    );
+    fixturePart(
+      canopy,
+      new CylinderGeometry(0.065 * m, 0.065 * m, 0.42 * m, 12),
+      lampBody,
+      0,
+      -0.28,
+    );
+    const barrel = new Group();
+    barrel.position.copy(spot.position);
+    barrel.quaternion.setFromUnitVectors(
+      new Vector3(0, -1, 0),
+      target.position.clone().sub(spot.position).normalize(),
+    );
+    scene.add(barrel);
+    fixturePart(
+      barrel,
+      new CylinderGeometry(0.22 * m, 0.29 * m, 0.62 * m, 24),
+      lampBody,
+    );
+    fixturePart(
+      barrel,
+      new TorusGeometry(0.27 * m, 0.045 * m, 8, 24),
+      lampTrim,
+      0,
+      -0.32,
+    ).rotation.x = Math.PI / 2;
+    const lens = new MeshStandardNodeMaterial({
+      color: '#e6ceb0',
+      emissive: '#ffdeb0',
+      emissiveIntensity: 0.2,
+      roughness: 0.18,
+    });
+    materials.push(lens);
+    fixturePart(
+      barrel,
+      new CylinderGeometry(0.24 * m, 0.24 * m, 0.012 * m, 24),
+      lens,
+      0,
+      -0.325,
+    );
+    return { id: plinth.id, exhibit, spot, lens, level: 0 };
   });
 
   // A quiet loop at each exhibit, heard only near it. Which sound goes with
@@ -171,6 +256,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   canvas.addEventListener('pointerdown', unlockSound);
   window.addEventListener('keydown', unlockSound);
   const facing = new Vector3();
+  let soundFailed = false;
 
   const tracker = createPlinthTracker();
   const arrivals: Arrival[] = [];
@@ -189,6 +275,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   > = {
     // From the middle of the room, all three plinths in view.
     overview: { x: 0, z: 19 * m, yaw: 0, pitch: -0.12 },
+    ceiling: { x: 0, z: 10 * m, yaw: 0, pitch: 0.72 },
   };
   const walk = createFirstPerson({
     canvas,
@@ -286,19 +373,27 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
       );
     }
     camera.getWorldDirection(facing);
-    drones.listen(
-      camera.position.x / m,
-      camera.position.y / m,
-      camera.position.z / m,
-      facing.x,
-      facing.y,
-      facing.z,
-    );
+    // Sound must never stop the room: an error thrown here would end the
+    // frame loop for good.
+    try {
+      drones.listen(
+        camera.position.x / m,
+        camera.position.y / m,
+        camera.position.z / m,
+        facing.x,
+        facing.y,
+        facing.z,
+      );
+    } catch (error) {
+      if (!soundFailed) console.warn('Plinth ambience failed:', error);
+      soundFailed = true;
+    }
     const levels = spotlightLevels(active);
     const step = Math.min(1, delta * FADE_RATE);
     for (const entry of exhibits) {
       entry.level += (levels[entry.id as ExhibitId] - entry.level) * step;
       entry.spot.intensity = SPOT_CANDELA * m * m * entry.level;
+      entry.lens.emissiveIntensity = 0.2 + entry.level * 4;
       entry.exhibit.update(delta);
     }
     pipeline.render();
