@@ -122,11 +122,11 @@ Okay, enough of the sphere. Come on, wean ourselves off it. We've got business t
 
 ### Clip nineteen: Rhombus to sphere
 
-After looking at that rhombus, this sphere is a sight for sore eyes. Just look at it. It's perfect. Spinning there, minding its own business. Not a care in the world. Everyone loves a sphere, because a sphere knows what it wants to be. It knows its place in the universe. Everybody loves a sphere because a sphere loves Everyone.
+After looking at that rhombus, this sphere is a sight for sore eyes. Just look at it. It's perfect. Spinning there, minding its own business. Not a care in the world. Everyone loves a sphere, because a sphere knows what it wants to be. It knows its place in the universe. Everybody loves a sphere because a sphere loves everyone.
 
 ### Clip twenty: Rhombus to sphere, again
 
-Do you know what? After walking away from that rhombus, this is like a cleanser for our eyes. We can see clearly again. We can smell again. Oh, it's like getting out of the dirty old city and breathing fresh, clean air for once in our life. That's what the sphere means. That's what it's trying to tell us. Forget about the rhombus. The sphere is saying: just be yourself. Be who you want to be. Be where you want to be. Maybe we should go travelling? See the world, find ourslves. Duscover who we really want to be. It's saying that we can be anything, do anything go anywhere. Limitless potential. That's the sphere's message.
+Do you know what? After walking away from that rhombus, this is like a cleanser for our eyes. We can see clearly again. We can smell again. Oh, it's like getting out of the dirty old city and breathing fresh, clean air for once in our life. That's what the sphere means. That's what it's trying to tell us. Forget about the rhombus. The sphere is saying: just be yourself. Be who you want to be. Be where you want to be. Maybe we should go travelling? See the world, find ourselves. Discover who we really want to be. It's saying that we can be anything, do anything, go anywhere. Limitless potential. That's the sphere's message.
 
 ### Clip twenty-six: Rhombus to helix
 
@@ -164,7 +164,7 @@ Yes, I think we've made the right choice. Better stay away from these things. Th
 
 ### Clip thirty-one: Leaving after seeing the shapes
 
-I did warn you. But maybe I'll be firmer next time. I just wish you'd believe me about this place. I told you, all three of them, they're just trash. I wish you'd learn to trust me, you know. I'm the only one who's always been on your side. That was horrible, wasn't it? I don't know why we ever set foot in this place. They're so manipulative. Honestly, I think they're all wrong. If I never see another shape in my entire life, I think I'll be happy. 
+I did warn you. But maybe I'll be firmer next time. I just wish you'd believe me about this place. I told you, all three of them, they're just trash. I wish you'd learn to trust me, you know. I'm the only one who's always been on your side. That was horrible, wasn't it? I don't know why we ever set foot in this place. They're so manipulative. Honestly, I think they're all wrong. If I never see another shape in my entire life, I think I'll be happy.
 
 ---
 
