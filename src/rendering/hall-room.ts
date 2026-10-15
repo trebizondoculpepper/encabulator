@@ -32,6 +32,7 @@ import {
 } from '../scene/hall-doors';
 import { createHallServices } from '../scene/hall-services';
 import { createFloorMarkings } from '../scene/floor-markings';
+import { OFFICE, createPlantOffice } from '../scene/plant-office';
 import { createFloorReflection } from '../scene/floor-reflection';
 import {
   HALL_LENGTH,
@@ -224,6 +225,20 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   put(props.pedestalFan(), -24.5, -NAVE_WIDTH / 2 - 1.6, 0.4);
   put(props.drumFan('#3d5a7a'), 30.5, NAVE_WIDTH / 2 + 1.8, Math.PI + 0.8);
 
+  // The facility administrators' office, in the north side hall between
+  // the containers and the dumpster, its windows and door toward the nave.
+  const office = createPlantOffice();
+  const officeAt = { x: -18.5, z: northWall - 0.4 + OFFICE.depth / 2 };
+  office.group.position.set(officeAt.x, 0, officeAt.z);
+  propGroup.add(office.group);
+  for (const s of office.solids)
+    propSolids.push({
+      minX: s.minX + officeAt.x,
+      maxX: s.maxX + officeAt.x,
+      minZ: s.minZ + officeAt.z,
+      maxZ: s.maxZ + officeAt.z,
+    });
+
   // ---- Services: ducts, heaters, sprinklers, cable trays ----------------
   const services = createHallServices();
   services.group.scale.setScalar(m);
@@ -340,8 +355,12 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     // Storage locations in the side halls, outlined in white with labels.
     const north = -W / 2 + 1.2;
     const south = W / 2 - 1.2;
-    marks.outline(-43, north + 1.6, 57, 3.6, 'white');
-    marks.stencil('CONTAINER STORAGE', -43, north + 4.2, 0.5, 0, '#ecebe6');
+    marks.outline(-50.5, north + 1.6, 42, 3.6, 'white');
+    marks.stencil('CONTAINER STORAGE', -50.5, north + 4.2, 0.5, 0, '#ecebe6');
+    // A walkway from the office door to the nave's walkway.
+    marks.line(-13, -34, -13, -22.6, 0.1);
+    marks.line(-11.4, -34, -11.4, -22.6, 0.1);
+    marks.stencil('OFFICE', -12.2, -27, 0.5, 0, '#e1a915');
     marks.outline(7, north + 1.4, 8, 3.2, 'white');
     marks.stencil('A1', 7, north + 3.6, 0.6, 0, '#ecebe6');
     for (let i = 0; i < 3; i++) {
@@ -595,6 +614,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     disposeKit(kit, desk.group);
     notes.remove();
     hall.dispose();
+    office.dispose();
     shine.dispose();
     services.dispose();
     marks.dispose();
