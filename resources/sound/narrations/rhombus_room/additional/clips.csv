@@ -1,17 +1,17 @@
 game_clip,shape,filename,source_ranges_s,duration_s,transcript,note
-34,sphere,sphere-look-1.wav,3.820-8.150,4.330,What a wonderful sphere. We could look at it for hours.,script
-35,sphere,sphere-look-2.wav,10.700-13.400,2.700,"It is so unpredictable, isn't it?",script
-36,sphere,sphere-look-3.wav,16.420-19.980,3.560,Looking at it just makes us feel happy.,script
-37,sphere,sphere-look-4.wav,24.740-29.890,5.150,I don't think we've ever known joy like looking into this sphere.,script
-38,sphere,sphere-look-5.wav,34.120-38.760,4.640,Let us stay looking at this sphere forever. We can be happy here.,script
-39,helix,helix-look-1.wav,70.420-75.450,5.030,It is just so painful staring into the abyss of this helix.,script; extended to preserve final helix
-40,helix,helix-look-2.wav,79.270-84.040,4.770,This helix is reminding us of everything we have ever done wrong in our lives.,script
-41,helix,helix-look-3.wav,89.960-97.540,7.580,Could there ever be a more painful way to confront our failures than looking directly at this helix?,script
-42,helix,helix-look-4.wav,101.650-105.420,3.770,Looking at this helix makes our head hurt.,script
-43,rhombus,rhombus-look-1.wav,111.830-120.260,8.430,This shape is just so wrong. It is like a Lovecraftian nightmare.,script
-44,rhombus,rhombus-look-2.wav,124.180-127.650,3.470,The geometry is unholy.,script
-45,rhombus,rhombus-look-3.wav,130.350-134.100,3.750,"We should just put it out of its misery, smash it.",script
-46,rhombus,rhombus-look-4.wav,136.350-139.470 + 142.650-145.330,6.150,This is a truly horrible thing. Do not suffer the rhombus to live.,script; joined two takes with 0.35 s pause
-47,rhombus,rhombus-look-5.wav,148.280-153.550,5.270,What on earth is this place coming to allowing rhombuses in here?,script
-48,sphere,sphere-extra-1.wav,41.580-54.210,12.630,"Oh sphere, I think I love you. Sphere, can you hear me? Please, if you can hear me, reach out. Give me a sign.",improvised
-49,sphere,sphere-extra-2.wav,58.600-61.960,3.360,"Oh sphere, I wish I could take you with me.",improvised
+34,sphere,sphere-look-1.wav,3.170-8.850,5.680,What a wonderful sphere. We could look at it for hours.,script; room-tone margins checked against word endings
+35,sphere,sphere-look-2.wav,10.050-14.100,4.050,"It is so unpredictable, isn't it?",script; room-tone margins checked against word endings
+36,sphere,sphere-look-3.wav,15.770-20.680,4.910,Looking at it just makes us feel happy.,script; room-tone margins checked against word endings
+37,sphere,sphere-look-4.wav,24.090-30.590,6.500,I don't think we've ever known joy like looking into this sphere.,script; room-tone margins checked against word endings
+38,sphere,sphere-look-5.wav,33.470-39.460,5.990,Let us stay looking at this sphere forever. We can be happy here.,script; room-tone margins checked against word endings
+39,helix,helix-look-1.wav,69.770-76.150,6.380,It is just so painful staring into the abyss of this helix.,script; extended to preserve final helix; room-tone margins checked against word endings
+40,helix,helix-look-2.wav,78.050-85.400,7.350,This helix is reminding us of everything we have ever done wrong in our lives.,script; extended to preserve final lives; room-tone margins checked against word endings
+41,helix,helix-look-3.wav,89.310-98.240,8.930,Could there ever be a more painful way to confront our failures than looking directly at this helix?,script; room-tone margins checked against word endings
+42,helix,helix-look-4.wav,101.000-106.120,5.120,Looking at this helix makes our head hurt.,script; room-tone margins checked against word endings
+43,rhombus,rhombus-look-1.wav,111.180-120.960,9.780,This shape is just so wrong. It is like a Lovecraftian nightmare.,script; room-tone margins checked against word endings
+44,rhombus,rhombus-look-2.wav,123.530-128.350,4.820,The geometry is unholy.,script; room-tone margins checked against word endings
+45,rhombus,rhombus-look-3.wav,129.700-134.800,5.100,"We should just put it out of its misery, smash it.",script; room-tone margins checked against word endings
+46,rhombus,rhombus-look-4.wav,135.700-140.170 + 142.000-146.030,8.850,This is a truly horrible thing. Do not suffer the rhombus to live.,script; joined two takes with 0.35 s pause; room-tone margins checked against word endings
+47,rhombus,rhombus-look-5.wav,147.630-154.250,6.620,What on earth is this place coming to allowing rhombuses in here?,script; room-tone margins checked against word endings
+48,sphere,sphere-extra-1.wav,40.930-54.910,13.980,"Oh sphere, I think I love you. Sphere, can you hear me? Please, if you can hear me, reach out. Give me a sign.",improvised; room-tone margins checked against word endings
+49,sphere,sphere-extra-2.wav,57.950-62.660,4.710,"Oh sphere, I wish I could take you with me.",improvised; room-tone margins checked against word endings
