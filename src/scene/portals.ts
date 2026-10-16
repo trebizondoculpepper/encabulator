@@ -165,16 +165,23 @@ export function createPortals(
       part(1.12, 0.07, 0.03, 0, 2.115, 0.015, frameWhite);
       for (const side of [-1, 1])
         part(0.07, 2.15, 0.03, side * 0.525, 1.075, 0.015, frameWhite);
+      // Intumescent strips and smoke seals round the frame's rebate.
+      const seal = material('#7e4038', 0.7);
+      for (const side of [-1, 1])
+        part(0.006, 2.05, 0.004, side * 0.478, 1.03, 0.024, seal);
+      part(0.95, 0.006, 0.004, 0, 2.071, 0.024, seal);
       const leaf = part(0.93, 2.04, 0.045, 0, 1.02, 0.02, beech);
       leaf.name = `Portal to ${portal.to}`;
       uses.set(leaf, () => travel(portal.to));
-      // The vision panel shows only the dim corridor beyond.
-      part(0.16, 0.8, 0.002, 0.22, 1.45, 0.044, dark);
+      // The vision panel, low enough to see a wheelchair user or a child
+      // (500 to 1500 mm at least, Approved Document M), shows only the dim
+      // corridor beyond.
+      part(0.16, 1.2, 0.002, 0.22, 1.15, 0.044, dark);
       for (const [w, h, x, y] of [
-        [0.2, 0.02, 0.22, 1.86],
-        [0.2, 0.02, 0.22, 1.04],
-        [0.02, 0.84, 0.12, 1.45],
-        [0.02, 0.84, 0.32, 1.45],
+        [0.2, 0.02, 0.22, 1.76],
+        [0.2, 0.02, 0.22, 0.54],
+        [0.02, 1.24, 0.12, 1.15],
+        [0.02, 1.24, 0.32, 1.15],
       ] as const)
         part(w, h, 0.012, x, y, 0.047, beech);
       part(0.03, 0.2, 0.015, -0.4, 1.02, 0.05, chromed);

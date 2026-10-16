@@ -30,6 +30,7 @@ import {
   SILL,
   SMOKE_DETECTORS,
   SPEAKERS,
+  EMERGENCY_LIGHTS,
   TILE,
   TRAINING_BOUNDS,
   bays,
@@ -49,8 +50,9 @@ const HALF_WALL = 0.15;
 
 /**
  * The training room (see `training-room-plan.ts`): a large, unremarkable,
- * empty meeting room in an English trading-estate office of the 1990s,
- * kept clean and tidy by a respectable company. Magnolia plasterboard
+ * empty meeting room in an English trading-estate office built in the
+ * 1990s, today, kept clean and tidy by a respectable company and up to
+ * current health and safety standards. Magnolia plasterboard
  * walls; a suspended ceiling of speckled mineral tiles in a white grid,
  * with recessed Category 2 fluorescent fittings, air-conditioning
  * cassettes, smoke detectors, motion sensors and speakers; a hard vinyl
@@ -392,6 +394,23 @@ export function createTrainingRoom(kit: PanelKit) {
     dome.position.set(x, CEILING - 0.012, z);
     inside.add(dome);
   }
+  // Emergency lights (BS 5266): a lens, and a green LED showing the
+  // battery charging.
+  const charging = lit({ color: '#35e06a' });
+  for (const { x, z } of EMERGENCY_LIGHTS) {
+    cylinder(inside, whitePlastic, 0.075, 0.03, x, CEILING - 0.015, z, 20);
+    cylinder(
+      inside,
+      paint('#f6f6f2', 0.15),
+      0.045,
+      0.012,
+      x,
+      CEILING - 0.034,
+      z,
+      20,
+    );
+    cylinder(inside, charging, 0.005, 0.004, x + 0.06, CEILING - 0.032, z, 8);
+  }
   const grille = texture(64, 64, (c, w, h) => {
     c.fillStyle = '#f0efe8';
     c.fillRect(0, 0, w, h);
@@ -653,6 +672,40 @@ export function createTrainingRoom(kit: PanelKit) {
     ] as const)
       box(leaf, alu, bw, bh, 0.06, x, y, 0);
     plane(leaf, glass, w - 0.18, h - 0.42, 0, 0.32 + (h - 0.42) / 2, 0.005);
+    // Manifestation at two heights, and the safety glass's etched mark.
+    const dots = texture(256, 16, (c, cw, ch) => {
+      c.clearRect(0, 0, cw, ch);
+      c.fillStyle = 'rgba(235,238,236,0.85)';
+      for (let x = 6; x < cw; x += 12) {
+        c.beginPath();
+        c.arc(x, ch / 2, 4, 0, Math.PI * 2);
+        c.fill();
+      }
+    });
+    const frosted = paint('#ffffff', 0.6, 0, {
+      map: dots,
+      transparent: true,
+      side: DoubleSide,
+      depthWrite: false,
+    });
+    for (const y of [0.92, 1.5])
+      plane(leaf, frosted, w - 0.18, 0.05, 0, y, 0.004);
+    const etched = sign(
+      0.04,
+      0.03,
+      (c, cw, ch) => {
+        c.clearRect(0, 0, cw, ch);
+        c.fillStyle = 'rgba(230,232,230,0.7)';
+        c.font = `${ch * 0.28}px ${SANS}`;
+        c.fillText('BS EN 12150', 2, ch * 0.4);
+        c.fillText('TOUGHENED', 2, ch * 0.8);
+      },
+      96,
+    );
+    (etched.material as MeshBasicMaterial).transparent = true;
+    etched.position.set(w / 2 - 0.12, 0.38, 0.003);
+    etched.rotation.y = Math.PI;
+    leaf.add(etched);
     // The panic bar, on the inside.
     box(leaf, chrome, w - 0.2, 0.035, 0.035, 0, 1.0, -0.09);
     for (const x of [-(w - 0.24) / 2, (w - 0.24) / 2])
@@ -805,6 +858,24 @@ export function createTrainingRoom(kit: PanelKit) {
     cylinder(g, black, 0.004, 0.25, 0, -0.19, 0.06);
   });
   mount(screen, 'west', 0.6, CEILING - 0.06);
+  // Its electrical safety test label.
+  const tested = sign(
+    0.045,
+    0.025,
+    (c, w, h) => {
+      c.fillStyle = '#3aa655';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#ffffff';
+      c.font = `bold ${h * 0.32}px ${SANS}`;
+      c.textAlign = 'center';
+      c.fillText('PASSED', w / 2, h * 0.42);
+      c.font = `${h * 0.22}px ${SANS}`;
+      c.fillText('Next test 03/26', w / 2, h * 0.8);
+    },
+    128,
+  );
+  tested.position.set(-2.92, CEILING - 0.45, 0.731);
+  inside.add(tested);
   // The projector on its drop pole, pointing at the screen.
   cylinder(inside, white, 0.02, 0.4, -3.0, CEILING - 0.2, 0.6);
   box(
@@ -871,6 +942,32 @@ export function createTrainingRoom(kit: PanelKit) {
     flyer.position.set(0.25, 0.12, 0.014);
     flyer.rotation.z = -0.05;
     g.add(flyer);
+    const firstAid = sign(0.15, 0.21, (c, w, h) => {
+      c.fillStyle = '#ffffff';
+      c.fillRect(0, 0, w, h);
+      c.fillStyle = '#0f7a3c';
+      c.fillRect(0, 0, w, h * 0.22);
+      c.fillStyle = '#ffffff';
+      c.fillRect(w * 0.08, h * 0.08, w * 0.12, h * 0.04);
+      c.fillRect(w * 0.12, h * 0.05, w * 0.04, h * 0.1);
+      c.font = `bold ${h * 0.08}px ${SANS}`;
+      c.fillText('FIRST AID', w * 0.26, h * 0.14);
+      c.fillStyle = '#111111';
+      c.font = `${h * 0.05}px ${SANS}`;
+      [
+        'Your first aiders are:',
+        '',
+        'Sandra Pike   ext. 214',
+        'Martin Cole   ext. 231',
+        '',
+        'First aid box: Reception',
+        'Accident book: Reception',
+      ].forEach((line, i) =>
+        c.fillText(line, w * 0.08, h * 0.33 + i * h * 0.08),
+      );
+    });
+    firstAid.position.set(0.3, -0.22, 0.014);
+    g.add(firstAid);
   });
   mount(pinboard, 'west', -2.9, 1.5);
 
@@ -893,27 +990,86 @@ export function createTrainingRoom(kit: PanelKit) {
     -4.2,
     1.2,
   );
-  const callPoint = assembly((g) => {
-    box(g, red, 0.09, 0.09, 0.05, 0, 0, 0.025);
-    const face = sign(
-      0.07,
-      0.07,
-      (c, w, h) => {
-        c.fillStyle = '#e8ebe8';
-        c.fillRect(0, 0, w, h);
-        c.fillStyle = '#c0261f';
-        c.textAlign = 'center';
-        c.font = `bold ${w * 0.16}px ${SANS}`;
-        c.fillText('FIRE', w / 2, h * 0.32);
-        c.font = `bold ${w * 0.1}px ${SANS}`;
-        c.fillText('PUSH HERE', w / 2, h * 0.62);
-      },
-      128,
+  const makeCallPoint = () =>
+    assembly((g) => {
+      box(g, red, 0.09, 0.09, 0.05, 0, 0, 0.025);
+      const face = sign(
+        0.07,
+        0.07,
+        (c, w, h) => {
+          c.fillStyle = '#e8ebe8';
+          c.fillRect(0, 0, w, h);
+          c.fillStyle = '#c0261f';
+          c.textAlign = 'center';
+          c.font = `bold ${w * 0.16}px ${SANS}`;
+          c.fillText('FIRE', w / 2, h * 0.32);
+          c.font = `bold ${w * 0.1}px ${SANS}`;
+          c.fillText('PUSH HERE', w / 2, h * 0.62);
+        },
+        128,
+      );
+      face.position.z = 0.051;
+      g.add(face);
+    });
+  mount(makeCallPoint(), 'north', -3.75, 1.4);
+  // A second call point by the fire exit (BS 5839), on a pattress on the
+  // mullion beside it.
+  const exitCallPoint = makeCallPoint();
+  box(exitCallPoint, whitePlastic, 0.11, 0.11, 0.02, 0, 0, -0.01);
+  exitCallPoint.position.set(maxX - 0.08, 1.4, FIRE_EXIT.z - BAY / 2);
+  exitCallPoint.rotation.y = -Math.PI / 2;
+  inside.add(exitCallPoint);
+  // The emergency lighting's test key switch.
+  const keySwitch = assembly((g) => {
+    box(g, whitePlastic, 0.086, 0.086, 0.01, 0, 0, 0.005);
+    const disc = cylinder(
+      g,
+      paint('#d8d0b4', 0.3, 0.7),
+      0.012,
+      0.004,
+      0,
+      0,
+      0.012,
+      12,
     );
-    face.position.z = 0.051;
-    g.add(face);
+    disc.rotation.x = Math.PI / 2;
+    box(g, black, 0.012, 0.003, 0.002, 0, 0, 0.0145);
   });
-  mount(callPoint, 'north', -3.75, 1.4);
+  mount(keySwitch, 'north', -4.2, 1.42);
+  // The No Smoking sign the law requires at the entrance.
+  const noSmoking = sign(
+    0.2,
+    0.2,
+    (c, w, h) => {
+      c.fillStyle = '#ffffff';
+      c.fillRect(0, 0, w, h);
+      const r = w * 0.27;
+      const cx = w / 2;
+      const cy = h * 0.37;
+      c.fillStyle = '#f2f2f2';
+      c.fillRect(cx - r * 0.75, cy - r * 0.08, r * 1.3, r * 0.2);
+      c.fillStyle = '#333333';
+      c.fillRect(cx - r * 0.75, cy - r * 0.08, r * 1.0, r * 0.2);
+      c.fillStyle = '#d0702a';
+      c.fillRect(cx + r * 0.25, cy - r * 0.08, r * 0.3, r * 0.2);
+      c.strokeStyle = '#d0201a';
+      c.lineWidth = w * 0.06;
+      c.beginPath();
+      c.arc(cx, cy, r, 0, Math.PI * 2);
+      c.moveTo(cx - r * 0.7, cy - r * 0.7);
+      c.lineTo(cx + r * 0.7, cy + r * 0.7);
+      c.stroke();
+      c.fillStyle = '#111111';
+      c.textAlign = 'center';
+      c.font = `bold ${h * 0.1}px ${SANS}`;
+      c.fillText('NO SMOKING', cx, h * 0.8);
+      c.font = `${h * 0.045}px ${SANS}`;
+      c.fillText('It is against the law to smoke', cx, h * 0.88);
+      c.fillText('in these premises', cx, h * 0.94);
+    },
+    256,
+  );
+  mount(noSmoking, 'north', -6.45, 1.6, 0.002);
   const controller = assembly((g) => {
     box(g, whitePlastic, 0.12, 0.12, 0.025, 0, 0, 0.0125);
     const lcd = sign(

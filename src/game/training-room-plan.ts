@@ -55,6 +55,12 @@ export const MOTION_SENSORS = [
   { x: -2.7, z: -2.1 },
   { x: 2.7, z: 2.1 },
 ];
+/** Emergency lights: by the fire exit, by the door and in the middle. */
+export const EMERGENCY_LIGHTS = [
+  { x: 6.3, z: 2.1 },
+  { x: -5.1, z: -3.9 },
+  { x: 0.3, z: -0.3 },
+];
 export const SPEAKERS = [
   { x: -4.5, z: 2.1 },
   { x: 4.5, z: 2.1 },
@@ -71,6 +77,7 @@ export function ceilingFittings() {
     ...SMOKE_DETECTORS,
     ...MOTION_SENSORS,
     ...SPEAKERS,
+    ...EMERGENCY_LIGHTS,
   ];
 }
 
