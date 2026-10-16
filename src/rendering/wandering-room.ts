@@ -54,8 +54,8 @@ const HOME = { x: 0, z: 0.5 };
  * floor stand, and on the north wall a mode panel with its four-position
  * knob, active-mode pilot lights and a PRESSED lamp. Normal, the stand
  * stays in the middle of the room; eager, it creeps to wherever you look;
- * skittish, it rolls away from you, a little faster than you can follow
- * (`src/game/mobile-pedestal.ts`).
+ * skittish, it runs round a loop in the middle of the room, away from you,
+ * too fast ever to be caught (`src/game/mobile-pedestal.ts`).
  */
 export function startWanderingRoom(canvas: HTMLCanvasElement) {
   const m = METRE;

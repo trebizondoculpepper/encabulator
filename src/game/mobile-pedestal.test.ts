@@ -8,7 +8,12 @@ import {
   EAGER_TRAVEL_RAMP,
   EAGER_NEAR_DISTANCE,
   WALL_MARGIN,
+  CAUGHT_DISTANCE,
+  FLEE_RADIUS,
   PEDESTAL_MODES,
+  PLAYER_TOP_SPEED,
+  orbitOf,
+  ORBIT_RATIO,
   createWanderingButton,
   createStandMotion,
   eagerTarget,
@@ -348,25 +353,151 @@ describe('the wandering button', () => {
     expect(later.z).toBeCloseTo(3, 0);
   });
 
-  it('runs, skittish, a little faster than the player, and only when near', () => {
-    const far = run(
-      { x: 0, z: -3, heading: 0 },
-      'skittish',
-      viewer(0, 0, -1),
-      1,
-    );
-    expect(far.x).toBeCloseTo(0);
-    expect(far.z).toBeCloseTo(-3);
+  it('waits on its loop, skittish, and runs round it only when the player is near', () => {
+    const loop = orbitOf(floor);
+    const on = { x: loop.x + loop.radius, z: loop.z, heading: 0 };
+    const far = run(on, 'skittish', viewer(1, 0, 0, 0, 0, 0), 1);
+    expect(far.x).toBeCloseTo(on.x);
+    expect(far.z).toBeCloseTo(on.z);
+    // Chased from just behind it (clockwise), it runs on anticlockwise.
+    const behind = { x: on.x - 0.5, z: on.z - 2, speed: 2 };
     const chased = stepStand(
-      { x: 0, z: 1.5, heading: 0 },
+      on,
       'skittish',
-      viewer(0, 0, -1, 2),
+      { ...viewer(0, 0, 1, 2), ...behind },
       floor,
       home,
       0.1,
     );
-    expect(chased.speed).toBeGreaterThan(2);
-    expect(chased.z).toBeLessThan(1.5);
+    expect(chased.speed).toBeCloseTo(ORBIT_RATIO * 2, 1);
+    expect(chased.z).toBeGreaterThan(on.z);
+    expect(Math.hypot(chased.x - loop.x, chased.z - loop.z)).toBeCloseTo(
+      loop.radius,
+    );
+  });
+
+  it('reverses round its loop when the player cuts ahead of it', () => {
+    const loop = orbitOf(floor);
+    const move = createStandMotion(() => 0);
+    const on = { x: loop.x + loop.radius, z: loop.z, heading: 0 };
+    const v = { ...viewer(0, 0, 1, 2), x: on.x - 1, z: on.z - 1.5 };
+    const first = move(on, 'skittish', v, floor, home, 0.1);
+    expect(first.z).toBeGreaterThan(on.z);
+    const ahead = { ...v, z: first.z + 1.5 };
+    const second = move(first, 'skittish', ahead, floor, home, 0.1);
+    expect(second.z).toBeLessThan(first.z);
+  });
+
+  it('makes for its loop from home, or from a corner, when skittish', () => {
+    const loop = orbitOf(floor);
+    for (const from of [home, { x: 7.5, z: 5.5 }]) {
+      const s = run(
+        { ...from, heading: 0 },
+        'skittish',
+        viewer(1, 0, 0, 0, -7, -5),
+        20,
+      );
+      expect(Math.hypot(s.x - loop.x, s.z - loop.z)).toBeCloseTo(
+        loop.radius,
+        1,
+      );
+    }
+  });
+
+  it('runs no faster than it needs to to beat a running player', () => {
+    const loop = orbitOf(floor);
+    const on = { x: loop.x + loop.radius, z: loop.z, heading: 0 };
+    const v = { ...viewer(0, 0, 1, 50), x: on.x - 0.5, z: on.z - 2 };
+    expect(stepStand(on, 'skittish', v, floor, home, 0.01).speed).toBeCloseTo(
+      ORBIT_RATIO * PLAYER_TOP_SPEED,
+    );
+  });
+
+  it('can never be caught, skittish, however the player chases it', () => {
+    const loop = orbitOf(floor);
+    type P = { x: number; z: number };
+    const onLoop = (a: number, r = loop.radius) => ({
+      x: loop.x + Math.cos(a) * r,
+      z: loop.z + Math.sin(a) * r,
+    });
+    const angleOf = (p: P) => Math.atan2(p.z - loop.z, p.x - loop.x);
+    // Each chaser says where to run, from where it is, where the stand is,
+    // where the stand was a frame ago and how long the chase has gone on.
+    const lead =
+      (seconds: number) =>
+      (_p: P, s: P, was: P): P => ({
+        x: s.x + (s.x - was.x) * 60 * seconds,
+        z: s.z + (s.z - was.z) * 60 * seconds,
+      });
+    const lion = (p: P, s: P) =>
+      onLoop(angleOf(s), Math.hypot(p.x - loop.x, p.z - loop.z) + 2);
+    const chasers: Record<string, (p: P, s: P, was: P, t: number) => P> = {
+      pursue: (_p, s) => s,
+      lead: lead(0.4),
+      'lead further': lead(1),
+      lion,
+      'head on': (p, s) => {
+        const d = Math.atan2(
+          Math.sin(angleOf(s) - angleOf(p)),
+          Math.cos(angleOf(s) - angleOf(p)),
+        );
+        return onLoop(angleOf(p) + Math.sign(d) * 0.6, loop.radius - 0.6);
+      },
+      ambush: (_p, s) => onLoop(angleOf(s) + 1.2),
+      'change of plan': (p, s, was, t) =>
+        [lion(p, s), lead(0.6)(p, s, was), s][Math.floor(t / 3) % 3],
+    };
+    let closest = Infinity;
+    for (const chase of Object.values(chasers))
+      for (const pace of [2, PLAYER_TOP_SPEED])
+        for (const start of [
+          { x: 0, z: 0 },
+          { x: 2.5, z: 0 },
+          { x: 5.4, z: 3 },
+          { x: 7.7, z: 2.6 },
+          { x: 5.4, z: -3 },
+          { x: -7, z: -5 },
+        ]) {
+          const move = createStandMotion(() => 0.5);
+          let s = { ...onLoop(0), heading: 0, speed: 0 };
+          let p = start;
+          let was: P = s;
+          for (let t = 0; t < 40; t += 1 / 60) {
+            const goal = chase(p, s, was, t);
+            was = s;
+            const gx = goal.x - p.x;
+            const gz = goal.z - p.z;
+            const g = Math.hypot(gx, gz) || 1;
+            const step = Math.min(g, pace / 60);
+            let next = {
+              x: Math.max(-7.75, Math.min(7.75, p.x + (gx / g) * step)),
+              z: Math.max(-5.75, Math.min(5.75, p.z + (gz / g) * step)),
+            };
+            // The player cannot walk through the stand.
+            const d = Math.hypot(next.x - s.x, next.z - s.z);
+            if (d < 0.55)
+              next = {
+                x: s.x + ((next.x - s.x) / d) * 0.55,
+                z: s.z + ((next.z - s.z) / d) * 0.55,
+              };
+            const speed = Math.hypot(next.x - p.x, next.z - p.z) * 60;
+            p = next;
+            const dx = s.x - p.x;
+            const dz = s.z - p.z;
+            const n = Math.hypot(dx, dz) || 1;
+            s = move(
+              s,
+              'skittish',
+              { x: p.x, y: 1.6, z: p.z, dx: dx / n, dy: 0, dz: dz / n, speed },
+              floor,
+              home,
+              1 / 60,
+            );
+            closest = Math.min(closest, Math.hypot(s.x - p.x, s.z - p.z));
+          }
+        }
+    expect(closest).toBeGreaterThan(CAUGHT_DISTANCE);
+    expect(FLEE_RADIUS).toBeGreaterThan(CAUGHT_DISTANCE);
   });
 
   it('starts at the furthest corner without using an evasion', () => {
@@ -536,17 +667,6 @@ describe('the wandering button', () => {
     b.press();
     expect(b.sparks.value).toBe(0);
     expect(b.mood.value).toBe('eager');
-  });
-
-  it('slides along a wall rather than into it when cornered', () => {
-    const s = run(
-      { x: 0, z: floor.minZ + 0.6, heading: 0 },
-      'skittish',
-      viewer(0, 0, -1, 2, 0, floor.minZ + 2),
-      0.5,
-    );
-    expect(Math.abs(s.x)).toBeGreaterThan(0.3);
-    expect(s.z).toBeGreaterThanOrEqual(floor.minZ + WALL_MARGIN - 1e-9);
   });
 
   it('goes home in normal mode', () => {

@@ -13,10 +13,13 @@ import { createGraph } from './world/graph';
  *   than a comfortable pressing distance, and turns to face them. It waits
  *   for a random one to four seconds of still camera, then turns and travels together,
  *   easing in and out at capped speeds. Tiny camera jitter is ignored.
- * - **Skittish**: it does not want to be pressed. When the player comes
- *   near it moves away, always a little faster than they are moving
- *   (walking or running), choosing the way that keeps it furthest from
- *   them and clear of the walls, so it can only be caught in a corner.
+ * - **Skittish**: it does not want to be pressed, and plays the faster
+ *   man in the "lion and man" pursuit game. It keeps to a circle round the
+ *   middle of the room (the loop) and, when the player comes near, runs
+ *   round it away from them, reversing whenever they cut ahead, and turns
+ *   its button away. Running `ORBIT_RATIO` times the player's speed, it
+ *   can never be caught (`doc/research/skittish-chase.md`). A corner, or a
+ *   straight run to the furthest spot, is where it would be.
  * - **Terrified**: first the furthest corner, then three random corner
  *   escapes when approached. After arriving from the third escape it
  *   gives up, faces the viewer and waits to be pressed.
@@ -56,10 +59,21 @@ const EAGER_CLEARANCE = STAND_RADIUS + 0.25;
 export const FURTHEST = 6;
 /** Skittish: how near the player may come before it moves away. */
 export const FLEE_RADIUS = 2.5;
-/** Skittish: how much faster than the player it moves. */
-export const FLEE_MARGIN = 1.12;
 /** Skittish: its least speed while it flees, m/s. */
 export const FLEE_MIN_SPEED = 0.6;
+/** Skittish: within this of the stand's centre, the player could press it. */
+export const CAUGHT_DISTANCE = 1.2;
+/** Skittish: how far its loop keeps the stand's centre off the walls. */
+export const ORBIT_CLEARANCE = 0.6;
+/**
+ * Skittish: how many times the player's speed it runs at. Solving the chase
+ * on dev9's loop (`doc/research/skittish-chase.py`), a chaser comes within
+ * `CAUGHT_DISTANCE` only below about 1.67; at 1.8 the best chaser comes no
+ * nearer than 1.42 m.
+ */
+export const ORBIT_RATIO = 1.8;
+/** The player's top speed, running (`RUN_METRES_PER_SECOND`), m/s. */
+export const PLAYER_TOP_SPEED = 4.2;
 /** Terrified: its pace while escaping to a corner. */
 export const TERRIFIED_MIN_SPEED = 2.8;
 export const TERRIFIED_MARGIN = 1.35;
@@ -189,39 +203,78 @@ function towards(
     : { x, z, moved: 0 };
 }
 
+/** Skittish: the loop it runs round, the largest circle in the room. */
+export function orbitOf(floor: Floor) {
+  return {
+    x: (floor.minX + floor.maxX) / 2,
+    z: (floor.minZ + floor.maxZ) / 2,
+    radius:
+      Math.min(floor.maxX - floor.minX, floor.maxZ - floor.minZ) / 2 -
+      ORBIT_CLEARANCE,
+  };
+}
+
+/** Skittish: its speed while it flees from a player moving at `speed`. */
+export const fleeSpeed = (speed: number) =>
+  Math.min(
+    ORBIT_RATIO * PLAYER_TOP_SPEED,
+    Math.max(FLEE_MIN_SPEED, ORBIT_RATIO * speed),
+  );
+
+/** Which way round the loop it runs: 1 anticlockwise seen from above, −1 not. */
+export type OrbitDirection = 1 | -1;
+
 /**
- * Skittish: where to go to get away from the viewer: of sixteen ways, the
- * one whose next step leaves it furthest from them, less a penalty for
- * coming near a wall, so in a corner it slides along a wall rather than
- * pressing into it.
+ * Skittish: one step of `speed` for `dt` seconds. Off its loop (at home,
+ * say), it makes for the point of the loop it can reach with the most time
+ * to spare before the player could. On it, it
+ * runs round it away from the player's side, keeping its way while they
+ * are all but level with it (`direction`, returned for the next step).
  */
-export function fleeStep(
-  stand: Stand,
+export function orbitStep(
+  stand: { x: number; z: number },
   viewer: Viewer,
   floor: Floor,
   speed: number,
   dt: number,
-) {
-  let best = { x: stand.x, z: stand.z, score: -Infinity };
-  const step = speed * dt;
-  for (let k = 0; k < 16; k++) {
-    const a = (k / 16) * Math.PI * 2;
-    const next = clampTo(
-      floor,
-      stand.x + Math.sin(a) * step,
-      stand.z - Math.cos(a) * step,
-    );
-    const away = Math.hypot(next.x - viewer.x, next.z - viewer.z);
-    const wall = Math.min(
-      next.x - floor.minX,
-      floor.maxX - next.x,
-      next.z - floor.minZ,
-      floor.maxZ - next.z,
-    );
-    const score = away - Math.max(0, 1.5 - wall) * 0.8;
-    if (score > best.score) best = { ...next, score };
+  direction: OrbitDirection,
+): { x: number; z: number; direction: OrbitDirection } {
+  const loop = orbitOf(floor);
+  const sx = stand.x - loop.x;
+  const sz = stand.z - loop.z;
+  const out = Math.hypot(sx, sz);
+  if (Math.abs(out - loop.radius) > 0.05) {
+    // Of the points round the loop, the one it reaches with most time to
+    // spare before the player could (at its usual speed ratio).
+    let best = { x: loop.x + loop.radius, z: loop.z, lead: -Infinity };
+    for (let k = 0; k < 72; k++) {
+      const a = (k / 72) * Math.PI * 2;
+      const x = loop.x + Math.cos(a) * loop.radius;
+      const z = loop.z + Math.sin(a) * loop.radius;
+      const lead =
+        Math.hypot(x - viewer.x, z - viewer.z) -
+        Math.hypot(x - stand.x, z - stand.z) / ORBIT_RATIO;
+      if (lead > best.lead) best = { x, z, lead };
+    }
+    const to = towards(stand.x, stand.z, best.x, best.z, speed, dt);
+    return { x: to.x, z: to.z, direction };
   }
-  return { x: best.x, z: best.z };
+  const angle = Math.atan2(sz, sx);
+  const px = viewer.x - loop.x;
+  const pz = viewer.z - loop.z;
+  if (Math.hypot(px, pz) > 0.3) {
+    const behind = Math.atan2(
+      Math.sin(angle - Math.atan2(pz, px)),
+      Math.cos(angle - Math.atan2(pz, px)),
+    );
+    if (Math.abs(behind) > 0.03) direction = behind > 0 ? 1 : -1;
+  }
+  const next = angle + (direction * speed * dt) / loop.radius;
+  return {
+    x: loop.x + Math.cos(next) * loop.radius,
+    z: loop.z + Math.sin(next) * loop.radius,
+    direction,
+  };
 }
 
 /**
@@ -238,6 +291,7 @@ export function stepStand(
   dt: number,
   escape?: { target: { x: number; z: number }; surrendered: boolean },
   eagerPose?: Stand,
+  orbit: { direction: OrbitDirection } = { direction: 1 },
 ): Stand & { speed: number } {
   const near = Math.hypot(stand.x - viewer.x, stand.z - viewer.z);
   let next = { x: stand.x, z: stand.z, moved: 0 };
@@ -283,11 +337,31 @@ export function stepStand(
           )
         : facing(viewer.x, viewer.z, next.x, next.z);
     heading = turn(heading, face, dt * Math.max(4.5, (speed * Math.PI) / 2));
-  } else if (mode === 'skittish' && near < FLEE_RADIUS) {
-    const speed = Math.max(FLEE_MIN_SPEED, viewer.speed * FLEE_MARGIN);
-    const to = fleeStep(stand, viewer, floor, speed, dt);
-    next = { ...to, moved: Math.hypot(to.x - stand.x, to.z - stand.z) };
-    heading = turn(heading, facing(viewer.x, viewer.z, next.x, next.z), dt * 3);
+  } else if (mode === 'skittish') {
+    // Near, it runs; left alone, it creeps onto its loop, ready to.
+    const threatened = near < FLEE_RADIUS;
+    const loop = orbitOf(floor);
+    const onLoop =
+      Math.abs(Math.hypot(stand.x - loop.x, stand.z - loop.z) - loop.radius) <=
+      0.05;
+    if (threatened || !onLoop) {
+      const to = orbitStep(
+        stand,
+        viewer,
+        floor,
+        threatened ? fleeSpeed(viewer.speed) : CREEP_SPEED,
+        dt,
+        orbit.direction,
+      );
+      orbit.direction = to.direction;
+      next = { ...to, moved: Math.hypot(to.x - stand.x, to.z - stand.z) };
+    }
+    if (threatened)
+      heading = turn(
+        heading,
+        facing(viewer.x, viewer.z, next.x, next.z),
+        dt * 6,
+      );
   }
   // Never into the player.
   const gap = Math.hypot(next.x - viewer.x, next.z - viewer.z);
@@ -375,6 +449,7 @@ export interface CornerEscape {
 /** Stateful camera reaction, kept outside the stateless movement calculation. */
 export function createStandMotion(random: () => number = Math.random) {
   let escape: CornerEscape | undefined;
+  const orbit: { direction: OrbitDirection } = { direction: 1 };
   let previous: Viewer | undefined;
   let stillFor = 0;
   let wasEager = false;
@@ -534,6 +609,7 @@ export function createStandMotion(random: () => number = Math.random) {
       movementTime,
       escape,
       eagerPose,
+      orbit,
     );
     return {
       ...next,
