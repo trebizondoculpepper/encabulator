@@ -453,6 +453,55 @@ export function createLeverSelector(
 }
 
 /**
+ * Four-step cam selector after Harmony K1D004NLH: a 45 mm square metal
+ * escutcheon and 35 mm black handle, with four maintained 45° detents.
+ * https://www.se.com/nl/en/product/K1D004NLH/
+ */
+export function createCamSelector(kit: PanelKit): LeverSelectorView {
+  const group = new Group();
+  add(
+    group,
+    new BoxGeometry(0.045, 0.045, 0.002),
+    kitPaint(kit, '#b8bbba', 0.6),
+    0,
+    0,
+    0.001,
+  );
+  disc(group, 0.014, 0.006, kitPaint(kit, '#18191a'), 0.002);
+  const handle = new Group();
+  group.add(handle);
+  add(
+    handle,
+    new BoxGeometry(0.008, 0.035, 0.014),
+    kitPaint(kit, '#202123'),
+    0,
+    0,
+    0.015,
+  );
+  add(
+    handle,
+    new BoxGeometry(0.0015, 0.01, 0.0006),
+    kitPaint(kit, '#f4f1e8'),
+    0,
+    0.01,
+    0.0223,
+  );
+  let target = Math.PI / 4;
+  handle.rotation.z = target;
+  return {
+    group,
+    knob: group,
+    set(position) {
+      target = Math.PI / 4 - (Math.max(0, Math.min(3, position)) * Math.PI) / 4;
+    },
+    update(delta) {
+      handle.rotation.z +=
+        (target - handle.rotation.z) * Math.min(1, delta * 25);
+    },
+  };
+}
+
+/**
  * A speed potentiometer: a round black knob with a pointer over a skirt
  * printed 0 to 10, turning through 270°.
  */

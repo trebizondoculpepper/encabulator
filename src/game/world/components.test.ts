@@ -110,6 +110,12 @@ describe('a momentary pushbutton', () => {
     expect(b.lit.value).toBe(false);
     power.value = true;
     expect(b.lit.value).toBe(true);
+    b.press();
+    expect(lamp.value).toBe(true);
+    expect(b.lit.value).toBe(true);
+    lamp.value = false;
+    b.press();
+    expect(b.lit.value).toBe(false);
   });
 });
 

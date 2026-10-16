@@ -31,6 +31,7 @@ import {
 } from '../scene/cabinet-fittings';
 import type { PanelKit } from '../scene/eighties-controls';
 import {
+  createCamSelector,
   createLegendPlate,
   createLeverSelector,
   createMushroomHead,
@@ -261,7 +262,9 @@ export function pushButton(
   kit: PanelKit,
   props: Common & {
     colour: OperatorColour;
-    head?: 'flush' | 'extended';
+    head?: 'flush' | 'extended' | 'illuminated';
+    /** Independent lamp drive for illuminated momentary buttons. */
+    lamp?: Readable<boolean>;
     action?: () => void;
     power?: Readable<boolean>;
     latch?: Readable<boolean>;
@@ -278,6 +281,7 @@ export function pushButton(
   a.legend(props.legend, 0.03);
   const button = createMomentary({
     action: props.action,
+    lamp: props.lamp,
     power: props.power,
     latch: props.latch,
   });
@@ -286,7 +290,10 @@ export function pushButton(
     view.press();
     button.press();
   });
-  a.updates.push(view.update);
+  a.updates.push((delta) => {
+    view.setLit(button.lit.value);
+    view.update(delta);
+  });
   a.disposers.push(button.dispose);
   return a.part();
 }
@@ -337,7 +344,8 @@ export function ledPushbutton(
 
 /**
  * A push-to-test pilot light: lit by `drive` while powered; pressing the
- * lens lights it a moment to prove the bulb.
+ * lens lights it a moment to prove the bulb. Set `pushToTest: false` for
+ * a display-only lamp with no operator action.
  */
 export function pilotLight(
   kit: PanelKit,
@@ -346,6 +354,8 @@ export function pilotLight(
     drive?: Readable<boolean>;
     power?: Readable<boolean>;
     series?: DeviceSeries;
+    /** Whether its lens can be pressed to test it; defaults to true. */
+    pushToTest?: boolean;
   },
 ): Part & { lit: ReadonlySignal<boolean> } {
   const a = beginPart(
@@ -359,11 +369,13 @@ export function pilotLight(
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
   const lamp = createPilotLight({ drive: props.drive, power: props.power });
-  a.voice(lamp, { press: PRESS });
-  a.uses.set(view.lens, () => {
-    view.press();
-    lamp.press();
-  });
+  if (props.pushToTest !== false) {
+    a.voice(lamp, { press: PRESS });
+    a.uses.set(view.lens, () => {
+      view.press();
+      lamp.press();
+    });
+  }
   a.updates.push((delta) => {
     lamp.step(delta);
     view.set(lamp.lit.value);
@@ -376,14 +388,15 @@ export function pilotLight(
 // ---- Selector ----------------------------------------------------------------
 
 /**
- * A lever selector of two or three positions, or a key selector with its
+ * A lever selector of two or three positions, a four-step cam selector,
+ * or a key selector with its
  * key standing in it. A click on the left of it turns it down a detent,
  * on the right up. Latched (or, for a key, locked) it refuses.
  */
 export function selector(
   kit: PanelKit,
   props: Common & {
-    positions: 2 | 3;
+    positions: 2 | 3 | 4;
     key?: boolean;
     initial?: number;
     bound?: Binding<number>;
@@ -397,9 +410,11 @@ export function selector(
       `${props.legend ?? ''} ${props.key ? 'key ' : ''}selector`.trim(),
   );
   const view =
-    props.series === 'xb4'
-      ? createXB4Selector(kit, props.positions)
-      : createLeverSelector(kit, props.positions, { key: props.key });
+    props.positions === 4
+      ? createCamSelector(kit)
+      : props.series === 'xb4'
+        ? createXB4Selector(kit, props.positions)
+        : createLeverSelector(kit, props.positions, { key: props.key });
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
   const part = createSelector({

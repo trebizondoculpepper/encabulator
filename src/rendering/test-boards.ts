@@ -207,6 +207,22 @@ export function createControlsBoard(kit: PanelKit): TestFitting {
     row2,
   );
   what('POTENTIOMETER', 0.04, row2);
+  board.place(
+    selector(kit, { positions: 4, legend: '1   2   3   4' }),
+    0.22,
+    row2,
+  );
+  what('CAM SELECTOR, 4 POSITION', 0.22, row2);
+  board.place(
+    pushButton(kit, {
+      colour: 'red',
+      head: 'illuminated',
+      lamp: computed(() => true),
+    }),
+    0.37,
+    row2,
+  );
+  what('MOMENTARY, SEPARATE LAMP', 0.37, row2);
   board.caption(
     'Click the left half of a knob to turn it down, the right half to turn it up.',
     0.2,

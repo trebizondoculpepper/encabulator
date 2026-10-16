@@ -1,3 +1,4 @@
+import { recordedLoop } from './recorded-loop';
 import { renderFireAlarm } from './fire-alarm';
 import type { LoopRecipe } from './part-audio';
 
@@ -5,7 +6,7 @@ import type { LoopRecipe } from './part-audio';
  * State sounds for parts: sounds a part holds for as long as its state
  * calls for them (`partAudio.hold`). Each is a recipe the part that
  * makes it imports and holds; nothing chooses them by name. They are
- * synthesised and quiet:
+ * quiet, synthesised except for the recorded castors:
  *
  * - `MAINS_HUM`: a transformer or breaker carrying load, 60 Hz (the
  *   American mains) and its harmonics;
@@ -255,16 +256,8 @@ export const CRACKLE: LoopRecipe = (context, out) => {
   return [roar, crackle];
 };
 
-/** Castors rolling on a hard floor: a low, gritty rumble. */
-export const CASTORS: LoopRecipe = (context, out) => {
-  const grit = noiseSource(context);
-  const band = context.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = 260;
-  band.Q.value = 0.8;
-  const level = context.createGain();
-  level.gain.value = 0.08;
-  grit.connect(band).connect(level).connect(out);
-  grit.start();
-  return [grit];
-};
+/** Recorded squeaky shopping-cart wheels; held only while the stand moves. */
+export const CASTORS = recordedLoop(
+  new URL('./assets/trolley-squeak.wav', import.meta.url),
+  0.2,
+);

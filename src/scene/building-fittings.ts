@@ -4,6 +4,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  CatmullRomCurve3,
   CylinderGeometry,
   DoubleSide,
   ExtrudeGeometry,
@@ -16,6 +17,8 @@ import {
   Shape,
   SphereGeometry,
   TorusGeometry,
+  TubeGeometry,
+  Vector3,
 } from 'three';
 import type { Material, Object3D } from 'three';
 import { METRE } from '../game/units';
@@ -2378,6 +2381,46 @@ export function createControlStation(kit: PanelKit, holes: 1 | 2) {
 }
 
 /**
+ * Wall control enclosure after PanelSeT CRN NSYCRN33200, 300 × 300 × 200 mm.
+ * Devices mount at true size on the inset light-grey steel door.
+ * https://www.se.com/sg/en/product/NSYCRN33200/
+ */
+export function createModePanel(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  const steel = t.paint('#bfc2bd', 0.45, 0.25);
+  t.box(group, steel, 0.3, 0.3, 0.192, 0, 0, 0.096);
+  t.box(group, t.paint('#343936'), 0.288, 0.288, 0.003, 0, 0, 0.1935);
+  t.box(
+    group,
+    t.paint('#d3d5cf', 0.45, 0.2),
+    0.282,
+    0.282,
+    0.005,
+    0,
+    0,
+    0.1975,
+  );
+  for (const y of [-0.095, 0.095])
+    t.box(group, steel, 0.01, 0.035, 0.009, -0.144, y, 0.1955);
+  t.cyl(
+    group,
+    t.paint('#5a5e5c', 0.35, 0.7),
+    0.006,
+    0.002,
+    0.127,
+    0,
+    0.201,
+    'z',
+    16,
+  );
+  const face = new Group();
+  face.position.z = 0.2;
+  group.add(face);
+  return { group, face };
+}
+
+/**
  * A mobile button stand: a weighted steel base on four swivel castors, a
  * galvanised post and a mounting plate carrying a one-hole control
  * station, its button about 1.05 m up. Its front faces +z. `roll` turns
@@ -2434,6 +2477,39 @@ export function createMobileStand(kit: PanelKit) {
   const station = createControlStation(kit, 1);
   station.group.position.set(0, 1.035, 0.036);
   group.add(station.group);
+  // Intentional low-voltage wiring: a black flexible lead leaves the box
+  // through a small compression gland, loops gently and enters the hollow
+  // post through a rubber grommet. Nominal 6 mm cable (LAPP H05VV5-F 3G0.75).
+  const rubber = t.paint('#202223', 0.85);
+  const gland = t.paint('#303335', 0.6);
+  t.cyl(group, gland, 0.008, 0.006, 0, 0.999, 0.062, 'y', 6);
+  t.cyl(group, gland, 0.007, 0.01, 0, 0.991, 0.062, 'y', 12);
+  t.cyl(group, rubber, 0.0045, 0.005, 0, 0.984, 0.062, 'y', 16);
+  const lead = new CatmullRomCurve3([
+    new Vector3(0, 0.983, 0.062),
+    new Vector3(0.026, 0.951, 0.07),
+    new Vector3(0.043, 0.905, 0.065),
+    new Vector3(0.025, 0.869, 0.052),
+    new Vector3(0, 0.86, 0.026),
+  ]);
+  const cable = new Mesh(new TubeGeometry(lead, 32, 0.003, 8, false), rubber);
+  cable.name = 'button box wiring lead';
+  group.add(cable);
+  const grommet = new Mesh(new TorusGeometry(0.005, 0.0018, 8, 20), rubber);
+  grommet.name = 'pole cable entry grommet';
+  grommet.position.set(0, 0.86, 0.0305);
+  group.add(grommet);
+  const zinc = t.paint('#b5b7b3', 0.35, 0.75);
+  for (const x of [-0.041, 0.041])
+    for (const y of [0.995, 1.075]) {
+      t.cyl(group, zinc, 0.005, 0.001, x, y, 0.0365, 'z', 16);
+      t.cyl(group, zinc, 0.0035, 0.003, x, y, 0.038, 'z', 6);
+    }
+  for (const x of [-0.035, 0.035])
+    for (const z of [-0.035, 0.035]) {
+      t.cyl(group, zinc, 0.006, 0.0015, x, 0.116, z, 'y', 16);
+      t.cyl(group, zinc, 0.004, 0.004, x, 0.119, z, 'y', 6);
+    }
   return {
     group,
     mount: station.mounts[0],

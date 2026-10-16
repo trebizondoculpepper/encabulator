@@ -60,7 +60,7 @@ export const tone = (spec: Tone): SoundRecipe => ({ tone: spec });
 export type LoopRecipe = (
   context: AudioContext,
   out: AudioNode,
-) => AudioScheduledSourceNode[];
+) => Pick<AudioScheduledSourceNode, 'stop'>[];
 
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -69,7 +69,7 @@ let muted = false;
 /** Metres to scene units, from the room that listens. */
 let metre = 1;
 const buffers = new Map<string, Promise<AudioBuffer>>();
-const holds = new Map<object, { stop(): void }>();
+const holds = new Map<object, { stop(): void; update(): void }>();
 const position = new Vector3();
 const facing = new Vector3();
 
@@ -245,9 +245,18 @@ export const partAudio = {
     const gain = ctx.createGain();
     gain.gain.value = 0;
     gain.gain.setTargetAtTime(1, ctx.currentTime, 0.08);
-    gain.connect(placed(from));
+    const output = placed(from);
+    gain.connect(output);
     const sources = recipe(ctx, gain);
     holds.set(owner, {
+      update() {
+        if (!from) return;
+        from.getWorldPosition(position).divideScalar(metre);
+        const panner = output as PannerNode;
+        panner.positionX.value = position.x;
+        panner.positionY.value = position.y;
+        panner.positionZ.value = position.z;
+      },
       stop() {
         gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
         const end = ctx.currentTime + 0.5;
@@ -264,6 +273,7 @@ export const partAudio = {
     awaitGesture();
     metre = metreInScene;
     if (!context) return;
+    for (const held of holds.values()) held.update();
     camera.getWorldPosition(position).divideScalar(metre);
     camera.getWorldDirection(facing);
     const l = context.listener;

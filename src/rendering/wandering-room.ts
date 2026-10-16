@@ -18,30 +18,30 @@ import { partAudio } from '../audio/part-audio';
 import { CASTORS } from '../audio/part-loops';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import {
+  PEDESTAL_MODES,
   STAND_RADIUS,
   createWanderingButton,
-  stepStand,
 } from '../game/mobile-pedestal';
 import type { Stand } from '../game/mobile-pedestal';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import {
-  createCaption,
-  createControlStation,
-  createMark,
   createMobileStand,
+  createModePanel,
   createSectionBoard,
 } from '../scene/building-fittings';
 import {
+  createMicroLabel,
   createPanelKit,
   disposeKit,
   kitGlow,
   kitPaint,
 } from '../scene/eighties-controls';
+import { createEmbers } from '../scene/embers';
 import { createPortals } from '../scene/portals';
 import { knobDirection } from '../scene/rotary-knob';
 import { createFirstPerson } from './first-person';
-import { createPartSet, ledPushbutton, pilotLight, selector } from './parts';
+import { createPartSet, pushButton, pilotLight, selector } from './parts';
 import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
@@ -51,8 +51,8 @@ const HOME = { x: 0, z: 0.5 };
 
 /**
  * Dev9, the Wandering Button: a red illuminated push button on a mobile
- * floor stand, and on the north wall a small control station with its mode
- * knob (NORMAL, EAGER, SKITTISH) and a PRESSED lamp. Normal, the stand
+ * floor stand, and on the north wall a mode panel with its four-position
+ * knob, active-mode pilot lights and a PRESSED lamp. Normal, the stand
  * stays in the middle of the room; eager, it creeps to wherever you look;
  * skittish, it rolls away from you, a little faster than you can follow
  * (`src/game/mobile-pedestal.ts`).
@@ -119,65 +119,83 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
       scene.add(light);
     }
 
-  // ---- The wall station: the mode knob and the PRESSED lamp ---------------
+  // ---- The wall station: one mode selector and one lamp per mode ----------
   const northFace = FLOOR.minZ + 0.154;
   const sign = createSectionBoard(kit, 'THE WANDERING BUTTON', 4.2);
   sign.position.set(0, 2.3, northFace);
   room.add(sign);
-  const station = createControlStation(kit, 2);
+  const station = createModePanel(kit);
   station.group.position.set(0, 1.4, northFace);
   room.add(station.group);
-  // Its devices are Schneider's 22 mm Harmony XB4 ones, at true size.
+  const label = (text: string, x: number, y: number, height = 0.007) => {
+    const mark = createMicroLabel(kit, text, { height, ink: '#262925' });
+    mark.position.set(x, y, 0.0008);
+    station.face.add(mark);
+  };
   const knob = selector(kit, {
-    positions: 3,
+    positions: 4,
     name: 'MODE selector',
     bound: model.mode,
-    series: 'xb4',
   });
-  station.mounts[0].add(knob.object);
+  knob.object.position.set(0, 0.04, 0);
+  station.face.add(knob.object);
   parts.add(knob);
+  label('MODE', -0.092, 0.12, 0.01);
   for (const [text, x, y] of [
-    ['NORMAL', -0.0205, 0.0165],
-    ['EAGER', 0, 0.019],
-    ['SKITTISH', 0.0205, 0.0165],
-  ] as const) {
-    const mark = createMark(kit, text);
-    mark.position.set(x, y, 0.0012);
-    station.mounts[0].add(mark);
-  }
-  const lamp = pilotLight(kit, {
+    ['NORMAL', -0.058, 0.096],
+    ['EAGER', 0, 0.12],
+    ['SKITTISH', 0.062, 0.096],
+    ['TERRIFIED', 0.087, 0.04],
+  ] as const)
+    label(text, x, y);
+  const colours = ['green', 'blue', 'amber', 'red'] as const;
+  PEDESTAL_MODES.forEach((mode, i) => {
+    const x = (i - 1.5) * 0.062;
+    const lamp = pilotLight(kit, {
+      colour: colours[i],
+      name: `${mode.toUpperCase()} mode pilot light`,
+      pushToTest: false,
+      drive: computed(() => model.mood.value === mode),
+      series: 'xb4',
+    });
+    lamp.object.position.set(x, -0.035, 0);
+    station.face.add(lamp.object);
+    parts.add(lamp);
+    label(mode.toUpperCase(), x, -0.062, 0.006);
+  });
+  const pressed = pilotLight(kit, {
     colour: 'amber',
     name: 'PRESSED pilot light',
+    pushToTest: false,
     drive: model.indicator,
     series: 'xb4',
   });
-  station.mounts[1].add(lamp.object);
-  parts.add(lamp);
-  const pressedMark = createMark(kit, 'PRESSED');
-  pressedMark.position.set(0, -0.0185, 0.0012);
-  station.mounts[1].add(pressedMark);
-  const caption = createCaption(kit, 'MODE');
-  caption.position.set(0, 1.4 + station.height / 2 + 0.025, northFace);
-  room.add(caption);
+  pressed.object.position.set(0, -0.105, 0);
+  station.face.add(pressed.object);
+  parts.add(pressed);
+  label('PRESSED', 0.05, -0.105);
 
   // ---- The stand ---------------------------------------------------------
   const stand = createMobileStand(kit);
   room.add(stand.group);
-  const button = ledPushbutton(kit, {
+  const button = pushButton(kit, {
     colour: 'red',
+    head: 'illuminated',
     name: 'the wandering button',
-    bound: {
-      get value() {
-        return model.indicator.value;
-      },
-      set: (on: boolean) => {
-        if (on) model.press();
-      },
-    },
+    action: model.press,
+    lamp: model.buttonLight,
   });
   stand.mount.add(button.object);
   parts.add(button);
   const rolling = signal(false);
+  const sparks = createEmbers(48, { spray: true });
+  sparks.group.position.z = 0.011;
+  sparks.group.visible = false;
+  sparks.group.traverse((object) => {
+    object.raycast = () => {};
+  });
+  button.object.add(sparks.group);
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let state: Stand & { speed: number } = {
     x: HOME.x,
     z: HOME.z,
@@ -219,6 +237,7 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
     { x: number; z: number; yaw: number; pitch: number }
   > = {
     room: { x: 0, z: 4 * m, yaw: 0, pitch: -0.15 },
+    button: { x: 0.35 * m, z: 1.15 * m, yaw: -0.494, pitch: -0.8 },
     knob: { x: 0, z: (FLOOR.minZ + 0.85) * m, yaw: 0, pitch: -0.5 },
   };
   const params = new URLSearchParams(location.search);
@@ -298,9 +317,8 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
     was = { x, z };
     camera.getWorldDirection(look);
     const before = state;
-    state = stepStand(
+    state = model.move(
       state,
-      model.mood.value,
       {
         x: x / m,
         y: camera.position.y / m,
@@ -319,12 +337,14 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
     const way = Math.atan2(state.x - before.x, state.z - before.z);
     stand.roll(way - stand.group.rotation.y, moved);
     place();
-    rolling.value = state.speed > 0.05;
+    rolling.value =
+      state.speed > 0.005 || Math.abs(state.heading - before.heading) > 0.001;
     if (castorSound.value !== castorsHeard) {
       castorsHeard = castorSound.value;
       partAudio.hold(castorOwner, castorsHeard ? CASTORS : null, stand.group);
     }
     model.tick(delta);
+    sparks.update(time / 1000, model.sparks.value, reducedMotion.matches);
     parts.update(delta);
     portals.update(delta, walk.walker.x, walk.walker.z);
     partAudio.listen(camera, m);
@@ -336,6 +356,7 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     parts.dispose();
+    sparks.dispose();
     partAudio.hold(castorOwner, null);
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
