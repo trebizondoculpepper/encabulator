@@ -74,7 +74,7 @@ import {
   windowWithVent,
 } from './building-parts';
 import { createFirstPerson } from './first-person';
-import { createPartSet, pushButton } from './parts';
+import { createPartSet, ledPushbutton } from './parts';
 import type { Part } from './parts';
 import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
@@ -361,7 +361,7 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
   column.position.y = 0.475;
   pedestal.add(column);
   const slope = new Group();
-  slope.position.set(0, 0.95, 0.06);
+  slope.position.set(0, 0.99, 0.04);
   slope.rotation.x = -0.6;
   pedestal.add(slope);
   const face = new Mesh(
@@ -370,14 +370,23 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
   );
   face.position.z = -0.01;
   slope.add(face);
-  const light = pushButton(kit, {
+  // A standard illuminated push button: lit while the bin burns; pressed
+  // while it is out, it lights the bin.
+  const light = ledPushbutton(kit, {
     colour: 'red',
     legend: 'LIGHT THE BIN',
     name: 'LIGHT THE BIN push button',
-    action: F.startFire,
+    bound: {
+      get value() {
+        return F.flames.value > 0;
+      },
+      set: (on: boolean) => {
+        if (on) F.startFire();
+      },
+    },
   });
   light.object.scale.setScalar(2.2);
-  light.object.position.set(0, -0.02, 0);
+  light.object.position.set(0, 0.0, 0.005);
   slope.add(light.object);
   parts.add(light);
   const warning = createWarningSign(kit, [
