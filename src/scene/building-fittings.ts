@@ -40,6 +40,20 @@ import { createCanvasTexture } from './screens';
  */
 
 const SANS = 'Arial, Helvetica, sans-serif';
+
+/** A soft round dot, so particles are puffs and drops rather than squares. */
+function softDot(kit: PanelKit) {
+  const { context: c, texture } = createCanvasTexture(64, 64);
+  const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.6)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, 64, 64);
+  texture.needsUpdate = true;
+  kit.textures.push(texture);
+  return texture;
+}
 const PLATE_WHITE = '#f4f3ee';
 
 function tools(kit: PanelKit) {
@@ -472,8 +486,12 @@ export interface PanelLamps {
   fire: boolean;
   zone1: boolean;
   zone2: boolean;
-  /** Sounders sounding or not: an alarm (a fire, or EVACUATE) is on. */
+  /** An alarm stage is on: alert or evacuate. */
   alarm: boolean;
+  /** Seconds left of the investigation delay, or 0. */
+  countdown: number;
+  /** The fire brigade has been called (the remote output). */
+  brigade: boolean;
   silenced: boolean;
   power: boolean;
   onBattery: boolean;
@@ -680,7 +698,7 @@ export function createFirePanel(kit: PanelKit) {
       const general = [
         'supply\npresent',
         'accessed',
-        'test',
+        'remote\noutput',
         'general\nfault',
         'power\nsupply fault',
         'system\nfault',
@@ -730,7 +748,7 @@ export function createFirePanel(kit: PanelKit) {
     fault2: lamp(984, 176, '#ffb020'),
     supply: lamp(820, 300, '#35e06a'),
     accessed: lamp(886, 300, '#ffb020'),
-    test: lamp(952, 300, '#ffb020'),
+    remote: lamp(952, 300, '#ffb020'),
     general: lamp(1018, 300, '#ffb020'),
     power: lamp(1084, 300, '#ffb020'),
     system: lamp(1150, 300, '#ffb020'),
@@ -858,12 +876,13 @@ export function createFirePanel(kit: PanelKit) {
       lamps.fault2.set(false);
       lamps.supply.set(s.power);
       lamps.accessed.set(s.enabled);
-      lamps.test.set(false);
+      lamps.remote.set(s.brigade);
       lamps.general.set(s.onBattery && time % 1 < 0.5);
       lamps.power.set(s.onBattery);
       lamps.system.set(false);
       lamps.sounders.set(s.silenced);
-      lamps.delays.set(false);
+      // Output delays: flashing while the investigation delay runs.
+      lamps.delays.set(s.countdown > 0 && time % 1 < 0.5);
     },
   };
 }
@@ -907,6 +926,7 @@ export function createSprinklerHead(kit: PanelKit) {
   const drops = new Points(
     geometry,
     new PointsMaterial({
+      map: softDot(kit),
       color: '#bcd4e6',
       // Point sizes ignore the room's scale: give them in scene units.
       size: 0.03 * METRE,
@@ -923,10 +943,10 @@ export function createSprinklerHead(kit: PanelKit) {
   let on = false;
   return {
     group,
-    set(value: boolean) {
-      on = value;
-      drops.visible = value;
-      bulb.visible = !value;
+    set(burst: boolean, spraying: boolean) {
+      on = spraying;
+      drops.visible = spraying;
+      bulb.visible = !burst;
     },
     update(delta: number) {
       if (!on) return;
@@ -950,7 +970,8 @@ export function createSprinklerHead(kit: PanelKit) {
 
 /**
  * A sprinkler valve set on its riser: the main valve's handwheel, the
- * pre-action valve with its TRIPPED flag and reset, and a gauge.
+ * alarm valve with its flag (SPRINKLER OPERATED while water flows), the
+ * reset that replaces burst heads, and a gauge.
  */
 export function createValveSet(kit: PanelKit) {
   const t = tools(kit);
@@ -1023,7 +1044,7 @@ export function createValveSet(kit: PanelKit) {
       c.font = `bold ${h * 0.34}px ${SANS}`;
       c.textAlign = 'center';
       c.fillText(
-        tripped ? 'PRE-ACTION TRIPPED' : 'PRE-ACTION SET',
+        tripped ? 'SPRINKLER OPERATED' : 'INSTALLATION SET',
         w / 2,
         h * 0.42,
       );
@@ -2040,6 +2061,151 @@ export function createSectionBoard(
 /** A small engraved caption for a fitting. */
 export function createCaption(kit: PanelKit, text: string) {
   return createMicroLabel(kit, text, { height: 0.016, ink: '#2a2a28' });
+}
+
+/** A ceiling loudspeaker of the voice alarm, hanging from y = 0. */
+export function createCeilingSpeaker(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  t.cyl(group, t.paint(PLATE_WHITE, 0.4), 0.11, 0.01, 0, -0.005, 0, 'y', 32);
+  const ring = t.paint('#c9c8c0', 0.5);
+  for (let r = 0.02; r < 0.1; r += 0.016) {
+    const torus = new Mesh(new TorusGeometry(r, 0.0015, 4, 32), ring);
+    torus.rotation.x = Math.PI / 2;
+    torus.position.y = -0.011;
+    group.add(torus);
+  }
+  return { group };
+}
+
+/** An electric fire bell: a red gong on its base, its striker under it. */
+export function createFireBell(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  const red = t.paint('#c4231c', 0.3, 0.4);
+  t.cyl(group, red, 0.05, 0.03, 0, 0, 0.015, 'z', 24);
+  const gong = new Mesh(
+    new SphereGeometry(0.1, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2.6),
+    red,
+  );
+  gong.rotation.x = Math.PI / 2;
+  gong.position.z = 0.03;
+  group.add(gong);
+  const striker = t.box(
+    group,
+    t.paint('#2a2a2a', 0.5),
+    0.01,
+    0.03,
+    0.01,
+    0,
+    -0.07,
+    0.05,
+  );
+  let time = 0;
+  let ringing = false;
+  return {
+    group,
+    set(value: boolean) {
+      ringing = value;
+    },
+    update(delta: number) {
+      time += delta;
+      striker.position.x = ringing ? Math.sin(time * 120) * 0.004 : 0;
+    },
+  };
+}
+
+/**
+ * A steel waste-paper bin, and the fire in it: flames that grow with the
+ * fire's size (0 to 1) and flicker, and an orange light the room adds.
+ */
+export function createBinFire(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  const bin = new Mesh(
+    new CylinderGeometry(0.15, 0.12, 0.36, 20, 1, true),
+    createPs1Material({
+      color: '#6d7376',
+      roughness: 0.5,
+      metalness: 0.6,
+      side: DoubleSide,
+    }),
+  );
+  kit.materials.push(bin.material as Material);
+  bin.position.y = 0.18;
+  group.add(bin);
+  t.cyl(group, t.paint('#2a2522', 0.9), 0.12, 0.01, 0, 0.005, 0);
+  const flames = new Group();
+  flames.position.y = 0.3;
+  group.add(flames);
+  const colours = ['#ff9a2a', '#ffcf4a', '#ff5a1a'];
+  const tongues = colours.map((colour, i) => {
+    const material = kitGlow(kit, colour);
+    material.transparent = true;
+    material.opacity = 0.85;
+    const cone = new Mesh(
+      new CylinderGeometry(0, 0.09 - i * 0.02, 0.4, 10),
+      material,
+    );
+    cone.position.set((i - 1) * 0.04, 0.2, (i % 2) * 0.03);
+    flames.add(cone);
+    return cone;
+  });
+  // Smoke: grey puffs rising from the bin in a plume, then spreading out
+  // under the ceiling, as a real ceiling jet does.
+  const count = 420;
+  const positions = new Float32Array(count * 3);
+  const life = new Float32Array(count).map(() => Math.random());
+  const drift = new Float32Array(count * 2).map(() => Math.random() * 2 - 1);
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(positions, 3));
+  const puffs = new PointsMaterial({
+    map: softDot(kit),
+    color: '#5a5a58',
+    size: 0.35 * METRE,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+  });
+  kit.materials.push(puffs);
+  const cloud = new Points(geometry, puffs);
+  cloud.frustumCulled = false;
+  group.add(cloud);
+  let time = 0;
+  let size = 0;
+  let smoke = 0;
+  return {
+    group,
+    set(value: number, smokiness = 0) {
+      size = value;
+      smoke = smokiness;
+    },
+    update(delta: number) {
+      time += delta;
+      puffs.opacity = Math.min(0.45, smoke * 0.5);
+      cloud.visible = smoke > 0.02;
+      if (cloud.visible)
+        for (let i = 0; i < count; i++) {
+          life[i] = (life[i] + delta * 0.25) % 1;
+          const s = life[i];
+          // Up the plume, then out under the ceiling.
+          const rise = Math.min(1, s / 0.4);
+          const spread = Math.max(0, s - 0.4) * 11;
+          positions[i * 3] = drift[i * 2] * (0.08 + spread);
+          positions[i * 3 + 1] =
+            0.5 + rise * 2.0 + Math.min(0.12, spread * 0.02);
+          positions[i * 3 + 2] = drift[i * 2 + 1] * (0.08 + spread);
+        }
+      geometry.attributes.position.needsUpdate = cloud.visible;
+      flames.visible = size > 0.001;
+      const scale = 0.4 + size * 2.2;
+      tongues.forEach((cone, i) => {
+        const flicker = 1 + 0.25 * Math.sin(time * (11 + i * 3.7) + i);
+        cone.scale.set(scale, scale * flicker, scale);
+        cone.position.y = 0.2 * scale * flicker;
+      });
+    },
+  };
 }
 
 export { kitPaint };

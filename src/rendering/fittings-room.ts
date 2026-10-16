@@ -13,8 +13,14 @@ import {
   Vector2,
 } from 'three';
 import type { Object3D } from 'three';
+import { computed } from '@preact/signals-core';
 import { partAudio } from '../audio/part-audio';
-import { HVAC_MODES, createBuildingServices } from '../game/building-services';
+import {
+  FIRE_SEAT,
+  HVAC_MODES,
+  SPRINKLER_HEADS,
+  createBuildingServices,
+} from '../game/building-services';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
@@ -30,6 +36,9 @@ import { createPortals } from '../scene/portals';
 import { knobDirection } from '../scene/rotary-knob';
 import {
   accessDoor,
+  burningBin,
+  fireBell,
+  voiceAlarm,
   acCassette,
   acController,
   callPoint,
@@ -314,23 +323,53 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     1.4,
     'CALL POINT (KEY TO RESET)',
   );
-  fit(sounderBeacon(kit, { sounding: F.sounding }), 'east', -4.0, 2.2);
+  // The voice alarm does the talking; the sounder-beacons only flash.
   fit(
-    pushButton(kit, {
-      colour: 'black',
-      legend: 'TEST SMOKE',
-      name: 'TEST SMOKE push button',
-      action: F.smokeTest,
-    }),
+    sounderBeacon(kit, { sounding: F.sounding, voice: false }),
     'east',
-    -3.2,
-    1.3,
-  ).object.scale.setScalar(2);
-  onCeiling(smokeDetector(kit, { alarm: F.detector }), 10.6, -3.2);
+    -4.0,
+    2.2,
+  );
+  onCeiling(
+    voiceAlarm(kit, { voice: F.voice, announcement: F.announcement }),
+    6.5,
+    -2,
+  );
+  // The joke: a waste-paper bin under the smoke detector, and a button on
+  // a pedestal beside it that sets it alight.
+  const bin = burningBin(kit, { size: F.flames, smoke: F.smokeShown });
+  bin.object.position.set(FIRE_SEAT.x, 0, FIRE_SEAT.z);
+  room.add(bin.object);
+  parts.add(bin);
+  onCeiling(
+    smokeDetector(kit, { alarm: F.detector }),
+    FIRE_SEAT.x,
+    FIRE_SEAT.z,
+  );
+  const pedestal = new Mesh(
+    new BoxGeometry(0.3, 1.0, 0.3),
+    kitPaint(kit, '#5d625f'),
+  );
+  pedestal.position.set(FIRE_SEAT.x - 0.4, 0.5, FIRE_SEAT.z + 1.4);
+  room.add(pedestal);
+  const light = pushButton(kit, {
+    colour: 'red',
+    legend: 'LIGHT THE BIN',
+    name: 'LIGHT THE BIN push button',
+    action: F.startFire,
+  });
+  light.object.scale.setScalar(2.2);
+  light.object.position.set(FIRE_SEAT.x - 0.4, 1.0, FIRE_SEAT.z + 1.4);
+  light.object.rotation.x = -Math.PI / 2;
+  room.add(light.object);
+  parts.add(light);
+  const glow = new PointLight('#ff8a3a', 0, 6 * m);
+  glow.position.set(FIRE_SEAT.x * m, 0.8 * m, FIRE_SEAT.z * m);
+  scene.add(glow);
   fit(
     valveSet(kit, {
       main: F.riserValve,
-      tripped: F.preaction,
+      tripped: computed(() => F.heads.value.some((h) => h.burst)),
       reset: F.resetSprinklers,
     }),
     'east',
@@ -338,16 +377,14 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     0,
   );
   onWall(createCaption(kit, 'SPRINKLER VALVE SET'), 'east', -1.6, 0.35);
-  [
-    [8.5, -4.5],
-    [8.5, -0.5],
-    [8.5, 3.5],
-    [5, -4.5],
-    [5, -0.5],
-    [5, 3.5],
-  ].forEach(([x, z], i) =>
+  fit(fireBell(kit, { ringing: F.discharging }), 'east', -2.6, 2.2);
+  onWall(createCaption(kit, 'SPRINKLER ALARM BELL'), 'east', -2.6, 2.03);
+  SPRINKLER_HEADS.forEach(({ x, z }, i) =>
     onCeiling(
-      sprinklerHead(kit, { discharging: F.discharging, voice: i === 1 }),
+      sprinklerHead(kit, {
+        head: computed(() => F.heads.value[i]),
+        voice: i === 0,
+      }),
       x,
       z,
     ),
@@ -565,6 +602,10 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     for (const { light } of emergencyLamps)
       light.intensity = L.emergencyLit.value ? 0.8 * m * m : 0;
     wcLamp.intensity = L.wcLight.value ? 0.6 * m * m : 0;
+    glow.intensity =
+      F.flames.value > 0
+        ? (0.4 + F.flames.value * 2) * m * m * (0.85 + Math.random() * 0.3)
+        : 0;
     (wcPanel.material as MeshBasicMaterial).color.setScalar(
       L.wcLight.value ? 1 : 0.15,
     );

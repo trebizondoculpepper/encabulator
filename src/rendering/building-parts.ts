@@ -4,7 +4,9 @@ import { click, partAudio, recording, tone } from '../audio/part-audio';
 import type { SoundRecipe } from '../audio/part-audio';
 import {
   ALARM_BUZZER,
+  CRACKLE,
   EXTRACT_FAN,
+  FIRE_BELL,
   FIRE_SOUNDER,
   WATER_SPRAY,
 } from '../audio/part-loops';
@@ -19,6 +21,9 @@ import {
   createAcCassette,
   createAcController,
   createAlarmReset,
+  createBinFire,
+  createCeilingSpeaker,
+  createFireBell,
   createCallPoint,
   createDimmerPlate,
   createDistributionBoard,
@@ -118,6 +123,27 @@ const MAGLOCK = click({
 });
 const BEEP = tone({ hz: 2700, seconds: 0.08, level: 0.04 });
 const ERROR = tone({ hz: 420, seconds: 0.25, level: 0.05, type: 'sawtooth' });
+/** A sprinkler head's glass bulb bursting. */
+const BULB = click({
+  band: 5200,
+  q: 1.5,
+  decay: 0.03,
+  level: 0.7,
+  thump: [300, 0.03],
+});
+/** The voice alarm's alert tone: a second on, a second off, three times. */
+const ALERT_TONE = tone({
+  hz: 970,
+  seconds: 1,
+  level: 0.05,
+  type: 'triangle',
+  repeat: [3, 1],
+});
+/** The voice alarm's messages, a calm British voice (`CREDITS.md`). */
+const ALERT = recording(asset('voice-alarm/va-alert.mp3'), 0.9);
+const EVACUATE = recording(asset('voice-alarm/va-evacuate.mp3'), 0.9);
+const FALSE_ALARM = recording(asset('voice-alarm/va-false-alarm.mp3'), 0.9);
+const ALL_CLEAR = recording(asset('voice-alarm/va-all-clear.mp3'), 0.9);
 const CHIME = tone({
   hz: 880,
   seconds: 0.35,
@@ -402,17 +428,149 @@ export function firePanel(
   return a.part();
 }
 
-/** A pendant sprinkler head; `voice` gives it the sound of the spray. */
+/**
+ * A pendant sprinkler head: its glass bulb bursts with a pop when the
+ * model says it has, and it sprays while water reaches it; `voice` gives
+ * it the sound of the spray.
+ */
 export function sprinklerHead(
   kit: PanelKit,
-  props: { discharging: Readable<boolean>; voice?: boolean },
+  props: {
+    head: Readable<{ burst: boolean; spraying: boolean }>;
+    voice?: boolean;
+  },
 ): Part {
   const a = beginPart(kit, 'sprinkler head');
   const view = createSprinklerHead(kit);
   a.object.add(view.group);
-  show(a, () => view.set(props.discharging.value));
+  const e = emitter();
+  a.voice(e, { trip: BULB });
+  let was = false;
+  show(a, () => {
+    const { burst, spraying } = props.head.value;
+    view.set(burst, spraying);
+    if (burst && !was) e.emit('trip');
+    was = burst;
+  });
   a.updates.push(view.update);
-  if (props.voice) a.holdWhile(props.discharging, WATER_SPRAY);
+  if (props.voice)
+    a.holdWhile(
+      computed(() => props.head.value.spraying),
+      WATER_SPRAY,
+    );
+  return a.part();
+}
+
+/**
+ * The voice alarm, heard from its ceiling speaker. In the alert stage it
+ * sounds the intermittent alert tone and the alert message, every half
+ * minute; in evacuation, the evacuation signal (the fire alarm) and the
+ * evacuation message, over and over; once over, the false alarm or the
+ * all-clear, after a chime. Silenced, it stops at once.
+ */
+export function voiceAlarm(
+  kit: PanelKit,
+  props: {
+    voice: Readable<'alert' | 'evacuate' | null>;
+    announcement: Readable<{
+      kind: 'false-alarm' | 'all-clear' | null;
+      n: number;
+    }>;
+  },
+): Part {
+  const a = beginPart(kit, 'voice alarm');
+  const view = createCeilingSpeaker(kit);
+  a.object.add(view.group);
+  const owner = {};
+  let stopMessage = () => {};
+  let mode: 'alert' | 'evacuate' | null = null;
+  let clock = 0;
+  let step = 0;
+  const say = (recipe: SoundRecipe) => {
+    stopMessage();
+    stopMessage = play(recipe, a.object);
+  };
+  const quiet = () => {
+    stopMessage();
+    partAudio.hold(owner, null);
+  };
+  show(a, () => {
+    const next = props.voice.value;
+    if (next === mode) return;
+    mode = next;
+    quiet();
+    clock = 0;
+    step = 0;
+  });
+  let heard = props.announcement.value.n;
+  show(a, () => {
+    const { kind, n } = props.announcement.value;
+    if (!kind || n === heard) return;
+    heard = n;
+    quiet();
+    play(CHIME, a.object);
+    setTimeout(
+      () => say(kind === 'false-alarm' ? FALSE_ALARM : ALL_CLEAR),
+      1200,
+    );
+  });
+  // The sequence, step by step: [seconds to wait, what to do].
+  const sequences: Record<'alert' | 'evacuate', [number, () => void][]> = {
+    alert: [
+      [0, () => play(ALERT_TONE, a.object)],
+      [6.2, () => say(ALERT)],
+      [12, () => {}],
+      [12, () => {}],
+    ],
+    evacuate: [
+      [0, () => partAudio.hold(owner, FIRE_SOUNDER, a.object)],
+      [5, () => partAudio.hold(owner, null)],
+      [0.6, () => say(EVACUATE)],
+      [11, () => {}],
+    ],
+  };
+  a.updates.push((delta) => {
+    if (!mode) return;
+    clock -= delta;
+    if (clock > 0) return;
+    const sequence = sequences[mode];
+    const [, act] = sequence[step];
+    act();
+    step = (step + 1) % sequence.length;
+    clock = sequence[step][0] || 0.01;
+  });
+  a.disposers.push(quiet);
+  return a.part();
+}
+
+/** An electric fire bell, ringing while water flows in the sprinklers. */
+export function fireBell(
+  kit: PanelKit,
+  props: { ringing: Readable<boolean> },
+): Part {
+  const a = beginPart(kit, 'sprinkler alarm bell');
+  const view = createFireBell(kit);
+  a.object.add(view.group);
+  show(a, () => view.set(props.ringing.value));
+  a.updates.push(view.update);
+  a.holdWhile(props.ringing, FIRE_BELL);
+  return a.part();
+}
+
+/** The waste-paper bin, burning as big as the model's fire. */
+export function burningBin(
+  kit: PanelKit,
+  props: { size: Readable<number>; smoke: Readable<number> },
+): Part {
+  const a = beginPart(kit, 'waste-paper bin');
+  const view = createBinFire(kit);
+  a.object.add(view.group);
+  show(a, () => view.set(props.size.value, props.smoke.value));
+  a.updates.push(view.update);
+  a.holdWhile(
+    computed(() => props.size.value > 0),
+    CRACKLE,
+  );
   return a.part();
 }
 

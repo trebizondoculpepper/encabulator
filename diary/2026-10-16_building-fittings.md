@@ -24,6 +24,10 @@ The owner asked whether free models could replace hand-built ones. A search foun
 
 The owner found the fire alarm panel unconvincing and asked for one modelled on a real panel. It now follows C-TEC's CFP two-zone conventional panel, from the photograph and dimensions in the maker's datasheet (380 × 235 × 90 mm), with a fictional maker's name: an off-white case, a charcoal facia drawn as one canvas with the instructions, numbered keys and colour-coded buttons, a red key in its keyswitch, and the fire, zone and general lamps set into it. The owner also asked for the VX3 Simulator's fire alarm sound: its synthesised Hausalarm (`src/audio/fire-alarm.ts`, with its test and credit) now plays from the sounder-beacons.
 
+## Revision: the burning bin and a voice alarm
+
+The owner pressed the call point and the sprinklers did not start (only the detector led to them), and asked for a realistic fire process, with calm spoken announcements, set off by a joke: a button on a pedestal that sets a waste-paper bin alight under the smoke detector. The fire model became a two-stage alarm with a voice alarm (BS 5839-1 and -8): the bin's smoke sets off the detector after a few seconds; the alert stage asks everyone to stay put for a 90-second investigation, which finds at random a fire or a false alarm; a false alarm is announced while the bin still burns, so the second activation evacuates; in evacuation the fire grows until the nearest sprinkler head's bulb bursts at 68 °C, and its spray puts the bin out. The messages, worded after BS 5839-8's examples, were rendered with Piper's CC BY 4.0 British VCTK voice (a male speaker from Surrey, checked at about 108 Hz) and given a public-address colour. The pre-action valve and TEST SMOKE button were removed. Smoke rises from the bin in a plume and spreads under the ceiling.
+
 ## Next Steps
 
 Decide on the free models; replace the training room's painted fittings with these parts.

@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   DOOR_RELEASE_SECONDS,
   FAN_RUN_ON_SECONDS,
-  PREACTION_DELAY,
+  INVESTIGATION_SECONDS,
   VACANCY_SECONDS,
   createBuildingServices,
 } from './building-services';
 
-const run = (b: ReturnType<typeof createBuildingServices>, seconds: number) => {
-  for (let t = 0; t < seconds; t += 0.1) b.tick(0.1);
+const run = (
+  b: ReturnType<typeof createBuildingServices>,
+  seconds: number,
+  random = () => 0,
+) => {
+  for (let t = 0; t < seconds; t += 0.1) b.tick(0.1, random);
 };
+/** The investigation finds a fire (0) or a false alarm (0.9). */
+const finds = { fire: () => 0, falseAlarm: () => 0.9 };
 
 describe('dev8 building services', () => {
   it('switch the room lights from either end (two-way)', () => {
@@ -43,36 +49,92 @@ describe('dev8 building services', () => {
     expect(b.lighting.emergencyLit.value).toBe(true);
   });
 
-  it('take smoke to the panel, the sounders, the door holders and the sprinklers', () => {
+  it('detect the lit bin a few seconds later, and investigate it', () => {
     const b = createBuildingServices();
-    expect(b.fire.sounding.value).toBe(false);
-    b.fire.smokeTest();
-    b.tick(0.1);
+    expect(b.fire.startFire()).toBe(true);
+    expect(b.fire.flames.value).toBeGreaterThan(0);
+    run(b, 2);
+    expect(b.fire.stage.value).toBe('normal');
+    run(b, 5);
     expect(b.fire.detector.value).toBe(true);
-    expect(b.fire.sounding.value).toBe(true);
+    expect(b.fire.stage.value).toBe('alert');
+    expect(b.fire.voice.value).toBe('alert');
     expect(b.fire.doorsHeld.value).toBe(false);
+    expect(b.access.locked.value).toBe(true);
+    expect(b.fire.panelLamps.value.countdown).toBeGreaterThan(80);
+  });
+
+  it('call a false alarm while the bin burns, then evacuate on the second activation', () => {
+    const b = createBuildingServices();
+    b.fire.startFire();
+    run(b, 7, finds.falseAlarm);
+    expect(b.fire.stage.value).toBe('alert');
+    run(b, INVESTIGATION_SECONDS, finds.falseAlarm);
+    expect(b.fire.announcement.value.kind).toBe('false-alarm');
+    expect(b.fire.stage.value).toBe('all-clear');
+    // The bin is still alight: its smoke is soon back, and this time
+    // everyone leaves.
+    run(b, 20, finds.falseAlarm);
+    expect(b.fire.stage.value).toBe('evacuate');
+  });
+
+  it('evacuate, burst the nearest head and put the bin out', () => {
+    const b = createBuildingServices();
+    b.fire.startFire();
+    run(b, 7 + INVESTIGATION_SECONDS, finds.fire);
+    expect(b.fire.stage.value).toBe('evacuate');
+    expect(b.fire.voice.value).toBe('evacuate');
     expect(b.access.locked.value).toBe(false);
+    expect(b.fire.panelLamps.value.brigade).toBe(true);
+    // The fire grows until the hot gas at the nearest head reaches 68 °C.
+    run(b, 20, finds.fire);
     expect(b.fire.discharging.value).toBe(false);
-    run(b, PREACTION_DELAY + 0.5);
+    run(b, 15, finds.fire);
     expect(b.fire.discharging.value).toBe(true);
+    expect(b.fire.heads.value[0].spraying).toBe(true);
+    // The spray puts the bin out; the water runs until the valve is shut.
+    run(b, 25, finds.fire);
+    expect(b.fire.flames.value).toBe(0);
+    expect(b.fire.discharging.value).toBe(true);
+    // RESET needs the key and nothing still in alarm: not while water flows.
+    b.fire.panelKey.set(true);
+    expect(b.fire.reset()).toBe(false);
     b.fire.riserValve.set(false);
     expect(b.fire.discharging.value).toBe(false);
+    run(b, 30, finds.fire);
+    expect(b.fire.reset()).toBe(true);
+    expect(b.fire.announcement.value.kind).toBe('all-clear');
+    b.fire.resetSprinklers();
+    expect(b.fire.heads.value.some((h) => h.burst)).toBe(false);
+  });
+
+  it('go straight to evacuation from a call point', () => {
+    const b = createBuildingServices();
+    b.fire.startFire();
+    run(b, 7);
+    expect(b.fire.stage.value).toBe('alert');
+    b.fire.pressCallPoint();
+    b.tick(0.1);
+    expect(b.fire.stage.value).toBe('evacuate');
   });
 
   it('latch a call point until it is reset with its key', () => {
     const b = createBuildingServices();
     b.fire.pressCallPoint();
+    b.tick(0.1);
     expect(b.fire.sounding.value).toBe(true);
     b.fire.panelKey.set(true);
-    b.fire.reset();
+    expect(b.fire.reset()).toBe(false);
     expect(b.fire.sounding.value).toBe(true);
     b.fire.resetCallPoint();
-    expect(b.fire.sounding.value).toBe(false);
+    expect(b.fire.reset()).toBe(true);
+    expect(b.fire.stage.value).toBe('all-clear');
   });
 
   it('silence and evacuate only with the panel key turned', () => {
     const b = createBuildingServices();
     b.fire.pressCallPoint();
+    b.tick(0.1);
     expect(b.fire.silence()).toBe(false);
     expect(b.fire.sounding.value).toBe(true);
     b.fire.panelKey.set(true);

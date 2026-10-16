@@ -168,9 +168,10 @@ const burst = (spec: Click, at: number, out: AudioNode) => {
 
 export const partAudio = {
   /** Play a part's sound once, from where `from` stands. */
-  play(recipe: SoundRecipe, from?: Object3D) {
+  play(recipe: SoundRecipe, from?: Object3D): () => void {
     awaitGesture();
-    if (!context || context.state !== 'running') return;
+    const none = () => {};
+    if (!context || context.state !== 'running') return none;
     const out = placed(from);
     if ('tone' in recipe) {
       const spec = recipe.tone;
@@ -189,7 +190,7 @@ export const partAudio = {
         osc.start(at);
         osc.stop(at + spec.seconds + 0.02);
       }
-      return;
+      return none;
     }
     if ('click' in recipe) {
       const spec = recipe.click;
@@ -201,12 +202,16 @@ export const partAudio = {
           at + i * gap * (0.85 + Math.random() * 0.3),
           out,
         );
-      return;
+      return none;
     }
+    // A recording can be cut short: the returned function stops it.
+    let stopped = false;
+    let playing: AudioBufferSourceNode | null = null;
     load(recipe.recording)
       .then((buffer) => {
-        if (!context || context.state !== 'running') return;
+        if (!context || context.state !== 'running' || stopped) return;
         const source = context.createBufferSource();
+        playing = source;
         const gain = context.createGain();
         source.buffer = buffer;
         gain.gain.value = recipe.level;
@@ -218,6 +223,14 @@ export const partAudio = {
         source.start();
       })
       .catch((error) => console.warn('A part sound could not play.', error));
+    return () => {
+      stopped = true;
+      try {
+        playing?.stop();
+      } catch {
+        // Already ended.
+      }
+    };
   },
   /**
    * Hold `recipe` for `owner` from where `from` stands, replacing what it

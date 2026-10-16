@@ -19,7 +19,10 @@ import type { LoopRecipe } from './part-audio';
  * - `ALARM_BUZZER`: an accessible toilet's emergency alarm, a pulsing
  *   buzz;
  * - `EXTRACT_FAN`: a small extractor fan's whirr;
- * - `WATER_SPRAY`: sprinklers discharging, a broad hiss.
+ * - `WATER_SPRAY`: sprinklers discharging, a broad hiss;
+ * - `CRACKLE`: a fire in a bin: crackle and the roar of the flames;
+ * - `FIRE_BELL`: an electric fire bell, its striker ringing the gong
+ *   about twenty times a second, as for a sprinkler flow alarm.
  */
 
 /** Tones at `hz`, each at its level, under one gain. */
@@ -174,4 +177,79 @@ export const WATER_SPRAY: LoopRecipe = (context, out) => {
   spray.connect(band).connect(level).connect(out);
   spray.start();
   return [spray];
+};
+
+/** A second of an electric bell: a gong of inharmonic partials struck 20 times. */
+function renderBell(sampleRate: number) {
+  const length = sampleRate;
+  const out = new Float32Array(length);
+  const partials: [number, number, number][] = [
+    [1180, 1, 9],
+    [2830, 0.5, 14],
+    [4710, 0.3, 20],
+    [6360, 0.15, 26],
+  ];
+  const strikes = 20;
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    const since = t % (1 / strikes);
+    let v = 0;
+    for (const [hz, level, decay] of partials)
+      // The gong rings on through the strikes; each strike refreshes it.
+      v +=
+        level *
+        Math.sin(2 * Math.PI * hz * t) *
+        (0.55 + 0.45 * Math.exp(-since * decay * 4));
+    out[i] = v * 0.35;
+  }
+  return out;
+}
+const bells = new WeakMap<BaseAudioContext, AudioBuffer>();
+
+export const FIRE_BELL: LoopRecipe = (context, out) => {
+  let buffer = bells.get(context);
+  if (!buffer) {
+    const samples = renderBell(context.sampleRate);
+    buffer = context.createBuffer(1, samples.length, context.sampleRate);
+    buffer.getChannelData(0).set(samples);
+    bells.set(context, buffer);
+  }
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  const gain = context.createGain();
+  gain.gain.value = 0.06;
+  source.connect(gain).connect(out);
+  source.start();
+  return [source];
+};
+
+export const CRACKLE: LoopRecipe = (context, out) => {
+  // The roar: low noise.
+  const roar = noiseSource(context);
+  const low = context.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 500;
+  const roarLevel = context.createGain();
+  roarLevel.gain.value = 0.05;
+  roar.connect(low).connect(roarLevel).connect(out);
+  roar.start();
+  // The crackle: sparse clicks, noise gated by a fast random envelope.
+  const length = context.sampleRate * 2;
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++)
+    if (Math.random() < 0.0009) {
+      const amp = 0.3 + Math.random() * 0.7;
+      for (let k = 0; k < 120 && i + k < length; k++)
+        data[i + k] += amp * (Math.random() * 2 - 1) * Math.exp(-k / 25);
+    }
+  const crackle = context.createBufferSource();
+  crackle.buffer = buffer;
+  crackle.loop = true;
+  const crackleLevel = context.createGain();
+  crackleLevel.gain.value = 0.12;
+  crackle.connect(crackleLevel).connect(out);
+  crackle.start();
+  return [roar, crackle];
 };
