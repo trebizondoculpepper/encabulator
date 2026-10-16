@@ -24,7 +24,11 @@ import {
 import { devPortals, devWalls } from '../game/dev-room-links';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
-import { createCaption, createSectionBoard } from '../scene/building-fittings';
+import {
+  createCaption,
+  createSectionBoard,
+  createWarningSign,
+} from '../scene/building-fittings';
 import type { ExtinguisherKind } from '../scene/building-fittings';
 import {
   createPanelKit,
@@ -346,12 +350,26 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     FIRE_SEAT.x,
     FIRE_SEAT.z,
   );
-  const pedestal = new Mesh(
-    new BoxGeometry(0.3, 1.0, 0.3),
-    kitPaint(kit, '#5d625f'),
-  );
-  pedestal.position.set(FIRE_SEAT.x - 0.4, 0.5, FIRE_SEAT.z + 1.4);
+  // The pedestal stands beside the bin, its sloping panel turned away
+  // from it, so whoever presses the button is looking at the bin.
+  const pedestal = new Group();
+  pedestal.position.set(FIRE_SEAT.x - 1.5, 0, FIRE_SEAT.z);
+  pedestal.rotation.y = -Math.PI / 2;
   room.add(pedestal);
+  const grey = kitPaint(kit, '#5d625f');
+  const column = new Mesh(new BoxGeometry(0.35, 0.95, 0.35), grey);
+  column.position.y = 0.475;
+  pedestal.add(column);
+  const slope = new Group();
+  slope.position.set(0, 0.95, 0.06);
+  slope.rotation.x = -0.6;
+  pedestal.add(slope);
+  const face = new Mesh(
+    new BoxGeometry(0.33, 0.26, 0.02),
+    kitPaint(kit, '#c4c6bf'),
+  );
+  face.position.z = -0.01;
+  slope.add(face);
   const light = pushButton(kit, {
     colour: 'red',
     legend: 'LIGHT THE BIN',
@@ -359,10 +377,16 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     action: F.startFire,
   });
   light.object.scale.setScalar(2.2);
-  light.object.position.set(FIRE_SEAT.x - 0.4, 1.0, FIRE_SEAT.z + 1.4);
-  light.object.rotation.x = -Math.PI / 2;
-  room.add(light.object);
+  light.object.position.set(0, -0.02, 0);
+  slope.add(light.object);
   parts.add(light);
+  const warning = createWarningSign(kit, [
+    'DO NOT PRESS',
+    'THIS BUTTON',
+    'UNDER ANY CIRCUMSTANCES',
+  ]);
+  warning.position.set(0, 0.62, 0.177);
+  pedestal.add(warning);
   const glow = new PointLight('#ff8a3a', 0, 6 * m);
   glow.position.set(FIRE_SEAT.x * m, 0.8 * m, FIRE_SEAT.z * m);
   scene.add(glow);
@@ -534,6 +558,13 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     overview: { x: 0, z: 5 * m, yaw: 0, pitch: 0.05 },
     lighting: { x: -2 * m, z: -4.5 * m, yaw: 0, pitch: 0.05 },
     fire: { x: 8 * m, z: -2.5 * m, yaw: Math.PI / 2, pitch: 0.05 },
+    bin: {
+      // From one side, so the pedestal does not hide the bin.
+      x: (FIRE_SEAT.x - 3.6) * m,
+      z: (FIRE_SEAT.z + 1.5) * m,
+      yaw: 1.09,
+      pitch: -0.3,
+    },
     power: { x: -5 * m, z: 4.5 * m, yaw: Math.PI, pitch: 0 },
     access: { x: -8.5 * m, z: -1.5 * m, yaw: -Math.PI / 2, pitch: 0 },
   };
@@ -546,8 +577,19 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     start:
       views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ??
-      views.overview,
-    solids: () => outer,
+      views.bin,
+    solids: () => [
+      ...outer,
+      ...[
+        { x: FIRE_SEAT.x, z: FIRE_SEAT.z, r: 0.2 },
+        { x: FIRE_SEAT.x - 1.5, z: FIRE_SEAT.z, r: 0.22 },
+      ].map(({ x, z, r }) => ({
+        minX: (x - r) * m,
+        maxX: (x + r) * m,
+        minZ: (z - r) * m,
+        maxZ: (z + r) * m,
+      })),
+    ],
     use: (x, y) => usableAt(x, y)?.(),
     aimed: () => Boolean(usableAt(0, 0)),
   });

@@ -66,16 +66,18 @@ export const FIRE_QUENCH = 0.02;
 export const SMOKE_RISE = 0.06;
 /** A sprinkler head's glass bulb bursts at this temperature, °C. */
 export const HEAD_OPENS_AT = 68;
-/** Where the campfire is laid, under the smoke detector. */
-export const FIRE_SEAT = { x: 9.6, z: -3.2 };
+/** Where the waste-paper bin stands, under the smoke detector: mid-room. */
+export const FIRE_SEAT = { x: 0.4, z: 0.3 };
 /** The sprinkler heads in the ceiling, metres. */
 export const SPRINKLER_HEADS: readonly { x: number; z: number }[] = [
-  { x: 8.5, z: -4.5 },
-  { x: 5, z: -4.5 },
-  { x: 8.5, z: -0.5 },
-  { x: 5, z: -0.5 },
-  { x: 8.5, z: 3.5 },
-  { x: 5, z: 3.5 },
+  { x: 1.5, z: 2 },
+  { x: -1.5, z: 2 },
+  { x: 1.5, z: -2 },
+  { x: -1.5, z: -2 },
+  { x: 4.5, z: 2 },
+  { x: -4.5, z: 2 },
+  { x: 4.5, z: -2 },
+  { x: -4.5, z: -2 },
 ];
 /** The fire alarm's stages. */
 export type FireStage = 'normal' | 'alert' | 'evacuate' | 'all-clear';
