@@ -56,12 +56,18 @@ export const INVESTIGATION_SECONDS = 90;
 /** How long the all-clear lasts before the system is normal again. */
 export const ALL_CLEAR_SECONDS = 10;
 /**
- * The fire's size when the bin is lit, its growth a second once the
- * building is evacuating, and how fast a sprinkler puts it out.
+ * Lighting the bin: it smoulders, smoking a little, for `SMOULDER_SECONDS`;
+ * then flames catch at `FIRE_START` and grow at `IGNITION_GROWTH` a second
+ * to `IGNITION_SIZE`, where they hold while the alarm is investigated.
+ * Once the building is evacuating the fire grows on at `FIRE_GROWTH`, and
+ * a sprinkler puts it out at `FIRE_QUENCH` a second.
  */
-export const FIRE_START = 0.15;
+export const SMOULDER_SECONDS = 6;
+export const FIRE_START = 0.04;
+export const IGNITION_GROWTH = 0.02;
+export const IGNITION_SIZE = 0.2;
 export const FIRE_GROWTH = 0.015;
-export const FIRE_QUENCH = 0.02;
+export const FIRE_QUENCH = 0.04;
 /** How fast smoke builds up at the detector, a second: a few seconds' worth. */
 export const SMOKE_RISE = 0.06;
 /** A sprinkler head's glass bulb bursts at this temperature, °C. */
@@ -70,6 +76,8 @@ export const HEAD_OPENS_AT = 68;
 export const FIRE_SEAT = { x: 0.4, z: 0.3 };
 /** The sprinkler heads in the ceiling, metres. */
 export const SPRINKLER_HEADS: readonly { x: number; z: number }[] = [
+  // The head over the bin, which is the one that goes off.
+  { x: FIRE_SEAT.x + 0.3, z: FIRE_SEAT.z },
   { x: 1.5, z: 2 },
   { x: -1.5, z: 2 },
   { x: 1.5, z: -2 },
@@ -89,7 +97,7 @@ export type FireStage = 'normal' | 'alert' | 'evacuate' | 'all-clear';
 export function headTemperature(size: number, i: number) {
   const { x, z } = SPRINKLER_HEADS[i];
   const distance = Math.hypot(x - FIRE_SEAT.x, z - FIRE_SEAT.z);
-  return 20 + (100 * size * 4) / (distance + 1.5);
+  return 20 + (192 * size) / (distance + 1.5);
 }
 /** Seconds the door stays released after a card or the exit button. */
 export const DOOR_RELEASE_SECONDS = 6;
@@ -205,6 +213,8 @@ export function createBuildingServices() {
   const callPoint = g.state('fire.callPoint', false);
   /** The fire itself: 0 when out, growing towards 1. */
   const fireSize = g.state('fire.size', 0);
+  /** Seconds the lit bin has left to smoulder before its flames catch. */
+  const smoulder = g.state('fire.smoulder', 0);
   /**
    * What the investigation will find (decided, at random, when the alert
    * begins): a fire, or a false alarm.
@@ -334,9 +344,10 @@ export function createBuildingServices() {
   };
   g.process(
     'fire',
-    [riserValve, callPoint],
+    [riserValve, callPoint, smoulder],
     [
       fireSize,
+      smoulder,
       willFindFire,
       calledFalse,
       smoke,
@@ -356,13 +367,23 @@ export function createBuildingServices() {
         .peek()
         .filter((burst) => burst && riserValve.peek()).length;
       let size = fireSize.peek();
-      if (size > 0) {
-        const growing = stage.peek() === 'evacuate';
-        size +=
-          dt * (spraying === 0 ? (growing ? FIRE_GROWTH : 0) : -FIRE_QUENCH);
-        size = Math.min(1, Math.max(0, size));
-        fireSize.set(size);
+      if (smoulder.peek() > 0) {
+        // Smouldering: smoke, no flames yet; water puts it out.
+        smoulder.set(spraying ? 0 : Math.max(0, smoulder.peek() - dt));
+        if (smoulder.peek() <= 0 && !spraying) size = FIRE_START;
+      } else if (size > 0) {
+        const rate =
+          spraying > 0
+            ? -FIRE_QUENCH
+            : stage.peek() === 'evacuate'
+              ? FIRE_GROWTH
+              : size < IGNITION_SIZE
+                ? IGNITION_GROWTH
+                : 0;
+        size = Math.min(1, Math.max(0, size + dt * rate));
       }
+      if (size !== fireSize.peek()) fireSize.set(size);
+      const lit = size > 0 || smoulder.peek() > 0;
       // Heat at each head, from the fire's size and the head's distance:
       // a head's bulb bursts at 68 °C.
       const burst = bulbs.peek();
@@ -371,7 +392,12 @@ export function createBuildingServices() {
       );
       if (next.some((b, i) => b !== burst[i])) bulbs.set(next);
       // Smoke builds up over a few seconds and clears slowly.
-      const target = size > 0 ? Math.min(1, 0.4 + size) : 0;
+      const target =
+        size > 0
+          ? Math.min(1, 0.3 + size * 1.5)
+          : smoulder.peek() > 0
+            ? 0.22
+            : 0;
       const now = smoke.peek();
       smoke.set(
         target > now
@@ -412,7 +438,7 @@ export function createBuildingServices() {
               // is still alight: its smoke will soon be back.
               detector.set(false);
               smoke.set(Math.min(smoke.peek(), SMOKE_ALARM * 0.5));
-              calledFalse.set(size > 0);
+              calledFalse.set(lit);
               finish('false-alarm');
             }
           }
@@ -429,9 +455,9 @@ export function createBuildingServices() {
     },
   );
   /** LIGHT THE BIN: set fire to the waste-paper bin under the detector. */
-  const startFire = g.action('fire.start', [], [fireSize, calledFalse], () => {
-    if (fireSize.peek() > 0) return false;
-    fireSize.set(FIRE_START);
+  const startFire = g.action('fire.start', [], [smoulder, calledFalse], () => {
+    if (fireSize.peek() > 0 || smoulder.peek() > 0) return false;
+    smoulder.set(SMOULDER_SECONDS);
     calledFalse.set(false);
     return true;
   });
@@ -479,6 +505,7 @@ export function createBuildingServices() {
         !callPoint.peek() &&
         !discharging.peek() &&
         fireSize.peek() <= 0 &&
+        smoulder.peek() <= 0 &&
         smoke.peek() <= SMOKE_ALARM;
       if (!clear) return false;
       detector.set(false);

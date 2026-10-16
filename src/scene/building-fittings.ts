@@ -2175,22 +2175,58 @@ export function createBinFire(kit: PanelKit) {
   bin.position.y = 0.18;
   group.add(bin);
   t.cyl(group, t.paint('#2a2522', 0.9), 0.12, 0.01, 0, 0.005, 0);
-  const flames = new Group();
-  flames.position.y = 0.3;
-  group.add(flames);
-  const colours = ['#ff9a2a', '#ffcf4a', '#ff5a1a'];
-  const tongues = colours.map((colour, i) => {
-    const material = kitGlow(kit, colour);
-    material.transparent = true;
-    material.opacity = 0.85;
-    const cone = new Mesh(
-      new CylinderGeometry(0, 0.09 - i * 0.02, 0.4, 10),
-      material,
-    );
-    cone.position.set((i - 1) * 0.04, 0.2, (i % 2) * 0.03);
-    flames.add(cone);
-    return cone;
-  });
+  // The flames: hundreds of soft, glowing particles rising from the
+  // paper in the bin, yellow-white at the root, orange, then red as they
+  // cool, narrowing and swaying towards their tips, drawn twice (a bright
+  // core and a wide dim glow) and added to what is behind them.
+  const sparks = 360;
+  const flamePositions = new Float32Array(sparks * 3);
+  const flameColours = new Float32Array(sparks * 3);
+  const age = new Float32Array(sparks).map(() => Math.random());
+  const span = new Float32Array(sparks).map(() => 0.45 + Math.random() * 0.45);
+  const root = new Float32Array(sparks * 2).map(() => Math.random() * 2 - 1);
+  const lift = new Float32Array(sparks).map(() => 0.6 + Math.random() * 0.5);
+  const flameGeometry = new BufferGeometry();
+  flameGeometry.setAttribute(
+    'position',
+    new BufferAttribute(flamePositions, 3),
+  );
+  flameGeometry.setAttribute('color', new BufferAttribute(flameColours, 3));
+  const dot = softDot(kit);
+  const layer = (base: number, opacity: number) => {
+    const material = new PointsMaterial({
+      map: dot,
+      size: base * METRE,
+      vertexColors: true,
+      transparent: true,
+      opacity,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    });
+    kit.materials.push(material);
+    const points = new Points(flameGeometry, material);
+    points.frustumCulled = false;
+    group.add(points);
+    return { points, material, base };
+  };
+  const layers = [layer(0.07, 0.75), layer(0.2, 0.3)];
+  /** The colour of a flame particle `l` (0 to 1) through its life. */
+  const stops: [number, number, number, number][] = [
+    [0, 0.75, 0.52, 0.2],
+    [0.3, 0.7, 0.32, 0.06],
+    [0.65, 0.45, 0.09, 0.02],
+    [1, 0, 0, 0],
+  ];
+  const tint = (l: number, out: Float32Array, at: number) => {
+    let k = 0;
+    while (k < stops.length - 2 && l > stops[k + 1][0]) k++;
+    const [l0, r0, g0, b0] = stops[k];
+    const [l1, r1, g1, b1] = stops[k + 1];
+    const f = Math.min(1, Math.max(0, (l - l0) / (l1 - l0)));
+    out[at] = r0 + (r1 - r0) * f;
+    out[at + 1] = g0 + (g1 - g0) * f;
+    out[at + 2] = b0 + (b1 - b0) * f;
+  };
   // Smoke: grey puffs rising from the bin in a plume, then spreading out
   // under the ceiling, as a real ceiling jet does.
   const count = 420;
@@ -2237,14 +2273,33 @@ export function createBinFire(kit: PanelKit) {
           positions[i * 3 + 2] = drift[i * 2 + 1] * (0.08 + spread);
         }
       geometry.attributes.position.needsUpdate = cloud.visible;
-      flames.visible = size > 0.001;
-      // The flames grow plainly with the fire, up out of the bin.
-      const scale = 0.4 + size * 4.5;
-      tongues.forEach((cone, i) => {
-        const flicker = 1 + 0.25 * Math.sin(time * (11 + i * 3.7) + i);
-        cone.scale.set(scale, scale * flicker, scale);
-        cone.position.y = 0.2 * scale * flicker;
-      });
+      const burning = size > 0.001;
+      for (const l of layers) {
+        l.points.visible = burning;
+        l.material.size = l.base * METRE * (0.6 + size * 2.2);
+      }
+      if (!burning) return;
+      // A bigger fire: more particles alight, rising faster and higher.
+      const alight = Math.min(sparks, Math.round(sparks * (0.25 + size * 2)));
+      const height = 0.5 + size * 2.4;
+      for (let i = 0; i < sparks; i++) {
+        age[i] += delta / span[i];
+        if (age[i] >= 1) {
+          age[i] -= 1;
+          root[i * 2] = Math.random() * 2 - 1;
+          root[i * 2 + 1] = Math.random() * 2 - 1;
+        }
+        const l = age[i];
+        const narrow = 0.11 * (1 - l * 0.75) * (0.7 + size);
+        const sway = Math.sin(time * 6 + i * 1.7) * 0.03 * l;
+        flamePositions[i * 3] = root[i * 2] * narrow + sway;
+        flamePositions[i * 3 + 1] = 0.3 + l * height * lift[i];
+        flamePositions[i * 3 + 2] = root[i * 2 + 1] * narrow;
+        if (i < alight) tint(l, flameColours, i * 3);
+        else flameColours.fill(0, i * 3, i * 3 + 3);
+      }
+      flameGeometry.attributes.position.needsUpdate = true;
+      flameGeometry.attributes.color.needsUpdate = true;
     },
   };
 }

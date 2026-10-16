@@ -52,10 +52,14 @@ describe('dev8 building services', () => {
   it('detect the lit bin a few seconds later, and investigate it', () => {
     const b = createBuildingServices();
     expect(b.fire.startFire()).toBe(true);
-    expect(b.fire.flames.value).toBeGreaterThan(0);
-    run(b, 2);
+    // It smoulders first: a little smoke, no flames.
+    run(b, 3);
+    expect(b.fire.flames.value).toBe(0);
+    expect(b.fire.smokeShown.value).toBeGreaterThan(0);
     expect(b.fire.stage.value).toBe('normal');
-    run(b, 5);
+    // Then the flames catch and grow, and their smoke sets off the detector.
+    run(b, 9);
+    expect(b.fire.flames.value).toBeGreaterThan(0.04);
     expect(b.fire.detector.value).toBe(true);
     expect(b.fire.stage.value).toBe('alert');
     expect(b.fire.voice.value).toBe('alert');
@@ -67,7 +71,7 @@ describe('dev8 building services', () => {
   it('call a false alarm while the bin burns, then evacuate on the second activation', () => {
     const b = createBuildingServices();
     b.fire.startFire();
-    run(b, 7, finds.falseAlarm);
+    run(b, 12, finds.falseAlarm);
     expect(b.fire.stage.value).toBe('alert');
     run(b, INVESTIGATION_SECONDS, finds.falseAlarm);
     expect(b.fire.announcement.value.kind).toBe('false-alarm');
@@ -81,7 +85,7 @@ describe('dev8 building services', () => {
   it('evacuate, burst the nearest head and put the bin out', () => {
     const b = createBuildingServices();
     b.fire.startFire();
-    run(b, 7 + INVESTIGATION_SECONDS, finds.fire);
+    run(b, 12 + INVESTIGATION_SECONDS, finds.fire);
     expect(b.fire.stage.value).toBe('evacuate');
     expect(b.fire.voice.value).toBe('evacuate');
     expect(b.access.locked.value).toBe(false);
@@ -93,7 +97,7 @@ describe('dev8 building services', () => {
     expect(b.fire.discharging.value).toBe(true);
     expect(b.fire.heads.value[0].spraying).toBe(true);
     // The spray puts the bin out; the water runs until the valve is shut.
-    run(b, 25, finds.fire);
+    run(b, 15, finds.fire);
     expect(b.fire.flames.value).toBe(0);
     expect(b.fire.discharging.value).toBe(true);
     // RESET needs the key and nothing still in alarm: not while water flows.
@@ -111,7 +115,7 @@ describe('dev8 building services', () => {
   it('go straight to evacuation from a call point', () => {
     const b = createBuildingServices();
     b.fire.startFire();
-    run(b, 7);
+    run(b, 12);
     expect(b.fire.stage.value).toBe('alert');
     b.fire.pressCallPoint();
     b.tick(0.1);
