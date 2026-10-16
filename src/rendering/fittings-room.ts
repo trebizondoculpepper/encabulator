@@ -1,6 +1,8 @@
 import {
   AmbientLight,
   BoxGeometry,
+  CylinderGeometry,
+  ExtrudeGeometry,
   Group,
   HemisphereLight,
   Mesh,
@@ -10,9 +12,10 @@ import {
   PointLight,
   Raycaster,
   Scene,
+  Shape,
   Vector2,
 } from 'three';
-import type { Object3D } from 'three';
+import type { BufferGeometry, Material, Object3D } from 'three';
 import { computed } from '@preact/signals-core';
 import { partAudio } from '../audio/part-audio';
 import {
@@ -350,31 +353,137 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     FIRE_SEAT.x,
     FIRE_SEAT.z,
   );
-  // The pedestal stands beside the bin, its sloping panel turned away
-  // from it, so whoever presses the button is looking at the bin.
+  // The button post beside the bin, copied from catalogue parts rather
+  // than made up: a galvanised steel post, 60 mm round tube, on a bolted
+  // base plate, with a welded mounting plate on top carrying a Schneider
+  // XALD01-style single-hole control station (68 × 68 × 53 mm, light grey
+  // body, dark grey lid, four lid screws) with the XB4-style illuminated
+  // button through its lid and its legend in a black holder below. It
+  // faces away from the bin, so whoever presses it is looking at the bin.
+  // The warning is band-clamped to the post.
   const pedestal = new Group();
   pedestal.position.set(FIRE_SEAT.x - 1.5, 0, FIRE_SEAT.z);
   pedestal.rotation.y = -Math.PI / 2;
   room.add(pedestal);
-  const grey = kitPaint(kit, '#5d625f');
-  const column = new Mesh(new BoxGeometry(0.35, 0.95, 0.35), grey);
-  column.position.y = 0.475;
-  pedestal.add(column);
-  const slope = new Group();
-  slope.position.set(0, 0.99, 0.04);
-  slope.rotation.x = -0.6;
-  pedestal.add(slope);
-  const face = new Mesh(
-    new BoxGeometry(0.33, 0.26, 0.02),
-    kitPaint(kit, '#c4c6bf'),
+  const galvanised = kitPaint(kit, '#a4abae', 0.55);
+  const bolts = kitPaint(kit, '#7d8386', 0.6);
+  const add = (
+    parent: Object3D,
+    geometry: BufferGeometry,
+    material: Material,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const mesh = new Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    parent.add(mesh);
+    return mesh;
+  };
+  /** A box with rounded corners and softened edges, its depth along z. */
+  const roundedBox = (w: number, h: number, d: number, r: number) => {
+    const shape = new Shape();
+    const x = w / 2 - r;
+    const y = h / 2 - r;
+    shape.absarc(x, y, r, 0, Math.PI / 2, false);
+    shape.absarc(-x, y, r, Math.PI / 2, Math.PI, false);
+    shape.absarc(-x, -y, r, Math.PI, Math.PI * 1.5, false);
+    shape.absarc(x, -y, r, Math.PI * 1.5, Math.PI * 2, false);
+    const edge = Math.min(r * 0.6, d / 4);
+    const geometry = new ExtrudeGeometry(shape, {
+      depth: d - edge * 2,
+      bevelEnabled: true,
+      bevelThickness: edge,
+      bevelSize: edge,
+      bevelSegments: 3,
+      curveSegments: 6,
+    });
+    geometry.translate(0, 0, -(d - edge * 2) / 2);
+    return geometry;
+  };
+  const top = 1.06;
+  add(pedestal, new BoxGeometry(0.2, 0.008, 0.2), galvanised, 0, 0.004, 0);
+  for (const [x, z] of [
+    [-0.075, -0.075],
+    [0.075, -0.075],
+    [-0.075, 0.075],
+    [0.075, 0.075],
+  ]) {
+    add(
+      pedestal,
+      new CylinderGeometry(0.009, 0.009, 0.008, 6),
+      bolts,
+      x,
+      0.012,
+      z,
+    );
+    add(
+      pedestal,
+      new CylinderGeometry(0.005, 0.005, 0.018, 8),
+      bolts,
+      x,
+      0.017,
+      z,
+    );
+  }
+  add(
+    pedestal,
+    new CylinderGeometry(0.03, 0.03, top, 24),
+    galvanised,
+    0,
+    top / 2,
+    0,
   );
-  face.position.z = -0.01;
-  slope.add(face);
-  // A standard illuminated push button: lit while the bin burns; pressed
-  // while it is out, it lights the bin.
+  add(
+    pedestal,
+    new CylinderGeometry(0.031, 0.031, 0.004, 24),
+    galvanised,
+    0,
+    top,
+    0,
+  );
+  // The mounting plate, welded upright to the post's front.
+  add(
+    pedestal,
+    new BoxGeometry(0.1, 0.1, 0.006),
+    galvanised,
+    0,
+    top - 0.02,
+    0.033,
+  );
+  const station = new Group();
+  station.position.set(0, top - 0.02, 0.036);
+  pedestal.add(station);
+  const body = new Mesh(
+    roundedBox(0.068 - 0.006, 0.068 - 0.006, 0.041, 0.006),
+    kitPaint(kit, '#c8ccc9'),
+  );
+  body.position.z = 0.0205;
+  station.add(body);
+  const lid = new Mesh(
+    roundedBox(0.068 - 0.005, 0.068 - 0.005, 0.012, 0.005),
+    kitPaint(kit, '#4a4f52'),
+  );
+  lid.position.z = 0.041 + 0.006;
+  station.add(lid);
+  for (const [x, y] of [
+    [-0.026, -0.026],
+    [0.026, -0.026],
+    [-0.026, 0.026],
+    [0.026, 0.026],
+  ]) {
+    const screw = add(
+      station,
+      new CylinderGeometry(0.0028, 0.0028, 0.0015, 12),
+      kitPaint(kit, '#2c2f31'),
+      x,
+      y,
+      0.0535,
+    );
+    screw.rotation.x = Math.PI / 2;
+  }
   const light = ledPushbutton(kit, {
     colour: 'red',
-    legend: 'LIGHT THE BIN',
     name: 'LIGHT THE BIN push button',
     bound: {
       get value() {
@@ -385,17 +494,47 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
       },
     },
   });
-  light.object.scale.setScalar(2.2);
-  light.object.position.set(0, 0.0, 0.005);
-  slope.add(light.object);
+  light.object.position.set(0, 0.004, 0.053);
+  station.add(light.object);
   parts.add(light);
-  const warning = createWarningSign(kit, [
-    'DO NOT PRESS',
-    'THIS BUTTON',
-    'UNDER ANY CIRCUMSTANCES',
-  ]);
-  warning.position.set(0, 0.62, 0.177);
+  // The legend holder: a black frame behind the bezel, its label below.
+  add(
+    station,
+    new BoxGeometry(0.03, 0.044, 0.0012),
+    kitPaint(kit, '#161616'),
+    0,
+    -0.002,
+    0.0536,
+  );
+  const legend = createCaption(kit, 'LIGHT THE BIN');
+  legend.scale.setScalar(0.26);
+  legend.position.set(0, -0.0185, 0.0545);
+  station.add(legend);
+  add(
+    station,
+    new BoxGeometry(0.026, 0.008, 0.0004),
+    kitPaint(kit, '#f2f1ea'),
+    0,
+    -0.0185,
+    0.0543,
+  );
+  const warning = createWarningSign(
+    kit,
+    ['DO NOT PRESS', 'THIS BUTTON', 'UNDER ANY CIRCUMSTANCES'],
+    0.24,
+    0.16,
+  );
+  warning.position.set(0, 0.78, 0.034);
   pedestal.add(warning);
+  for (const y of [0.73, 0.83])
+    add(
+      pedestal,
+      new CylinderGeometry(0.0315, 0.0315, 0.012, 24),
+      bolts,
+      0,
+      y,
+      0,
+    );
   const glow = new PointLight('#ff8a3a', 0, 6 * m);
   glow.position.set(FIRE_SEAT.x * m, 0.8 * m, FIRE_SEAT.z * m);
   scene.add(glow);

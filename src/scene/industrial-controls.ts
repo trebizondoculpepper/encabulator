@@ -4,9 +4,19 @@ import {
   CylinderGeometry,
   DoubleSide,
   Group,
+  LatheGeometry,
   Mesh,
+  TorusGeometry,
+  Vector2,
 } from 'three';
-import type { BufferGeometry, Material, Object3D } from 'three';
+import type {
+  BufferGeometry,
+  Material,
+  MeshStandardMaterial,
+  Object3D,
+} from 'three';
+import { createPs1Material } from '../rendering/ps1-material';
+import { createCanvasTexture } from './screens';
 import { createMicroLabel, kitGlow, kitPaint } from './eighties-controls';
 import type { PanelKit } from './eighties-controls';
 
@@ -66,6 +76,61 @@ export const OPERATOR_COLOURS = {
   yellow: '#e8c215',
 } as const;
 export type OperatorColour = keyof typeof OPERATOR_COLOURS;
+
+/**
+ * The face of an illuminated lens: brightest where the bulb sits behind
+ * it, a little off centre, falling away to the rim, with the faint
+ * concentric rings of a moulded diffuser. It shapes both the lens's colour
+ * and its glow, so a lit lens looks lit from within.
+ */
+function lensTexture(kit: PanelKit) {
+  const size = 128;
+  const { context: c, texture } = createCanvasTexture(size, size);
+  const mid = size / 2;
+  const glow = c.createRadialGradient(mid - 6, mid - 8, 2, mid, mid, mid);
+  glow.addColorStop(0, '#ffffff');
+  glow.addColorStop(0.18, '#f4f4f4');
+  glow.addColorStop(0.55, '#b9b9b9');
+  glow.addColorStop(0.85, '#7a7a7a');
+  glow.addColorStop(1, '#5a5a5a');
+  c.fillStyle = glow;
+  c.fillRect(0, 0, size, size);
+  // The diffuser's rings.
+  for (let r = 6; r < mid; r += 5) {
+    c.strokeStyle = `rgba(0,0,0,${0.05 + (r / mid) * 0.05})`;
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.arc(mid, mid, r, 0, Math.PI * 2);
+    c.stroke();
+  }
+  // The moulded ring at the lens's centre.
+  c.strokeStyle = 'rgba(0,0,0,0.22)';
+  c.lineWidth = 3;
+  c.beginPath();
+  c.arc(mid, mid, size * 0.2, 0, Math.PI * 2);
+  c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.arc(mid - 1, mid - 1, size * 0.2 - 2, 0, Math.PI * 2);
+  c.stroke();
+  // The lamp's hot spot.
+  const spot = c.createRadialGradient(
+    mid - 6,
+    mid - 8,
+    0,
+    mid - 6,
+    mid - 8,
+    14,
+  );
+  spot.addColorStop(0, 'rgba(255,255,255,0.9)');
+  spot.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = spot;
+  c.fillRect(0, 0, size, size);
+  texture.needsUpdate = true;
+  kit.textures.push(texture);
+  return texture;
+}
 
 /** The ring nut every 30 mm device is held by. */
 function ringNut(kit: PanelKit, group: Group) {
@@ -156,12 +221,58 @@ export function createPushButton(
   { head = 'flush' as 'flush' | 'extended' | 'illuminated' } = {},
 ): PushButtonView {
   const group = new Group();
-  ringNut(kit, group);
   const lit = head === 'illuminated';
+  // An illuminated button is a modern 22 mm one, clamped from behind, so
+  // no ring nut shows; the others are 30 mm oiltight devices in theirs.
+  if (!lit) ringNut(kit, group);
   const base = new Color(OPERATOR_COLOURS[colour]);
-  const material = lit
-    ? kitGlow(kit, base.clone().multiplyScalar(0.45).getStyle())
-    : kitPaint(kit, OPERATOR_COLOURS[colour]);
+  // An illuminated cap is a glossy, translucent lens: shaded like the rest
+  // of the panel, and glowing from within when its lamp is on.
+  const lens = lit
+    ? (() => {
+        const face = lensTexture(kit);
+        return createPs1Material({
+          color: base.clone().multiplyScalar(0.55),
+          map: face,
+          roughness: 0.15,
+          emissive: base,
+          emissiveMap: face,
+          emissiveIntensity: 0,
+        }) as MeshStandardMaterial;
+      })()
+    : null;
+  if (lens) kit.materials.push(lens);
+  const material = lens ?? kitPaint(kit, OPERATOR_COLOURS[colour]);
+  if (lit) {
+    // Copied from Schneider's Harmony XB4 illuminated push button
+    // (XB4BW34M5, datasheet dimensions): a chromed metal bezel about 30 mm
+    // across, standing about 10 mm proud of the panel, its sides tapering
+    // to a rounded lip round a flush, faintly domed lens, the whole head
+    // 13.5 mm deep.
+    const chrome = kitPaint(kit, '#d2d5d5', 0.9);
+    chrome.side = DoubleSide;
+    const profile = [
+      [0.0124, 0.0098],
+      [0.0131, 0.0106],
+      [0.0139, 0.0103],
+      [0.0144, 0.0094],
+      [0.0147, 0.006],
+      [0.015, 0.0015],
+      [0.015, 0],
+    ].map(([r, z]) => new Vector2(r, z));
+    const bezel = add(group, new LatheGeometry(profile, 40), chrome);
+    // The lathe turns about y; stand it out of the panel along +z.
+    bezel.rotation.x = Math.PI / 2;
+    // The dark gap between lens and bezel.
+    add(
+      group,
+      new TorusGeometry(0.01235, 0.0004, 6, 40),
+      kitPaint(kit, '#141414'),
+      0,
+      0,
+      0.0099,
+    );
+  }
   // A guard ring stands round a flush head, so it is hard to press by accident.
   if (head === 'flush') {
     const guard = kitPaint(kit, '#18181a');
@@ -178,9 +289,18 @@ export function createPushButton(
   }
   const cap = new Group();
   group.add(cap);
-  const capDepth = head === 'extended' ? 0.012 : 0.008;
-  disc(cap, 0.0125, capDepth, material, 0, 24, 0.0122);
-  const rest = 0.006 + (head === 'flush' ? -0.002 : 0);
+  const capDepth = head === 'extended' ? 0.012 : lit ? 0.007 : 0.008;
+  // A lens sits in its bezel, faintly domed; a plain cap is nearly flat.
+  disc(
+    cap,
+    lit ? 0.0123 : 0.0125,
+    capDepth,
+    material,
+    0,
+    40,
+    lit ? 0.0117 : 0.0122,
+  );
+  const rest = lit ? 0.0035 : 0.006 + (head === 'flush' ? -0.002 : 0);
   cap.position.z = rest;
   const litColour = base.clone().lerp(new Color('#ffffff'), 0.25);
   const darkColour = base.clone().multiplyScalar(0.45);
@@ -192,10 +312,9 @@ export function createPushButton(
       held = 0.18;
     },
     setLit(on) {
-      if (lit)
-        (material as unknown as { color: Color }).color.copy(
-          on ? litColour : darkColour,
-        );
+      if (!lens) return;
+      lens.color.copy(on ? litColour : darkColour);
+      lens.emissiveIntensity = on ? 1.8 : 0;
     },
     update(delta) {
       held = Math.max(0, held - delta);
