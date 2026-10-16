@@ -1,15 +1,29 @@
 import type { PerspectiveCamera } from 'three';
 import { slide } from '../game/walk-collision';
 import type { Footprint } from '../game/walk-collision';
+import { PAD, controlsHelp, deadZone } from '../game/controls';
+import type { InputMode } from '../game/controls';
+import { turningKnobs } from '../scene/rotary-knob';
+import { createTouchSticks } from '../ui/touch-sticks';
 
 /**
  * First-person walking, as in any PC shooter, with the same feel as the
  * lab: click to capture the mouse and look around, WASD or the arrow keys
  * to walk, Shift to run, C to crouch, V to crouch lower, click or E to use
- * whatever is under the crosshair, the wheel to step, Alt+wheel to change
+ * whatever is under the crosshair, the wheel to zoom, Alt+wheel to change
  * eye height and Escape to get the cursor back. Where the browser refuses
  * to capture the mouse, dragging looks around and clicking uses whatever
  * is under the cursor.
+ *
+ * This is the game's one control scheme (`src/game/controls.ts`), the
+ * same in every room: rooms never bind a control themselves. On a touch
+ * screen, two on-screen thumbsticks, the left to walk (to the rim to run)
+ * and the right to look; a drag anywhere else looks too, a tap uses what
+ * it touches, a two-finger pinch zooms and a button crouches. On a
+ * gamepad, the left stick walks (click it to run), the right stick looks,
+ * A uses, LB and RB turn a knob down and up, the triggers zoom and B
+ * crouches. A help line at the foot of the screen gives the controls for
+ * the input in use.
  *
  * The numbers match the lab's walker in `start-scene.ts`; keep the two in
  * step if either changes.
@@ -39,6 +53,21 @@ export function wheelZoom(zoom: number, deltaY: number, deltaMode: number) {
     MIN_ZOOM,
     Math.min(MAX_ZOOM, zoom * Math.exp(-step * 0.0015)),
   );
+}
+
+/** How fast a look stick turns the head at full deflection, rad/s. */
+export const TOUCH_LOOK_RADIANS_PER_SECOND = 2.2;
+/** A walk stick pushed this far, or further, runs. */
+export const RUN_DEFLECTION = 0.95;
+
+/**
+ * Zoom under a two-finger pinch: the zoom when the fingers came down,
+ * scaled by how far apart they are now against how far apart they were,
+ * within the zoom limits.
+ */
+export function pinchZoom(zoom: number, from: number, to: number) {
+  if (from <= 0 || to <= 0) return zoom;
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, (zoom * to) / from));
 }
 
 const WALK_KEYS = new Set([
@@ -147,6 +176,45 @@ export function createFirstPerson(options: FirstPersonOptions) {
   canvas.parentElement?.append(movement);
 
   const locked = () => document.pointerLockElement === canvas;
+
+  // Touch: twin thumbsticks and a crouch button, shown while the last
+  // input was a finger.
+  const container = canvas.parentElement;
+  const sticks = container ? createTouchSticks(container) : null;
+  const crouchButton = document.createElement('button');
+  crouchButton.type = 'button';
+  crouchButton.className = 'touch-crouch';
+  crouchButton.textContent = 'CROUCH';
+  crouchButton.addEventListener('click', () => {
+    walker.crouched = !walker.crouched;
+    walker.lowCrouched = false;
+  });
+  container?.append(crouchButton);
+  // The controls for the input in use, at the foot of the screen.
+  const help = document.createElement('div');
+  help.className = 'controls-help';
+  help.setAttribute('aria-live', 'polite');
+  container?.append(help);
+  let input: InputMode | undefined;
+  const setInput = (mode: InputMode) => {
+    if (!container || input === mode) return;
+    input = mode;
+    container.dataset.input = mode;
+    movement.style.display = mode === 'mouse' ? 'flex' : 'none';
+    help.textContent = controlsHelp(mode);
+    crosshair.hidden = !(locked() || mode === 'gamepad');
+    if (mode !== 'touch') sticks?.reset();
+  };
+  setInput(
+    typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches
+      ? 'touch'
+      : 'mouse',
+  );
+  const noticeInput = (event: PointerEvent) =>
+    setInput(event.pointerType === 'mouse' ? 'mouse' : 'touch');
+  // Safari's own pinch would zoom the page; the pinch here zooms the view.
+  const stopGesture = (event: Event) => event.preventDefault();
+
   const typing = (event: Event) =>
     event.target instanceof HTMLInputElement ||
     event.target instanceof HTMLTextAreaElement ||
@@ -159,6 +227,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (typing(event)) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (WALK_KEYS.has(event.code)) {
+      setInput('mouse');
       keys.add(event.code);
       tapped.add(event.code);
       if (event.code.startsWith('Arrow')) event.preventDefault();
@@ -181,13 +250,14 @@ export function createFirstPerson(options: FirstPersonOptions) {
   };
   const look = (event: MouseEvent) => {
     if (!locked()) return;
+    setInput('mouse');
     // Looking slows as the view zooms in, so small controls stay easy to aim at.
     const rate = LOOK_RADIANS_PER_PIXEL / walker.zoom;
     walker.yaw += event.movementX * rate;
     walker.pitch = clampPitch(walker.pitch - event.movementY * rate);
   };
   const lockChange = () => {
-    crosshair.hidden = !locked();
+    crosshair.hidden = !(locked() || input === 'gamepad');
     if (!locked()) forget();
   };
   const refuseLock = () => {
@@ -209,7 +279,25 @@ export function createFirstPerson(options: FirstPersonOptions) {
       -((event.clientY - rect.top) / rect.height) * 2 + 1,
     ];
   };
+  // Fingers on the canvas, for the pinch.
+  const fingers = new Map<number, { x: number; y: number }>();
+  let pinch: { distance: number; zoom: number } | null = null;
+  const spread = () => {
+    const [a, b] = [...fingers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
   const down = (event: PointerEvent) => {
+    if (event.pointerType === 'touch') {
+      fingers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      canvas.setPointerCapture(event.pointerId);
+      if (fingers.size === 2) {
+        // A second finger turns the drag into a pinch.
+        drag = null;
+        pinch = { distance: spread(), zoom: walker.zoom };
+        return;
+      }
+      if (fingers.size > 2) return;
+    }
     if (event.pointerType === 'mouse' && !lockRefused) {
       if (event.button !== 0) return;
       if (locked()) options.use(0, 0);
@@ -226,6 +314,15 @@ export function createFirstPerson(options: FirstPersonOptions) {
     };
   };
   const move = (event: PointerEvent) => {
+    const finger = fingers.get(event.pointerId);
+    if (finger) {
+      finger.x = event.clientX;
+      finger.y = event.clientY;
+      if (pinch && fingers.size >= 2) {
+        walker.zoom = pinchZoom(pinch.zoom, pinch.distance, spread());
+        return;
+      }
+    }
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
@@ -235,13 +332,16 @@ export function createFirstPerson(options: FirstPersonOptions) {
     walker.pitch = clampPitch(drag.pitch + (dy * 0.003) / walker.zoom);
   };
   const up = (event: PointerEvent) => {
+    fingers.delete(event.pointerId);
+    // After a pinch, the fingers left behind neither look nor use.
+    if (fingers.size < 2) pinch = null;
     if (!drag) return;
     if (!drag.moved) options.use(...screenPoint(event));
     drag = null;
   };
-  // The wheel zooms. Alt+wheel raises and lowers the eye, and a swipe that
-  // is clearly sideways steps sideways. A trackpad pinch arrives as
-  // Ctrl+wheel, so it zooms too instead of zooming the page.
+  // The wheel zooms and Alt+wheel raises and lowers the eye. A trackpad
+  // pinch arrives as Ctrl+wheel, so it zooms too instead of zooming the
+  // page.
   const wheel = (event: WheelEvent) => {
     event.preventDefault();
     const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
@@ -253,10 +353,6 @@ export function createFirstPerson(options: FirstPersonOptions) {
           walker.eyeOffset - event.deltaY * scale * 0.004 * metre,
         ),
       );
-      return;
-    }
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) * 2) {
-      nudge.right += event.deltaX * scale * 0.005 * metre;
       return;
     }
     walker.zoom = wheelZoom(walker.zoom, event.deltaY, event.deltaMode);
@@ -273,6 +369,56 @@ export function createFirstPerson(options: FirstPersonOptions) {
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
   canvas.addEventListener('wheel', wheel, { passive: false });
+  container?.addEventListener('pointerdown', noticeInput, { capture: true });
+  container?.addEventListener('gesturestart', stopGesture);
+
+  // The gamepad, read each frame: sticks, triggers, and buttons acted on
+  // as they go down.
+  const pressed = new Set<number>();
+  let padRun = false;
+  const idle = {
+    move: { x: 0, y: 0 },
+    look: { x: 0, y: 0 },
+    zoom: 0,
+    run: false,
+  };
+  const readGamepad = () => {
+    if (canvas.parentElement?.hidden) return idle;
+    const pad =
+      typeof navigator !== 'undefined' && navigator.getGamepads
+        ? [...navigator.getGamepads()].find((p) => p?.mapping === 'standard')
+        : undefined;
+    if (!pad) return idle;
+    const axis = (i: number) => pad.axes[i] ?? 0;
+    const button = (i: number) => pad.buttons[i]?.value ?? 0;
+    const move = deadZone(axis(0), axis(1));
+    const look = deadZone(axis(2), axis(3));
+    const zoom = button(PAD.zoomIn) - button(PAD.zoomOut);
+    const went = (i: number) => {
+      const down = (pad.buttons[i]?.pressed ?? false) === true;
+      const was = pressed.has(i);
+      if (down) pressed.add(i);
+      else pressed.delete(i);
+      return down && !was;
+    };
+    const active =
+      Math.hypot(move.x, move.y) > 0 ||
+      Math.hypot(look.x, look.y) > 0 ||
+      Math.abs(zoom) > 0.05 ||
+      pad.buttons.some((b) => b.pressed);
+    if (active) setInput('gamepad');
+    if (went(PAD.use)) options.use(0, 0);
+    if (went(PAD.knobDown)) turningKnobs(-1, () => options.use(0, 0));
+    if (went(PAD.knobUp)) turningKnobs(1, () => options.use(0, 0));
+    if (went(PAD.crouch)) {
+      walker.crouched = !walker.crouched;
+      walker.lowCrouched = false;
+    }
+    // A click of the walk stick runs until the stick comes back to centre.
+    if (went(PAD.run)) padRun = true;
+    if (!Math.hypot(move.x, move.y)) padRun = false;
+    return { move, look, zoom, run: padRun };
+  };
 
   const eyeY = floorY + EYE_HEIGHT_METRES * metre;
   return {
@@ -285,19 +431,45 @@ export function createFirstPerson(options: FirstPersonOptions) {
       walker.yaw = yaw;
       walker.pitch = clampPitch(pitch);
       walker.eyeOffset = y - eyeY;
+      sticks?.reset();
     },
     /** Walk and look for `delta` seconds, then place the camera. */
     update(delta: number) {
+      const pad = readGamepad();
       const held = (...codes: string[]) =>
         codes.some((code) => keys.has(code) || tapped.has(code));
+      // The keys and the walk stick add; the stick's push sets the pace.
       const ahead =
-        (held('KeyW', 'ArrowUp') ? 1 : 0) - (held('KeyS', 'ArrowDown') ? 1 : 0);
+        (held('KeyW', 'ArrowUp') ? 1 : 0) -
+        (held('KeyS', 'ArrowDown') ? 1 : 0) -
+        (sticks?.move.y ?? 0) -
+        pad.move.y;
       const aside =
         (held('KeyD', 'ArrowRight') ? 1 : 0) -
-        (held('KeyA', 'ArrowLeft') ? 1 : 0);
+        (held('KeyA', 'ArrowLeft') ? 1 : 0) +
+        (sticks?.move.x ?? 0) +
+        pad.move.x;
+      if (sticks) {
+        // The look stick turns the head, slower as the view zooms in.
+        const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
+        walker.yaw += sticks.look.x * turn;
+        walker.pitch = clampPitch(walker.pitch - sticks.look.y * turn * 0.75);
+      }
+      {
+        const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
+        walker.yaw += pad.look.x * turn;
+        walker.pitch = clampPitch(walker.pitch - pad.look.y * turn * 0.75);
+        if (pad.zoom)
+          walker.zoom = Math.max(
+            MIN_ZOOM,
+            Math.min(MAX_ZOOM, walker.zoom * Math.exp(pad.zoom * 1.5 * delta)),
+          );
+      }
+      const stickRun =
+        Math.hypot(sticks?.move.x ?? 0, sticks?.move.y ?? 0) >= RUN_DEFLECTION;
       const length = Math.max(1, Math.hypot(ahead, aside));
       const speed =
-        (held('ShiftLeft', 'ShiftRight')
+        (held('ShiftLeft', 'ShiftRight') || stickRun || pad.run
           ? RUN_METRES_PER_SECOND
           : WALK_METRES_PER_SECOND) *
         metre *
@@ -355,9 +527,16 @@ export function createFirstPerson(options: FirstPersonOptions) {
       canvas.removeEventListener('pointerup', up);
       canvas.removeEventListener('pointercancel', up);
       canvas.removeEventListener('wheel', wheel);
+      container?.removeEventListener('pointerdown', noticeInput, {
+        capture: true,
+      });
+      container?.removeEventListener('gesturestart', stopGesture);
+      sticks?.dispose();
       if (locked()) document.exitPointerLock();
       crosshair.remove();
       movement.remove();
+      crouchButton.remove();
+      help.remove();
     },
   };
 }

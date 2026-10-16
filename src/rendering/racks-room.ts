@@ -494,7 +494,7 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
   });
   const notes = document.createElement('div');
   notes.textContent =
-    'DEV3 · Racks: rack cabinets and rack-mount units to catalogue dimensions · Portals: dev2 west, dev6 east · WASD: walk · Esc: cursor';
+    'DEV3 · Racks: rack cabinets and rack-mount units to catalogue dimensions · Portals: dev2 west, dev6 east';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

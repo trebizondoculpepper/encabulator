@@ -690,8 +690,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
 
   const notes = document.createElement('div');
   notes.id = 'hall-notes';
-  notes.textContent =
-    "The Hall · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
+  notes.textContent = 'The Hall · the console desk sets materials and light';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

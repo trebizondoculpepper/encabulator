@@ -13,8 +13,25 @@ export function mountRotaryKnob(body: Object3D, marker: Object3D) {
   return pivot;
 }
 
+/** A direction a gamepad's shoulder button gives a knob, while it uses one. */
+let given: -1 | 1 | null = null;
+
+/**
+ * Use something with a knob's direction given, as a gamepad's LB and RB
+ * do: inside `act`, every knob turns `direction`, wherever it was aimed.
+ */
+export function turningKnobs(direction: -1 | 1, act: () => void) {
+  given = direction;
+  try {
+    act();
+  } finally {
+    given = null;
+  }
+}
+
 /** Screen left/right stays correct even when the panel or knob is rotated. */
 export function knobDirection(shaft: Object3D, point: Vector3, camera: Camera) {
+  if (given) return given;
   const centre = shaft.getWorldPosition(new Vector3()).project(camera);
   return point.clone().project(camera).x < centre.x ? -1 : 1;
 }

@@ -1185,8 +1185,7 @@ export function startEffectsRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.innerHTML =
     '<strong>Effects room</strong> · not part of the game · the console is in front of you<br>' +
-    'Click: mouse look · WASD: walk · Shift: run · C: crouch · wheel: zoom · Esc: cursor<br>' +
-    'Click a knob’s left or right half to turn it down or up · RECORD prints and saves the settings<br>' +
+    'RECORD prints and saves the settings<br>' +
     'Doors: dev0 west · dev2 east · <a href="?room=dev0">controls and displays</a> · <a href="?room=dev2">hallucinations</a>';
   Object.assign(notes.style, {
     position: 'absolute',

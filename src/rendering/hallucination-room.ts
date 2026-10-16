@@ -1234,11 +1234,10 @@ export function startHallucinationRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.innerHTML =
     '<strong>Hallucination room</strong> · not part of the game · the console is in front of you<br>' +
-    'Click: mouse look · WASD: walk · Shift: run · C: crouch · wheel: zoom · Esc: cursor<br>' +
     'APPARITION: turn up RATE, or press SUMMON, then turn about: they wait at the edge of sight and fade when looked at<br>' +
     'GHOSTING: turn up STRENGTH, hold still a moment, then turn: what you saw stays on your eyes, fading and blurring<br>' +
     'PATTERNS: turn up STRENGTH: kaleidoscopic geometry worked into the room (MODE: XOR, AND or colour BURN), never into apparitions or ghosts<br>' +
-    'Door: dev1 west · <a href="?room=dev0">controls and displays</a> · <a href="?room=dev1">effects room</a>';
+    'Portals: dev1 west · dev3 east · <a href="?room=dev0">controls and displays</a> · <a href="?room=dev1">effects room</a>';
   Object.assign(notes.style, {
     position: 'absolute',
     left: '12px',

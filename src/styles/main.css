@@ -299,11 +299,59 @@ canvas {
   mix-blend-mode: normal;
 }
 
+/* The controls help line, the same in every room (src/game/controls.ts). */
+.controls-help {
+  position: absolute;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 440px);
+  padding: 4px 8px;
+  background: #20302bcc;
+  color: #e8e2cc;
+  font: 11px monospace;
+  text-align: center;
+  pointer-events: none;
+}
+[data-input='touch'] > .controls-help {
+  max-width: calc(100% - 340px);
+}
+[data-input='gamepad'] > .controls-help {
+  max-width: calc(100% - 24px);
+}
+@media (max-width: 700px) {
+  .controls-help {
+    max-width: calc(100% - 24px);
+    bottom: auto;
+    top: 52px;
+  }
+}
+
+/* The touch crouch button, above the walk stick. */
+.touch-crouch {
+  display: none;
+  position: absolute;
+  left: max(44px, env(safe-area-inset-left));
+  bottom: calc(max(28px, env(safe-area-inset-bottom)) + 144px);
+  padding: 10px 14px;
+  border-radius: 20px;
+  border: 2px solid #bca575aa;
+  background: #292d29cc;
+  color: #e8e2cc;
+  font: bold 12px monospace;
+  touch-action: manipulation;
+}
+[data-input='touch'] > .touch-crouch {
+  display: block;
+}
+
 /* Twin thumbsticks for touch input. */
 .touch-sticks {
   display: none;
 }
-.rack-ui[data-input='touch'] .touch-sticks {
+.rack-ui[data-input='touch'] .touch-sticks,
+[data-input='touch'] > .touch-sticks {
   display: block;
 }
 .touch-stick {

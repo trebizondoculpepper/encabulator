@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { MAX_ZOOM, MIN_ZOOM, wheelZoom } from './first-person';
+import { MAX_ZOOM, MIN_ZOOM, pinchZoom, wheelZoom } from './first-person';
 
 describe('wheel zoom', () => {
   it('zooms in when scrolling up and out when scrolling down', () => {
@@ -26,5 +26,22 @@ describe('wheel zoom', () => {
     expect(zoom).toBe(MAX_ZOOM);
     for (let i = 0; i < 2000; i++) zoom = wheelZoom(zoom, 4, 0);
     expect(zoom).toBe(MIN_ZOOM);
+  });
+});
+
+describe('pinch zoom', () => {
+  it('zooms in as the fingers spread and out as they close', () => {
+    expect(pinchZoom(1, 100, 200)).toBeCloseTo(2);
+    expect(pinchZoom(2, 200, 100)).toBeCloseTo(1);
+  });
+
+  it('stays within its limits', () => {
+    expect(pinchZoom(1, 10, 1000)).toBe(MAX_ZOOM);
+    expect(pinchZoom(1, 1000, 10)).toBe(MIN_ZOOM);
+  });
+
+  it('ignores fingers on top of one another', () => {
+    expect(pinchZoom(1.5, 0, 100)).toBe(1.5);
+    expect(pinchZoom(1.5, 100, 0)).toBe(1.5);
   });
 });
