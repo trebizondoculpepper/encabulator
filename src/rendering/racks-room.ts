@@ -32,7 +32,6 @@ import {
   DEPTHS,
   createCabinetSuite,
   createRackCabinet,
-  createRackUnit,
   createRelayRack,
 } from '../scene/rack-equipment';
 import type {
@@ -41,6 +40,8 @@ import type {
   RackUnitView,
 } from '../scene/rack-equipment';
 import { createFirstPerson } from './first-person';
+import { createPartSet, rackUnit } from './parts';
+import { partAudio } from '../audio/part-audio';
 import { createPs1Material, ps1Uniforms } from './ps1-material';
 
 /** A unit to fit, and the rack unit its bottom sits at. */
@@ -67,6 +68,7 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
   };
   const height = 3.6;
   const scene = new Scene();
+  const parts = createPartSet();
   const renderer = createRenderer(canvas);
   const freeEnvironment = useEnvironment(renderer, scene, 0.35);
   renderer.setClearColor('#262827');
@@ -145,9 +147,10 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     fits: Fit[],
   ) => {
     for (const [at, options] of fits) {
-      const unit = createRackUnit(kit, options);
-      dress(kit, unit, options);
-      mount(unit, at);
+      // Every unit is a part: a click runs it out of its rack and back.
+      const unit = parts.add(rackUnit(kit, options));
+      dress(kit, unit.view, options);
+      mount(unit.view, at);
     }
   };
 
@@ -380,11 +383,11 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     group.add(block);
     let y = h;
     for (const [lift, options] of units) {
-      const unit = createRackUnit(kit, options);
-      dress(kit, unit, options);
+      const unit = parts.add(rackUnit(kit, options));
+      dress(kit, unit.view, options);
       // Loose, a unit stands back from the plinth's front edge.
-      unit.group.position.set(0, y + lift, 0.02);
-      group.add(unit.group);
+      unit.object.position.set(0, y + lift, 0.02);
+      group.add(unit.object);
       y += options.u * 0.04445 + lift;
     }
     const plate = createNameplate(kit, title, { width: 0.36, height: 0.06 });
@@ -454,7 +457,7 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     [0.004, { u: 2, style: 'handles', colour: 'white', label: 'MODEL 120' }],
   ]);
 
-  // Walking and looking; nothing here takes a click.
+  // Walking and looking; the units take a click.
   const views: Record<
     string,
     { x: number; z: number; yaw: number; pitch: number }
@@ -473,11 +476,20 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     start: views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ?? { x: 0, z: 5 * m, yaw: 0 },
     solids: () => [...walls, ...footprints],
-    // A click on a portal travels, as walking into it does.
+    // A click on a portal travels, as walking into it does; on a unit,
+    // runs it out of its rack or back.
     use: (x, y) => {
       raycaster.setFromCamera(pointer.set(x, y), camera);
-      const hit = raycaster.intersectObjects([...portals.uses.keys()], true)[0];
-      if (hit) portals.uses.get(hit.object as Mesh)?.();
+      const hit = raycaster.intersectObjects(scene.children, true)[0];
+      if (!hit || hit.distance > 3.2 * m) return;
+      if (portals.uses.has(hit.object as Mesh)) {
+        portals.uses.get(hit.object as Mesh)?.();
+        return;
+      }
+      for (let o: Object3D | null = hit.object; o; o = o.parent) {
+        const work = parts.uses.get(o);
+        if (work) return work();
+      }
     },
   });
   const notes = document.createElement('div');
@@ -533,7 +545,9 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
+    parts.update(delta);
     portals.update(delta, walk.walker.x, walk.walker.z);
+    partAudio.listen(camera, m);
     renderer.render(scene, camera);
   });
   const dispose = () => {
@@ -541,6 +555,7 @@ export function startRacksRoom(canvas: HTMLCanvasElement) {
     observer.disconnect();
     walk.dispose();
     portals.dispose();
+    parts.dispose();
     notes.remove();
     disposeKit(kit, scene as unknown as Group);
     scene.traverse((object) => {

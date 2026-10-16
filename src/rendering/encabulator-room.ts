@@ -22,6 +22,8 @@ import {
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
 import { createFirstPerson } from './first-person';
+import { knobDirection } from '../scene/rotary-knob';
+import { partAudio } from '../audio/part-audio';
 import { createPs1Material, ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
@@ -118,23 +120,31 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   ];
   const raycaster = new Raycaster();
   const pointer = new Vector2();
-  const use = (x: number, y: number) => {
+  /** What a click at (x, y) on the screen would work, if anything in reach. */
+  const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
     const hit = raycaster.intersectObjects([portals.group, mcc.group], true)[0];
-    if (!hit || hit.distance > 3.2 * m) return;
-    let object: Object3D | null = hit.object;
-    while (object) {
+    if (!hit || hit.distance > 3.2 * m) return null;
+    for (
+      let object: Object3D | null = hit.object;
+      object;
+      object = object.parent
+    ) {
       if (portals.uses.has(object as Mesh)) {
-        portals.uses.get(object as Mesh)?.();
-        return;
+        const work = portals.uses.get(object as Mesh);
+        return () => work?.();
       }
-      if (mcc.doors.has(object)) {
-        mcc.doors.get(object)?.();
-        return;
+      // Each part says what a click on it does: a latch opens its door,
+      // a button presses. Nothing else on a door takes a click.
+      const work = mcc.parts.uses.get(object);
+      if (work) {
+        const at = object;
+        return () => work(knobDirection(at, hit.point, camera));
       }
-      object = object.parent;
     }
+    return null;
   };
+  const use = (x: number, y: number) => usableAt(x, y)?.();
   const params = new URLSearchParams(location.search);
   const views: Record<
     string,
@@ -155,6 +165,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
       views.lineup,
     solids: () => [...walls, ...footprints],
     use,
+    aimed: () => Boolean(usableAt(0, 0)),
   });
   const resize = () => {
     const { width, height: tall } = canvas.getBoundingClientRect();
@@ -169,7 +180,23 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   resize();
   (window as unknown as { devEncabulator: unknown }).devEncabulator = {
     openAll: mcc.openAll,
-    doors: () => mcc.doors.size,
+    /** Stand with the eye at (x, y, z), looking at (tx, ty, tz), in metres. */
+    view(x: number, y: number, z: number, tx: number, ty: number, tz: number) {
+      const dx = tx - x;
+      const dz = tz - z;
+      walk.place(
+        x * m,
+        z * m,
+        Math.atan2(dx, -dz),
+        Math.atan2(ty - y, Math.hypot(dx, dz)),
+        y * m,
+      );
+    },
+    /** Open or shut one unit's door, as its latch would. */
+    door: (index: number) => mcc.door(index),
+    /** Click at (x, y) on the screen, -1 to 1 each way, as the player would. */
+    click: (x: number, y: number) => use(x, y),
+    doors: () => mcc.doorCount,
   };
   let last = 0;
   renderer.setAnimationLoop((time) => {
@@ -182,6 +209,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     mcc.update(delta);
+    partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
     renderer.render(scene, camera);
   });
@@ -190,6 +218,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     observer.disconnect();
     walk.dispose();
     portals.dispose();
+    mcc.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.traverse((object) => {
       if (object instanceof Mesh) object.geometry.dispose();
@@ -201,6 +230,8 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     delete (window as unknown as { devEncabulator?: unknown }).devEncabulator;
   };
   return Object.assign(dispose, {
+    suspend: () => mcc.parts.setAudible(false),
+    resume: () => mcc.parts.setAudible(true),
     enter(previous: string | null) {
       const view =
         views[new URLSearchParams(location.search).get('view') ?? ''];

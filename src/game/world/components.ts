@@ -20,12 +20,11 @@ import type { ReadonlySignal } from '@preact/signals-core';
  *   only an operation writes to the world.
  * - **Setting** it from the model moves it silently: no sound, no write
  *   back, so the world and the part cannot drive each other in circles.
- * - **Sounds** come in two kinds. A *transition* sound plays once when the
- *   part does something (`press`, `on`, `off`, `detent`, `end-stop`,
- *   `refused`); a *state* sound is held for as long as the part's state
- *   calls for it (a hum while on, a buzz while lit). A part may name its
- *   own sound for either; otherwise the room uses its default for that
- *   kind of part, and plays it where the part is.
+ * - **Events**: a component says what it did (`press`, `on`, `off`,
+ *   `detent`, `end-stop`, `refused`, `trip`, `pull-in`, `blow`, ...). Its
+ *   sounds are its part's (`src/rendering/parts.ts`), which defines them
+ *   beside it and plays them where it stands; no room chooses them. The
+ *   optional named `sounds` here remain for a component used on its own.
  * - **Self-acting parts** (a contactor, a breaker's trip, a fuse, a
  *   capacitor) are moved by what flows through them, not by a hand. They
  *   follow their state, whatever moved it, and sound as they act: a

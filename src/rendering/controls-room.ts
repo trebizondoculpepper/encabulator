@@ -12,48 +12,20 @@ import {
 import type { Object3D } from 'three';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
-import type { PartEvent } from '../game/world/components';
 import { METRE } from '../game/units';
 import { createPortals } from '../scene/portals';
 import { createPanelKit, disposeKit } from '../scene/eighties-controls';
 import { knobDirection } from '../scene/rotary-knob';
-import { createControlSounds } from '../audio/control-sounds';
-import type { ControlSound, ControlSounds } from '../audio/control-sounds';
-import { createPartLoops } from '../audio/part-loops';
+import { partAudio } from '../audio/part-audio';
 import { createFirstPerson } from './first-person';
 import { createPs1Material, ps1Uniforms } from './ps1-material';
-import { createControlsBoard, createDisplaysBoard } from './test-boards';
+import {
+  createCabinetBoard,
+  createControlsBoard,
+  createDisplaysBoard,
+} from './test-boards';
 import type { TestFitting } from './test-boards';
 import { createPedestals, PEDESTAL_WIDTH } from './device-pedestals';
-
-/** The sounds that a part's own events make, whatever kind of part it is. */
-const EVENT_SOUNDS: Partial<Record<PartEvent, ControlSound | null>> = {
-  refused: 'locked',
-  'end-stop': null,
-  trip: 'trip',
-  'pull-in': 'pull-in',
-  'drop-out': 'drop-out',
-  blow: 'blow',
-  bulge: 'bulge',
-  vent: 'vent',
-  release: 'mushroom',
-};
-/** The sound each kind of part makes doing anything else. */
-const PART_SOUNDS: Record<string, ControlSound | null> = {
-  button: 'button',
-  key: 'key',
-  selector: 'selector',
-  knob: 'knob',
-  'key-switch': 'key-switch',
-  mushroom: 'mushroom',
-  handle: 'handle',
-  door: 'isolator',
-  overload: 'button',
-  fuse: 'key-switch',
-  capacitor: 'key-switch',
-  contactor: null,
-  motor: null,
-};
 
 /**
  * Dev0, Controls and Displays: the kinds of controls, displays and working
@@ -163,6 +135,16 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     0,
     boardFootprint(2.4, 3.2),
   );
+  // The cabinet fittings on the east wall, facing west: tried here first,
+  // then fitted to the Retro Encabulator (dev6).
+  const cabinetX = half.x - 0.25;
+  const cabinetZ = -0.9;
+  place(createCabinetBoard(kit), cabinetX, 1.55, cabinetZ, -Math.PI / 2, {
+    minX: (cabinetX - 0.1) * m,
+    maxX: half.x * m,
+    minZ: (cabinetZ - 1.75) * m,
+    maxZ: (cabinetZ + 1.75) * m,
+  });
   const pedestalZ = half.z - 1.9;
   createPedestals(kit).forEach((pedestal, i) => {
     const x = -4.6 + i * 1.6;
@@ -204,13 +186,14 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     console.info(`dev0: ${item.textContent}`);
   };
 
-  // The parts' own sounds. Browsers allow sound only after a gesture.
-  let audio: AudioContext | null = null;
-  let resumeAudio = false;
-  let sounds: ControlSounds | null = null;
+  // The parts make their own sounds; this only mutes them all.
   const soundButton = document.createElement('button');
   soundButton.type = 'button';
-  soundButton.textContent = 'Sound: off';
+  const label = () =>
+    (soundButton.textContent = partAudio.muted()
+      ? 'Sound: muted'
+      : 'Sound: on (click to mute)');
+  label();
   Object.assign(soundButton.style, {
     position: 'absolute',
     right: '12px',
@@ -219,40 +202,15 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     padding: '4px 10px',
     cursor: 'pointer',
   });
-  const loops = createPartLoops();
+  soundButton.addEventListener('click', () => {
+    partAudio.setMuted(!partAudio.muted());
+    label();
+  });
   const uses = new Map<Object3D, (direction?: number) => void>();
   for (const fitting of fittings) {
-    for (const [object, use] of fitting.uses) uses.set(object, use);
-    fitting.onHeld((sound, from) => loops.hold(from.uuid, sound));
-    fitting.onSound((event, sound, part, from) => {
-      let name = from.name;
-      for (let p = from.parent; !name && p; p = p.parent) name = p.name;
-      report(name || part, event);
-      if (sound === null) return;
-      const kind =
-        (sound as ControlSound | undefined) ??
-        (event in EVENT_SOUNDS ? EVENT_SOUNDS[event] : PART_SOUNDS[part]);
-      if (kind) sounds?.play(kind);
-    });
+    for (const [object, use] of fitting.parts.uses) uses.set(object, use);
+    fitting.parts.onEvent((event, name) => report(name, event));
   }
-  soundButton.addEventListener('click', () => {
-    void loops.unlock();
-    if (!audio) {
-      audio = new AudioContext();
-      sounds = createControlSounds(audio);
-      sounds.output.connect(audio.destination);
-    } else if (audio.state === 'running') {
-      void audio.suspend();
-      loops.setMuted(true);
-    } else {
-      void audio.resume();
-      loops.setMuted(false);
-    }
-    window.setTimeout(() => {
-      soundButton.textContent =
-        audio?.state === 'running' ? 'Sound: on (click to mute)' : 'Sound: off';
-    }, 50);
-  });
   canvas.parentElement?.append(soundButton);
 
   const raycaster = new Raycaster();
@@ -283,6 +241,12 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   > = {
     controls: { x: -3 * m, z: (boardZ + 2.2) * m, yaw: 0, pitch: -0.12 },
     displays: { x: 2.4 * m, z: (boardZ + 2.2) * m, yaw: 0, pitch: -0.12 },
+    cabinet: {
+      x: (cabinetX - 2.6) * m,
+      z: cabinetZ * m,
+      yaw: Math.PI / 2,
+      pitch: -0.1,
+    },
     pedestals: {
       x: -0.6 * m,
       z: (pedestalZ - 2.6) * m,
@@ -383,6 +347,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     passages.update(delta, walk.walker.x, walk.walker.z);
     for (const fitting of fittings)
       fitting.update(time / 1000, delta, reducedMotion?.matches ?? false);
+    partAudio.listen(camera, m);
     renderer.render(scene, camera);
   });
   const dispose = () => {
@@ -393,9 +358,6 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     notes.remove();
     log.remove();
     soundButton.remove();
-    sounds?.dispose();
-    void audio?.close();
-    loops.dispose();
     for (const fitting of fittings) {
       fitting.dispose();
       disposeKit(kit, fitting.group);
@@ -410,13 +372,10 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   };
   return Object.assign(dispose, {
     suspend() {
-      resumeAudio = audio?.state === 'running';
-      if (resumeAudio) void audio?.suspend();
-      loops.setVisible(false);
+      for (const fitting of fittings) fitting.parts.setAudible(false);
     },
     resume() {
-      if (resumeAudio) void audio?.resume();
-      loops.setVisible(true);
+      for (const fitting of fittings) fitting.parts.setAudible(true);
     },
     enter(previous: string | null) {
       const view =

@@ -14,9 +14,9 @@ All authors, original source URLs and licences are recorded centrally in [CREDIT
 
 `button-press.wav` is mono 22,050 Hz PCM16, 0.14 seconds, a mechanical press isolated from a cassette-key recording with an 80 Hz high-pass, 4,500 Hz low-pass and 5/10 ms fades; playback gain is 0.07 before spatial and master attenuation.
 
-`switch-click.wav` and `rocker-click.wav` are mono 22,050 Hz PCM16 excerpts of the credited StevenBrown rocker recording, 0.15 and 0.20 seconds respectively. All three control recordings are peak-normalised to 0.55. Defaults use gain 0.07 for buttons/switches and 0.08 for rockers, before spatial/master attenuation. Shared control-type defaults apply in both the lab and the development control test.
+`switch-click.wav` and `rocker-click.wav` are mono 22,050 Hz PCM16 excerpts of the credited StevenBrown rocker recording, 0.15 and 0.20 seconds respectively. All three control recordings are peak-normalised to 0.55. Defaults use gain 0.07 for buttons/switches and 0.08 for rockers, before spatial/master attenuation. Each part sets its own gain beside its sound.
 
-Rotary detents share the crisp switch recording at gain 0.025; selectors use gain 0.06. Isolators/breakers share the deeper rocker recording at gain 0.12. The defaults are centralised in `control-sound-defaults.ts`; individual mechanical effects such as a valve handwheel, clamp or ram stop retain their own sound definitions.
+Rotary detents share the crisp switch recording at gain 0.025; selectors use gain 0.06. There is no central table of control sounds: each part in `src/rendering/parts.ts` defines its own sounds beside it (a recording with its gain, or a synthesised click from `src/audio/part-audio.ts`), so a part sounds the same wherever it is placed.
 
 `key-thock.wav` is the second press/release pair from the MattRuthSound mechanical-keyboard recording, filtered and played at 88% source speed during editing, about 0.25 seconds long. Peak 0.55; keycap playback gain 0.09. Source and licence are in CREDITS.md.
 
