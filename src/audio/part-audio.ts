@@ -27,8 +27,21 @@ export interface Click {
   sweep?: number;
 }
 
+/** A synthesised electronic tone: a beep, a buzzer, a chime. */
+export interface Tone {
+  hz: number;
+  seconds: number;
+  level: number;
+  type?: OscillatorType;
+  /** Repeated beeps: count and gap, seconds. */
+  repeat?: [number, number];
+}
+
 /** A sound a part makes once. */
-export type SoundRecipe = { recording: URL; level: number } | { click: Click };
+export type SoundRecipe =
+  | { recording: URL; level: number }
+  | { click: Click }
+  | { tone: Tone };
 
 /** A recorded sound, at `level`. */
 export const recording = (url: URL, level: number): SoundRecipe => ({
@@ -37,6 +50,8 @@ export const recording = (url: URL, level: number): SoundRecipe => ({
 });
 /** A synthesised click. */
 export const click = (spec: Click): SoundRecipe => ({ click: spec });
+/** A synthesised beep. */
+export const tone = (spec: Tone): SoundRecipe => ({ tone: spec });
 
 /**
  * A sound a part holds for as long as its state calls for it: builds its
@@ -157,6 +172,25 @@ export const partAudio = {
     awaitGesture();
     if (!context || context.state !== 'running') return;
     const out = placed(from);
+    if ('tone' in recipe) {
+      const spec = recipe.tone;
+      const [count, gap] = spec.repeat ?? [1, 0];
+      for (let i = 0; i < count; i++) {
+        const at = context.currentTime + 0.005 + i * (spec.seconds + gap);
+        const osc = context.createOscillator();
+        osc.type = spec.type ?? 'square';
+        osc.frequency.value = spec.hz;
+        const gain = context.createGain();
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(spec.level, at + 0.005);
+        gain.gain.setValueAtTime(spec.level, at + spec.seconds - 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + spec.seconds);
+        osc.connect(gain).connect(out);
+        osc.start(at);
+        osc.stop(at + spec.seconds + 0.02);
+      }
+      return;
+    }
     if ('click' in recipe) {
       const spec = recipe.click;
       const at = context.currentTime + 0.005;

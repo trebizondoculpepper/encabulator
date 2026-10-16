@@ -96,8 +96,11 @@ interface Common {
   yellow?: boolean;
 }
 
-/** A part's plumbing: its group, uses, updates, and its sounds. */
-function begin(kit: PanelKit, name: string) {
+/**
+ * A part's plumbing: its group, uses, updates, and its sounds. Parts in
+ * other files (`building-parts.ts`) are built on it too.
+ */
+export function beginPart(kit: PanelKit, name: string) {
   const object = new Group();
   object.name = name;
   const uses = new Map<Object3D, (direction?: number) => void>();
@@ -254,7 +257,7 @@ export function pushButton(
     latch?: Readable<boolean>;
   },
 ): Part {
-  const a = begin(
+  const a = beginPart(
     kit,
     props.name ?? `${props.legend ?? props.colour} push button`,
   );
@@ -294,7 +297,7 @@ export function ledPushbutton(
     latch?: Readable<boolean>;
   },
 ): Part & { state: ReadonlySignal<boolean>; lit: ReadonlySignal<boolean> } {
-  const a = begin(
+  const a = beginPart(
     kit,
     props.name ?? `${props.legend ?? props.colour} LED pushbutton`,
   );
@@ -334,7 +337,7 @@ export function pilotLight(
     power?: Readable<boolean>;
   },
 ): Part & { lit: ReadonlySignal<boolean> } {
-  const a = begin(
+  const a = beginPart(
     kit,
     props.name ?? `${props.legend ?? props.colour} pilot light`,
   );
@@ -373,7 +376,7 @@ export function selector(
     latch?: Readable<boolean>;
   },
 ): Part & { position: ReadonlySignal<number> } {
-  const a = begin(
+  const a = beginPart(
     kit,
     props.name ??
       `${props.legend ?? ''} ${props.key ? 'key ' : ''}selector`.trim(),
@@ -415,7 +418,7 @@ export function potentiometer(
   kit: PanelKit,
   props: Common & { steps?: number; initial?: number },
 ): Part & { share: ReadonlySignal<number>; position: ReadonlySignal<number> } {
-  const a = begin(
+  const a = beginPart(
     kit,
     props.name ?? `${props.legend ?? ''} potentiometer`.trim(),
   );
@@ -444,7 +447,7 @@ export function mushroomStop(
   kit: PanelKit,
   props: Common & { initial?: boolean; bound?: Binding<boolean> },
 ): Part & { pushed: ReadonlySignal<boolean> } {
-  const a = begin(kit, props.name ?? 'EMERGENCY STOP');
+  const a = beginPart(kit, props.name ?? 'EMERGENCY STOP');
   const view = createMushroomHead(kit);
   a.object.add(view.group);
   a.legend(props.legend ?? 'EMERGENCY STOP', 0.042, true);
@@ -482,7 +485,7 @@ export function disconnectHandle(
   on: ReadonlySignal<boolean>;
   trip(): void;
 } {
-  const a = begin(kit, props.name ?? 'disconnect handle');
+  const a = beginPart(kit, props.name ?? 'disconnect handle');
   const view = createFlangeHandle(kit, { colour: props.colour });
   a.object.add(view.group);
   const handle = createOperatingHandle({
@@ -512,7 +515,10 @@ export function keySwitch(
   kit: PanelKit,
   props: Common & { initial?: boolean; bound?: Binding<boolean> },
 ): Part & { state: ReadonlySignal<boolean> } {
-  const a = begin(kit, props.name ?? `${props.legend ?? ''} key switch`.trim());
+  const a = beginPart(
+    kit,
+    props.name ?? `${props.legend ?? ''} key switch`.trim(),
+  );
   const view = createKeySwitch(kit, props.initial ?? false);
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
@@ -544,7 +550,7 @@ export function pushbuttonStation(
     power?: Readable<boolean>;
   },
 ): Part {
-  const a = begin(kit, props.name ?? 'pushbutton station');
+  const a = beginPart(kit, props.name ?? 'pushbutton station');
   const view = createPushbuttonStation(kit, props.buttons);
   a.object.add(view.group);
   view.buttons.forEach((cap, i) => {
@@ -573,7 +579,7 @@ export function driveKeypad(
     power?: Readable<boolean>;
   },
 ): Part & { view: DriveKeypadView } {
-  const a = begin(kit, props.name ?? 'drive keypad');
+  const a = beginPart(kit, props.name ?? 'drive keypad');
   const view = createDriveKeypad(kit);
   a.object.add(view.group);
   for (const [name, key] of Object.entries(view.keys)) {
@@ -600,7 +606,7 @@ export function operatorTerminal(
     power?: Readable<boolean>;
   },
 ): Part & { view: TerminalView } {
-  const a = begin(kit, props.name ?? 'operator terminal');
+  const a = beginPart(kit, props.name ?? 'operator terminal');
   const view = createOperatorTerminal(kit);
   a.object.add(view.group);
   const legends = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '.', '↵'];
@@ -645,7 +651,7 @@ export function doorLatch(
   open: ReadonlySignal<boolean>;
   door: ReturnType<typeof createSwitch>;
 } {
-  const a = begin(kit, props.name ?? 'door latch');
+  const a = beginPart(kit, props.name ?? 'door latch');
   a.object.add(createWingLatchView(props.material));
   const door =
     props.shared ??
@@ -713,7 +719,10 @@ export function rackUnit(
       travel?: number;
     },
 ): Part & { view: RackUnitView; pulled: ReadonlySignal<boolean> } {
-  const a = begin(kit, props.name ?? `${props.label ?? props.style} rack unit`);
+  const a = beginPart(
+    kit,
+    props.name ?? `${props.label ?? props.style} rack unit`,
+  );
   const view = createRackUnit(kit, props);
   a.object.add(view.group);
   const out = createSwitch({
@@ -799,7 +808,7 @@ export function motorControlUnit(
   kit: PanelKit,
   props: Common & { latch?: Readable<boolean> },
 ): Part & { trip(): void; on: ReadonlySignal<boolean> } {
-  const a = begin(kit, props.name ?? 'motor control unit');
+  const a = beginPart(kit, props.name ?? 'motor control unit');
   const view = createMotorUnit(kit);
   a.object.add(view.group);
   const handle = createOperatingHandle({ latch: props.latch });
@@ -830,7 +839,7 @@ export function contactor(
   kit: PanelKit,
   props: Common & { coil: Readable<boolean> },
 ): Part & { component: ReturnType<typeof createContactor> } {
-  const a = begin(kit, props.name ?? 'contactor');
+  const a = beginPart(kit, props.name ?? 'contactor');
   const view = createContactorView(kit);
   a.object.add(view.group);
   const part = createContactor({ coil: props.coil });
@@ -853,7 +862,7 @@ export function overloadRelay(
   kit: PanelKit,
   props: Common & { current: Readable<number> },
 ): Part & { component: ReturnType<typeof createOverloadRelay> } {
-  const a = begin(kit, props.name ?? 'overload relay');
+  const a = beginPart(kit, props.name ?? 'overload relay');
   const view = createOverloadRelayView(kit);
   a.object.add(view.group);
   const relay = createOverloadRelay({ current: props.current });
@@ -885,7 +894,7 @@ export function fuse(
   kit: PanelKit,
   props: Common & { current: Readable<number>; rating: number },
 ): Part & { component: ReturnType<typeof createFuse> } {
-  const a = begin(kit, props.name ?? 'fuse');
+  const a = beginPart(kit, props.name ?? 'fuse');
   const view = createFuseHolderView(kit);
   a.object.add(view.group);
   const part = createFuse({ current: props.current, rating: props.rating });
@@ -913,7 +922,7 @@ export function capacitorBoard(
     reducedMotion?: () => boolean;
   },
 ): Part & { capacitors: ReturnType<typeof createCapacitor>[] } {
-  const a = begin(kit, props.name ?? 'capacitor board');
+  const a = beginPart(kit, props.name ?? 'capacitor board');
   const view = createCapacitorBoardView(kit);
   a.object.add(view.group);
   const capacitors = [0, 1].map((i) => {
@@ -944,7 +953,7 @@ export function motor(
   kit: PanelKit,
   props: Common & { running: Readable<boolean>; speed: Readable<number> },
 ): Part {
-  const a = begin(kit, props.name ?? 'motor');
+  const a = beginPart(kit, props.name ?? 'motor');
   const view = createMotorView(kit);
   a.object.add(view.group);
   a.holdWhile(

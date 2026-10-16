@@ -1,3 +1,4 @@
+import { renderFireAlarm } from './fire-alarm';
 import type { LoopRecipe } from './part-audio';
 
 /**
@@ -11,7 +12,14 @@ import type { LoopRecipe } from './part-audio';
  * - `NEON_BUZZ`: a mains neon or lamp ballast, a thin 120 Hz rasp;
  * - `RELAY_HOLD`: a relay or contactor coil holding in, a 120 Hz buzz;
  * - `MOTOR_HUM`: an induction motor running, its 120 Hz magnetic hum
- *   and the hiss of its cooling fan.
+ *   and the hiss of its cooling fan;
+ * - `FIRE_SOUNDER`: the fire alarm, the VX3 Simulator's synthesised
+ *   sounders (`fire-alarm.ts`): a pulsing piezo, a two-note buzzer and a
+ *   far sweep;
+ * - `ALARM_BUZZER`: an accessible toilet's emergency alarm, a pulsing
+ *   buzz;
+ * - `EXTRACT_FAN`: a small extractor fan's whirr;
+ * - `WATER_SPRAY`: sprinklers discharging, a broad hiss.
  */
 
 /** Tones at `hz`, each at its level, under one gain. */
@@ -78,4 +86,92 @@ export const MOTOR_HUM: LoopRecipe = (context, out) => {
   fan.connect(band).connect(level).connect(out);
   fan.start();
   return [...hum, fan];
+};
+
+/** A shared second of white noise, for hisses. */
+const noiseSource = (context: AudioContext) => {
+  const buffer = context.createBuffer(
+    1,
+    context.sampleRate,
+    context.sampleRate,
+  );
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  return source;
+};
+
+/** The fire alarm's loop, rendered once for each audio context. */
+const alarmLoops = new WeakMap<BaseAudioContext, AudioBuffer>();
+
+export const FIRE_SOUNDER: LoopRecipe = (context, out) => {
+  let buffer = alarmLoops.get(context);
+  if (!buffer) {
+    const samples = renderFireAlarm(context.sampleRate);
+    buffer = context.createBuffer(1, samples.length, context.sampleRate);
+    buffer.getChannelData(0).set(samples);
+    alarmLoops.set(context, buffer);
+  }
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  const gain = context.createGain();
+  gain.gain.value = 0.12;
+  source.connect(gain).connect(out);
+  source.start();
+  return [source];
+};
+
+export const ALARM_BUZZER: LoopRecipe = (context, out) => {
+  const osc = context.createOscillator();
+  osc.type = 'square';
+  osc.frequency.value = 2400;
+  const gate = context.createGain();
+  gate.gain.value = 0;
+  // Pulse it on and off about twice a second.
+  const lfo = context.createOscillator();
+  lfo.type = 'square';
+  lfo.frequency.value = 2;
+  const depth = context.createGain();
+  depth.gain.value = 0.02;
+  lfo.connect(depth).connect(gate.gain);
+  const bias = context.createConstantSource();
+  bias.offset.value = 0.02;
+  bias.connect(gate.gain);
+  osc.connect(gate).connect(out);
+  osc.start();
+  lfo.start();
+  bias.start();
+  return [osc, lfo, bias];
+};
+
+export const EXTRACT_FAN: LoopRecipe = (context, out) => {
+  const hum = tones(0.02, [
+    ['sine', 100, 1],
+    ['sine', 200, 0.3],
+  ])(context, out);
+  const air = noiseSource(context);
+  const band = context.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = 1400;
+  band.Q.value = 0.6;
+  const level = context.createGain();
+  level.gain.value = 0.02;
+  air.connect(band).connect(level).connect(out);
+  air.start();
+  return [...hum, air];
+};
+
+export const WATER_SPRAY: LoopRecipe = (context, out) => {
+  const spray = noiseSource(context);
+  const band = context.createBiquadFilter();
+  band.type = 'highpass';
+  band.frequency.value = 1500;
+  const level = context.createGain();
+  level.gain.value = 0.06;
+  spray.connect(band).connect(level).connect(out);
+  spray.start();
+  return [spray];
 };
