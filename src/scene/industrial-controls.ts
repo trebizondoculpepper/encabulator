@@ -559,14 +559,7 @@ export function createXB4Selector(
   const handle = new Group();
   handle.position.z = 0.01;
   group.add(handle);
-  const grip = add(
-    handle,
-    new BoxGeometry(0.0075, 0.018, 0.011),
-    black,
-    0,
-    0,
-    0.0055,
-  );
+  add(handle, new BoxGeometry(0.0075, 0.018, 0.011), black, 0, 0, 0.0055);
   for (const y of [-0.009, 0.009])
     disc(handle, 0.00375, 0.011, black, 0, 16).position.set(0, y, 0.0055);
   add(
@@ -582,7 +575,9 @@ export function createXB4Selector(
   let target = angles[0];
   return {
     group,
-    knob: grip,
+    // The whole selector takes a click, not just its handle: a fingertip
+    // on a phone is wider than the handle.
+    knob: group,
     set(position) {
       target = angles[Math.max(0, Math.min(angles.length - 1, position))];
     },

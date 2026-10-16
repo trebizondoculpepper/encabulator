@@ -282,11 +282,11 @@ export function createFirstPerson(options: FirstPersonOptions) {
     pitch: number;
     moved: boolean;
   } | null = null;
-  const screenPoint = (event: PointerEvent): [number, number] => {
+  const screenPoint = (x: number, y: number): [number, number] => {
     const rect = canvas.getBoundingClientRect();
     return [
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      ((x - rect.left) / rect.width) * 2 - 1,
+      -((y - rect.top) / rect.height) * 2 + 1,
     ];
   };
   // Fingers on the canvas, for the pinch.
@@ -336,7 +336,10 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (!drag) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
-    if (Math.hypot(dx, dy) > 5) drag.moved = true;
+    // A fingertip wobbles more than a mouse: a touch must move further
+    // before it counts as a drag rather than a tap.
+    const slop = event.pointerType === 'mouse' ? 5 : 12;
+    if (Math.hypot(dx, dy) > slop) drag.moved = true;
     if (!drag.moved) return;
     walker.yaw = drag.yaw - (dx * 0.004) / walker.zoom;
     walker.pitch = clampPitch(drag.pitch + (dy * 0.003) / walker.zoom);
@@ -346,7 +349,9 @@ export function createFirstPerson(options: FirstPersonOptions) {
     // After a pinch, the fingers left behind neither look nor use.
     if (fingers.size < 2) pinch = null;
     if (!drag) return;
-    if (!drag.moved) options.use(...screenPoint(event));
+    // A tap works what the finger first touched, not where it lifted:
+    // a fingertip wobbles off a small control as it comes away.
+    if (!drag.moved) options.use(...screenPoint(drag.x, drag.y));
     drag = null;
   };
   // The wheel zooms and Alt+wheel raises and lowers the eye. A trackpad

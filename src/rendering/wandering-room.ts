@@ -219,7 +219,7 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
     { x: number; z: number; yaw: number; pitch: number }
   > = {
     room: { x: 0, z: 4 * m, yaw: 0, pitch: -0.15 },
-    knob: { x: 0, z: (FLOOR.minZ + 1.2) * m, yaw: 0, pitch: -0.35 },
+    knob: { x: 0, z: (FLOOR.minZ + 0.85) * m, yaw: 0, pitch: -0.5 },
   };
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
@@ -257,6 +257,20 @@ export function startWanderingRoom(canvas: HTMLCanvasElement) {
   (window as unknown as { devWandering: unknown }).devWandering = {
     model,
     stand: () => ({ ...state }),
+    /** Work whatever is at screen point (x, y), −1 to 1, as a click does. */
+    use: (x: number, y: number) => usableAt(x, y)?.(),
+    /** What a click at screen point (x, y), −1 to 1, hits, and whether it works it. */
+    probe(x: number, y: number) {
+      raycaster.setFromCamera(pointer.set(x, y), camera);
+      const hit = raycaster.intersectObjects([room, portals.group], true)[0];
+      if (!hit) return null;
+      const chain: string[] = [];
+      for (let o: Object3D | null = hit.object; o; o = o.parent)
+        chain.push(
+          `${o.type}:${o.name}${parts.uses.has(o) ? ' [usable]' : ''}`,
+        );
+      return { distance: hit.distance / m, chain };
+    },
     view(name: string) {
       const pose = views[name];
       if (pose) walk.place(pose.x, pose.z, pose.yaw, pose.pitch);

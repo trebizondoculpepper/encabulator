@@ -118,6 +118,9 @@ export function createMicroLabel(
     material,
   );
   mesh.name = `Label ${text}`;
+  // Printed lettering is a decal: it never takes a click meant for the
+  // control it labels (its sheet is larger than its letters).
+  mesh.raycast = () => {};
   return mesh;
 }
 
