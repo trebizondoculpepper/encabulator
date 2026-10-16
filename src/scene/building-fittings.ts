@@ -2238,7 +2238,8 @@ export function createBinFire(kit: PanelKit) {
         }
       geometry.attributes.position.needsUpdate = cloud.visible;
       flames.visible = size > 0.001;
-      const scale = 0.4 + size * 2.2;
+      // The flames grow plainly with the fire, up out of the bin.
+      const scale = 0.4 + size * 4.5;
       tongues.forEach((cone, i) => {
         const flicker = 1 + 0.25 * Math.sin(time * (11 + i * 3.7) + i);
         cone.scale.set(scale, scale * flicker, scale);

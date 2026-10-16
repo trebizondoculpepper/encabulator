@@ -87,9 +87,9 @@ describe('dev8 building services', () => {
     expect(b.access.locked.value).toBe(false);
     expect(b.fire.panelLamps.value.brigade).toBe(true);
     // The fire grows until the hot gas at the nearest head reaches 68 °C.
-    run(b, 20, finds.fire);
+    run(b, 10, finds.fire);
     expect(b.fire.discharging.value).toBe(false);
-    run(b, 15, finds.fire);
+    run(b, 10, finds.fire);
     expect(b.fire.discharging.value).toBe(true);
     expect(b.fire.heads.value[0].spraying).toBe(true);
     // The spray puts the bin out; the water runs until the valve is shut.

@@ -60,7 +60,7 @@ export const ALL_CLEAR_SECONDS = 10;
  * building is evacuating, and how fast a sprinkler puts it out.
  */
 export const FIRE_START = 0.15;
-export const FIRE_GROWTH = 0.0075;
+export const FIRE_GROWTH = 0.015;
 export const FIRE_QUENCH = 0.02;
 /** How fast smoke builds up at the detector, a second: a few seconds' worth. */
 export const SMOKE_RISE = 0.06;
