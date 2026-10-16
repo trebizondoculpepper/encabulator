@@ -132,6 +132,39 @@ function lensTexture(kit: PanelKit) {
   return texture;
 }
 
+/**
+ * The bezel of Schneider's Harmony XB4 22 mm devices (push buttons,
+ * selectors, pilot lights; datasheets XB4BW34M5, XB4BD33, XB4BVB5): a
+ * chromed metal bezel about 30 mm across, standing about 10 mm proud of
+ * the panel, its sides tapering to a rounded lip round the device's face,
+ * with a thin dark gap inside the lip. No ring nut shows: an XB4 device is
+ * clamped from behind.
+ */
+function xb4Bezel(kit: PanelKit, group: Group) {
+  const chrome = kitPaint(kit, '#d2d5d5', 0.9);
+  chrome.side = DoubleSide;
+  const profile = [
+    [0.0124, 0.0098],
+    [0.0131, 0.0106],
+    [0.0139, 0.0103],
+    [0.0144, 0.0094],
+    [0.0147, 0.006],
+    [0.015, 0.0015],
+    [0.015, 0],
+  ].map(([r, z]) => new Vector2(r, z));
+  const bezel = add(group, new LatheGeometry(profile, 40), chrome);
+  // The lathe turns about y; stand it out of the panel along +z.
+  bezel.rotation.x = Math.PI / 2;
+  add(
+    group,
+    new TorusGeometry(0.01235, 0.0004, 6, 40),
+    kitPaint(kit, '#141414'),
+    0,
+    0,
+    0.0099,
+  );
+}
+
 /** The ring nut every 30 mm device is held by. */
 function ringNut(kit: PanelKit, group: Group) {
   disc(group, 0.021, 0.004, kitPaint(kit, '#141415'), 0, 24);
@@ -244,34 +277,7 @@ export function createPushButton(
   if (lens) kit.materials.push(lens);
   const material = lens ?? kitPaint(kit, OPERATOR_COLOURS[colour]);
   if (lit) {
-    // Copied from Schneider's Harmony XB4 illuminated push button
-    // (XB4BW34M5, datasheet dimensions): a chromed metal bezel about 30 mm
-    // across, standing about 10 mm proud of the panel, its sides tapering
-    // to a rounded lip round a flush, faintly domed lens, the whole head
-    // 13.5 mm deep.
-    const chrome = kitPaint(kit, '#d2d5d5', 0.9);
-    chrome.side = DoubleSide;
-    const profile = [
-      [0.0124, 0.0098],
-      [0.0131, 0.0106],
-      [0.0139, 0.0103],
-      [0.0144, 0.0094],
-      [0.0147, 0.006],
-      [0.015, 0.0015],
-      [0.015, 0],
-    ].map(([r, z]) => new Vector2(r, z));
-    const bezel = add(group, new LatheGeometry(profile, 40), chrome);
-    // The lathe turns about y; stand it out of the panel along +z.
-    bezel.rotation.x = Math.PI / 2;
-    // The dark gap between lens and bezel.
-    add(
-      group,
-      new TorusGeometry(0.01235, 0.0004, 6, 40),
-      kitPaint(kit, '#141414'),
-      0,
-      0,
-      0.0099,
-    );
+    xb4Bezel(kit, group);
   }
   // A guard ring stands round a flush head, so it is hard to press by accident.
   if (head === 'flush') {
@@ -533,5 +539,95 @@ export function createPilotLamp(
       const target = held > 0 ? -0.0025 : 0;
       lens.position.z += (target - lens.position.z) * Math.min(1, delta * 30);
     },
+  };
+}
+
+/**
+ * Schneider's Harmony XB4 three-position selector switch (XB4BD33): the
+ * XB4 bezel round a black insert with a black standard handle spanning
+ * it, about 25 mm long, turning through 45° to each side, a white index line at its
+ * top end. Two positions turn 0° and 45°.
+ */
+export function createXB4Selector(
+  kit: PanelKit,
+  positions: 2 | 3,
+): LeverSelectorView {
+  const group = new Group();
+  xb4Bezel(kit, group);
+  const black = kitPaint(kit, '#1d1e20', 0.4);
+  disc(group, 0.0123, 0.0065, black, 0.0035, 40);
+  const handle = new Group();
+  handle.position.z = 0.01;
+  group.add(handle);
+  const grip = add(
+    handle,
+    new BoxGeometry(0.0075, 0.018, 0.011),
+    black,
+    0,
+    0,
+    0.0055,
+  );
+  for (const y of [-0.009, 0.009])
+    disc(handle, 0.00375, 0.011, black, 0, 16).position.set(0, y, 0.0055);
+  add(
+    handle,
+    new BoxGeometry(0.0012, 0.006, 0.0004),
+    kitPaint(kit, '#f2f1ea'),
+    0,
+    0.0085,
+    0.0112,
+  );
+  const angles =
+    positions === 3 ? [Math.PI / 4, 0, -Math.PI / 4] : [0, -Math.PI / 4];
+  let target = angles[0];
+  return {
+    group,
+    knob: grip,
+    set(position) {
+      target = angles[Math.max(0, Math.min(angles.length - 1, position))];
+    },
+    update(delta) {
+      handle.rotation.z +=
+        (target - handle.rotation.z) * Math.min(1, delta * 25);
+    },
+  };
+}
+
+/**
+ * Schneider's Harmony XB4 pilot light (XB4BV.. with an integral LED): the
+ * XB4 bezel round a flush, faintly domed plain lens, glowing from within
+ * when lit, brightest at its middle.
+ */
+export function createXB4PilotLight(
+  kit: PanelKit,
+  colour: OperatorColour,
+): PilotLightView {
+  const group = new Group();
+  xb4Bezel(kit, group);
+  const base = new Color(OPERATOR_COLOURS[colour]);
+  const face = lensTexture(kit);
+  const glass = createPs1Material({
+    color: base.clone().multiplyScalar(0.55),
+    map: face,
+    roughness: 0.15,
+    emissive: base,
+    emissiveMap: face,
+    emissiveIntensity: 0,
+  }) as MeshStandardMaterial;
+  kit.materials.push(glass);
+  const lens = new Group();
+  group.add(lens);
+  disc(lens, 0.0123, 0.0068, glass, 0.0035, 40, 0.0118);
+  const on = base.clone().lerp(new Color('#ffffff'), 0.25);
+  const off = base.clone().multiplyScalar(0.55);
+  return {
+    group,
+    lens,
+    set(lit) {
+      glass.color.copy(lit ? on : off);
+      glass.emissiveIntensity = lit ? 1.8 : 0;
+    },
+    press() {},
+    update() {},
   };
 }

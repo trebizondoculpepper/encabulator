@@ -18,7 +18,8 @@ export type DevRoomId =
   | 'dev3'
   | 'dev6'
   | 'dev7'
-  | 'dev8';
+  | 'dev8'
+  | 'dev9';
 export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
@@ -38,6 +39,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev6',
   'dev7',
   'dev8',
+  'dev9',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -61,6 +63,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev6: 'DEV6 · RETRO ENCABULATOR',
   dev7: 'DEV7 · UNDERGROUND CORRIDOR',
   dev8: 'DEV8 · BUILDING FITTINGS',
+  dev9: 'DEV9 · THE WANDERING BUTTON',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
@@ -74,6 +77,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev6: '#9a9685',
   dev7: '#2d9ca0',
   dev8: '#b8433a',
+  dev9: '#c7542f',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',

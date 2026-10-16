@@ -37,6 +37,8 @@ import {
   createPilotLamp,
   createPotentiometer,
   createPushButton,
+  createXB4PilotLight,
+  createXB4Selector,
 } from '../scene/industrial-controls';
 import type { OperatorColour } from '../scene/industrial-controls';
 import {
@@ -85,6 +87,14 @@ export interface Part {
   setAudible(on: boolean): void;
   dispose(): void;
 }
+
+/**
+ * Which family a pilot device comes from: the 30 mm oiltight devices of the
+ * American MCC (the default), or Schneider's 22 mm Harmony XB4, which a
+ * small control station (XALD) takes. A part is always shown at its true
+ * size; to fit a smaller enclosure, choose the smaller family, never scale.
+ */
+export type DeviceSeries = '30mm' | 'xb4';
 
 /** The props every part takes. */
 interface Common {
@@ -335,13 +345,17 @@ export function pilotLight(
     colour: OperatorColour;
     drive?: Readable<boolean>;
     power?: Readable<boolean>;
+    series?: DeviceSeries;
   },
 ): Part & { lit: ReadonlySignal<boolean> } {
   const a = beginPart(
     kit,
     props.name ?? `${props.legend ?? props.colour} pilot light`,
   );
-  const view = createPilotLamp(kit, props.colour);
+  const view =
+    props.series === 'xb4'
+      ? createXB4PilotLight(kit, props.colour)
+      : createPilotLamp(kit, props.colour);
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
   const lamp = createPilotLight({ drive: props.drive, power: props.power });
@@ -374,6 +388,7 @@ export function selector(
     initial?: number;
     bound?: Binding<number>;
     latch?: Readable<boolean>;
+    series?: DeviceSeries;
   },
 ): Part & { position: ReadonlySignal<number> } {
   const a = beginPart(
@@ -381,7 +396,10 @@ export function selector(
     props.name ??
       `${props.legend ?? ''} ${props.key ? 'key ' : ''}selector`.trim(),
   );
-  const view = createLeverSelector(kit, props.positions, { key: props.key });
+  const view =
+    props.series === 'xb4'
+      ? createXB4Selector(kit, props.positions)
+      : createLeverSelector(kit, props.positions, { key: props.key });
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
   const part = createSelector({

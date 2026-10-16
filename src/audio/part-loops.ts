@@ -21,6 +21,7 @@ import type { LoopRecipe } from './part-audio';
  * - `EXTRACT_FAN`: a small extractor fan's whirr;
  * - `WATER_SPRAY`: sprinklers discharging, a broad hiss;
  * - `CRACKLE`: a fire in a bin: crackle and the roar of the flames;
+ * - `CASTORS`: castors rolling on a hard floor;
  * - `FIRE_BELL`: an electric fire bell, its striker ringing the gong
  *   about twenty times a second, as for a sprinkler flow alarm.
  */
@@ -252,4 +253,18 @@ export const CRACKLE: LoopRecipe = (context, out) => {
   crackle.connect(crackleLevel).connect(out);
   crackle.start();
   return [roar, crackle];
+};
+
+/** Castors rolling on a hard floor: a low, gritty rumble. */
+export const CASTORS: LoopRecipe = (context, out) => {
+  const grit = noiseSource(context);
+  const band = context.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = 260;
+  band.Q.value = 0.8;
+  const level = context.createGain();
+  level.gain.value = 0.08;
+  grit.connect(band).connect(level).connect(out);
+  grit.start();
+  return [grit];
 };

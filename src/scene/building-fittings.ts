@@ -2305,3 +2305,149 @@ export function createBinFire(kit: PanelKit) {
 }
 
 export { kitPaint };
+
+/**
+ * A rounded box: a rectangle with rounded corners, its edges softened,
+ * `d` deep along z and centred on the origin.
+ */
+function roundedBox(w: number, h: number, d: number, r: number) {
+  const shape = new Shape();
+  const x = w / 2 - r;
+  const y = h / 2 - r;
+  shape.absarc(x, y, r, 0, Math.PI / 2, false);
+  shape.absarc(-x, y, r, Math.PI / 2, Math.PI, false);
+  shape.absarc(-x, -y, r, Math.PI, Math.PI * 1.5, false);
+  shape.absarc(x, -y, r, Math.PI * 1.5, Math.PI * 2, false);
+  const edge = Math.min(r * 0.6, d / 4);
+  const geometry = new ExtrudeGeometry(shape, {
+    depth: d - edge * 2,
+    bevelEnabled: true,
+    bevelThickness: edge,
+    bevelSize: edge,
+    bevelSegments: 3,
+    curveSegments: 6,
+  });
+  geometry.translate(0, 0, -(d - edge * 2) / 2);
+  return geometry;
+}
+
+/**
+ * An empty control station after Schneider's XALD range: a light grey
+ * polycarbonate body and a dark grey lid with four screws, 68 mm wide and
+ * 53 mm deep, 68 mm high for one hole (XALD01) or 106 mm for two
+ * (XALD02). Its back is at z = 0; `mounts` are where devices go on the
+ * lid, top to bottom, facing +z.
+ */
+export function createControlStation(kit: PanelKit, holes: 1 | 2) {
+  const t = tools(kit);
+  const group = new Group();
+  const w = 0.068;
+  const h = holes === 1 ? 0.068 : 0.106;
+  const body = new Mesh(
+    roundedBox(w - 0.006, h - 0.006, 0.041, 0.006),
+    t.paint('#c8ccc9', 0.6),
+  );
+  body.position.z = 0.0205;
+  group.add(body);
+  const lid = new Mesh(
+    roundedBox(w - 0.005, h - 0.005, 0.012, 0.005),
+    t.paint('#4a4f52', 0.6),
+  );
+  lid.position.z = 0.047;
+  group.add(lid);
+  for (const sx of [-1, 1])
+    for (const sy of [-1, 1])
+      t.cyl(
+        group,
+        t.paint('#2c2f31'),
+        0.0028,
+        0.0015,
+        sx * 0.026,
+        sy * (h / 2 - 0.008),
+        0.0535,
+        'z',
+        12,
+      );
+  const mounts = Array.from({ length: holes }, (_, i) => {
+    const mount = new Group();
+    mount.position.set(0, holes === 1 ? 0.004 : 0.022 - i * 0.042, 0.053);
+    group.add(mount);
+    return mount;
+  });
+  return { group, mounts, height: h };
+}
+
+/**
+ * A mobile button stand: a weighted steel base on four swivel castors, a
+ * galvanised post and a mounting plate carrying a one-hole control
+ * station, its button about 1.05 m up. Its front faces +z. `roll` turns
+ * the castors to the way it is moving and spins their wheels.
+ */
+export function createMobileStand(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  const galvanised = t.paint('#a4abae', 0.55, 0.5);
+  const base = t.paint('#3a3f42', 0.6, 0.3);
+  // The base: a heavy steel plate with turned-down edges, on its castors.
+  t.box(group, base, 0.44, 0.03, 0.44, 0, 0.1, 0);
+  for (const [w, d, x, z] of [
+    [0.44, 0.012, 0, 0.214],
+    [0.44, 0.012, 0, -0.214],
+    [0.012, 0.44, 0.214, 0],
+    [0.012, 0.44, -0.214, 0],
+  ] as const)
+    t.box(group, base, w, 0.05, d, x, 0.09, z);
+  const castors = [
+    [-0.17, -0.17],
+    [0.17, -0.17],
+    [-0.17, 0.17],
+    [0.17, 0.17],
+  ].map(([x, z]) => {
+    const swivel = new Group();
+    swivel.position.set(x, 0.085, z);
+    group.add(swivel);
+    t.cyl(
+      swivel,
+      t.paint('#9ea4a6', 0.3, 0.8),
+      0.02,
+      0.008,
+      0,
+      -0.004,
+      0,
+      'y',
+      16,
+    );
+    const fork = t.paint('#6d7376', 0.4, 0.6);
+    for (const side of [-1, 1])
+      t.box(swivel, fork, 0.004, 0.05, 0.035, side * 0.014, -0.03, 0.01);
+    const wheel = new Group();
+    wheel.position.set(0, -0.06, 0.012);
+    swivel.add(wheel);
+    t.cyl(wheel, t.paint('#1c1d1e', 0.8), 0.025, 0.022, 0, 0, 0, 'x', 18);
+    t.cyl(wheel, t.paint('#b9bcbd', 0.4, 0.6), 0.01, 0.024, 0, 0, 0, 'x', 10);
+    return { swivel, wheel };
+  });
+  // The post, its collar, and the mounting plate on top.
+  t.cyl(group, galvanised, 0.03, 0.92, 0, 0.115 + 0.46, 0, 'y', 24);
+  t.cyl(group, base, 0.045, 0.02, 0, 0.125, 0, 'y', 24);
+  t.box(group, galvanised, 0.1, 0.1, 0.006, 0, 1.035, 0.033);
+  const station = createControlStation(kit, 1);
+  station.group.position.set(0, 1.035, 0.036);
+  group.add(station.group);
+  return {
+    group,
+    mount: station.mounts[0],
+    /** Turn the castors to `direction` (radians, in the stand's frame) and roll them `distance` metres. */
+    roll(direction: number, distance: number) {
+      for (const { swivel, wheel } of castors) {
+        if (distance > 1e-4) swivel.rotation.y = direction;
+        wheel.rotation.x -= distance / 0.025;
+      }
+    },
+  };
+}
+
+/** A printed position mark round a selector: small dark capitals. */
+export function createMark(kit: PanelKit, text: string) {
+  return createMicroLabel(kit, text, { height: 0.0026, ink: '#e8e8e2' });
+}
