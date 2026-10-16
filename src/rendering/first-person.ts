@@ -196,12 +196,22 @@ export function createFirstPerson(options: FirstPersonOptions) {
   help.setAttribute('aria-live', 'polite');
   container?.append(help);
   let input: InputMode | undefined;
+  // On a touch screen the help line covers the view, so it fades after a
+  // while; it comes back when the input changes or the room is entered.
+  let fading: ReturnType<typeof setTimeout> | undefined;
+  const showHelp = () => {
+    help.classList.remove('is-faded');
+    clearTimeout(fading);
+    if (input === 'touch')
+      fading = setTimeout(() => help.classList.add('is-faded'), 10_000);
+  };
   const setInput = (mode: InputMode) => {
     if (!container || input === mode) return;
     input = mode;
     container.dataset.input = mode;
     movement.style.display = mode === 'mouse' ? 'flex' : 'none';
     help.textContent = controlsHelp(mode);
+    showHelp();
     crosshair.hidden = !(locked() || mode === 'gamepad');
     if (mode !== 'touch') sticks?.reset();
   };
@@ -432,6 +442,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       walker.pitch = clampPitch(pitch);
       walker.eyeOffset = y - eyeY;
       sticks?.reset();
+      showHelp();
     },
     /** Walk and look for `delta` seconds, then place the camera. */
     update(delta: number) {
@@ -536,6 +547,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       crosshair.remove();
       movement.remove();
       crouchButton.remove();
+      clearTimeout(fading);
       help.remove();
     },
   };

@@ -299,12 +299,15 @@ canvas {
   mix-blend-mode: normal;
 }
 
-/* The controls help line, the same in every room (src/game/controls.ts). */
+/* The controls help line, the same in every room (src/game/controls.ts).
+   At the foot of the screen for a mouse or gamepad; on a touch screen it
+   goes to the top, clear of the thumbsticks, and fades after a while. */
 .controls-help {
   position: absolute;
   left: 50%;
   bottom: max(12px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
+  box-sizing: border-box;
   width: max-content;
   max-width: calc(100% - 440px);
   padding: 4px 8px;
@@ -313,18 +316,23 @@ canvas {
   font: 11px monospace;
   text-align: center;
   pointer-events: none;
+  transition: opacity 1s;
 }
-[data-input='touch'] > .controls-help {
-  max-width: calc(100% - 340px);
+.controls-help.is-faded {
+  opacity: 0;
 }
 [data-input='gamepad'] > .controls-help {
   max-width: calc(100% - 24px);
 }
+[data-input='touch'] > .controls-help {
+  top: max(12px, env(safe-area-inset-top));
+  bottom: auto;
+  max-width: calc(100% - 24px);
+  font-size: 12px;
+}
 @media (max-width: 700px) {
-  .controls-help {
+  [data-input] > .controls-help {
     max-width: calc(100% - 24px);
-    bottom: auto;
-    top: 52px;
   }
 }
 
