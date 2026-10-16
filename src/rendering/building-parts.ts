@@ -139,11 +139,27 @@ const ALERT_TONE = tone({
   type: 'triangle',
   repeat: [3, 1],
 });
-/** The voice alarm's messages, a calm British voice (`CREDITS.md`). */
-const ALERT = recording(asset('voice-alarm/va-alert.mp3'), 0.9);
-const EVACUATE = recording(asset('voice-alarm/va-evacuate.mp3'), 0.9);
-const FALSE_ALARM = recording(asset('voice-alarm/va-false-alarm.mp3'), 0.9);
-const ALL_CLEAR = recording(asset('voice-alarm/va-all-clear.mp3'), 0.9);
+/**
+ * The voice alarm's messages, a calm British voice (`CREDITS.md`). Their
+ * paths are written out in full so the build bundles them: a path built at
+ * run time from a folder below `assets/` is left out.
+ */
+const ALERT = recording(
+  new URL('../audio/assets/voice-alarm/va-alert.mp3', import.meta.url),
+  0.9,
+);
+const EVACUATE = recording(
+  new URL('../audio/assets/voice-alarm/va-evacuate.mp3', import.meta.url),
+  0.9,
+);
+const FALSE_ALARM = recording(
+  new URL('../audio/assets/voice-alarm/va-false-alarm.mp3', import.meta.url),
+  0.9,
+);
+const ALL_CLEAR = recording(
+  new URL('../audio/assets/voice-alarm/va-all-clear.mp3', import.meta.url),
+  0.9,
+);
 const CHIME = tone({
   hz: 880,
   seconds: 0.35,
