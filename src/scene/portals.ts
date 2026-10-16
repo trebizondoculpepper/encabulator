@@ -131,6 +131,77 @@ export function createPortals(
       frame.add(sign);
       continue;
     }
+    if (from === 'training') {
+      // The training room's own door: a beech-veneered fire door in a
+      // painted frame, with a vision panel, lever handle, closer, kick
+      // plate and its signs.
+      const material = (color: string, roughness: number, metalness = 0) => {
+        const m = createPs1Material({ color, roughness, metalness });
+        materials.push(m);
+        return m;
+      };
+      const frameWhite = material('#eeece4', 0.5);
+      const beech = material('#c79d64', 0.5);
+      const chromed = material('#cfd2d2', 0.2, 0.9);
+      const dark = material('#1d2326', 0.08, 0.3);
+      const part = (
+        w: number,
+        h: number,
+        d: number,
+        x: number,
+        y: number,
+        z: number,
+        m: Material,
+      ) => {
+        const mesh = new Mesh(
+          new BoxGeometry(w * metre, h * metre, d * metre),
+          m,
+        );
+        mesh.position.set(x * metre, y * metre, z * metre);
+        mesh.userData.noCollision = true;
+        frame.add(mesh);
+        return mesh;
+      };
+      part(1.12, 0.07, 0.03, 0, 2.115, 0.015, frameWhite);
+      for (const side of [-1, 1])
+        part(0.07, 2.15, 0.03, side * 0.525, 1.075, 0.015, frameWhite);
+      const leaf = part(0.93, 2.04, 0.045, 0, 1.02, 0.02, beech);
+      leaf.name = `Portal to ${portal.to}`;
+      uses.set(leaf, () => travel(portal.to));
+      // The vision panel shows only the dim corridor beyond.
+      part(0.16, 0.8, 0.002, 0.22, 1.45, 0.044, dark);
+      for (const [w, h, x, y] of [
+        [0.2, 0.02, 0.22, 1.86],
+        [0.2, 0.02, 0.22, 1.04],
+        [0.02, 0.84, 0.12, 1.45],
+        [0.02, 0.84, 0.32, 1.45],
+      ] as const)
+        part(w, h, 0.012, x, y, 0.047, beech);
+      part(0.03, 0.2, 0.015, -0.4, 1.02, 0.05, chromed);
+      part(0.14, 0.022, 0.022, -0.34, 1.02, 0.07, chromed);
+      part(0.86, 0.25, 0.003, 0, 0.14, 0.044, chromed);
+      part(0.32, 0.06, 0.06, -0.2, 1.98, 0.075, chromed);
+      const signs: [string, string, string, number, number][] = [
+        ['FIRE DOOR KEEP SHUT', '#ffffff', '#1d4f9c', 1.62, 0.2],
+        ['TRAINING ROOM', '#1d1d1d', '#e8e6de', 1.82, 0.26],
+      ];
+      for (const [text, ink, plate, y, w] of signs) {
+        const label = createLabelTexture(text, { ink, plate, size: 28 });
+        textures.push(label.texture);
+        const face = createPs1Material({ map: label.texture, roughness: 0.6 });
+        materials.push(face);
+        const mesh = new Mesh(
+          new PlaneGeometry(
+            w * metre,
+            (w * metre * label.height) / label.width,
+          ),
+          face,
+        );
+        mesh.position.set(-0.17 * metre, y * metre, 0.044 * metre);
+        frame.add(mesh);
+      }
+      continue;
+    }
     const glow = createPs1Material(
       { color: DEV_ROOM_COLOURS[portal.to] },
       true,

@@ -1,15 +1,18 @@
+import { ROOM_DOOR_FROM_WEST } from './training-room-plan';
 import type { Footprint } from './walk-collision';
 
 /**
- * How the development rooms join. They are not one connected world: each
- * is a room of its own, and a portal (a coloured patch on a wall) sends
- * whoever touches it straight to the room it names, arriving in front of
- * that room's portal back. The Hall is the hub; the Rhombus mini-game
- * has a single exit to it.
+ * How the rooms join. They are not one connected world: each is a room of
+ * its own, and a portal (a coloured patch on a wall, or a room's own door)
+ * sends whoever touches it straight to the room it names, arriving in
+ * front of that room's portal back. The rooms form one chain, each linked
+ * to its neighbours: the training room at one end, then the development
+ * rooms, then the Rhombus mini-game. The Hall is not in it: it has no
+ * portals and is reached only by its URL.
  */
 
 export type DevRoomId = 'dev0' | 'dev1' | 'dev2' | 'dev3' | 'dev6' | 'dev7';
-export type RoomId = DevRoomId | 'hall' | 'rhombus';
+export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: RoomId;
@@ -29,8 +32,11 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev7',
 ];
 
-/** The Hall and mini-game have their own public room IDs. */
-export const ROOMS: readonly RoomId[] = [...DEV_ROOMS, 'hall', 'rhombus'];
+/** The rooms linked by portals, in order along the chain. */
+export const CHAIN: readonly RoomId[] = ['training', ...DEV_ROOMS, 'rhombus'];
+
+/** Every room with a URL of its own. */
+export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall'];
 
 /** Historic URLs remain usable without changing the address bar. */
 export function resolveRoomId(id: string | null): RoomId | undefined {
@@ -48,6 +54,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev7: 'DEV7 · UNDERGROUND CORRIDOR',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
+  training: 'TRAINING ROOM',
 };
 /** Each room's portal colour, so a portal says where it goes. */
 export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
@@ -59,60 +66,45 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev7: '#2d9ca0',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
+  training: '#e3d6b0',
 };
 export const PORTAL_WIDTH = 1.2;
 export const PORTAL_HEIGHT = 2.2;
 /** How thick a room's walls are, metres. */
 export const WALL_THICKNESS = 0.3;
 
-/** The hall, where the game takes place: every room has a way to it. */
-export const HALL: RoomId = 'hall';
-/** The rooms the hall's door station leads to. */
-export const STATION_ROOMS: readonly RoomId[] = ROOMS.filter(
-  (id) => id !== HALL,
-);
-
 /**
  * A room's portals, in scene units (`metre` per metre): to the room
- * before it on its west wall and the room after it on its east wall,
- * both near its south end, and to the hall, if the hall is not already
- * its neighbour, on its west wall near its north end. The hall has no
- * wall portals: its door station leads everywhere.
+ * before it in the chain on its west wall and the room after it on its
+ * east wall, both near its south end. The chain's two ends have a single
+ * way out of their own: the training room's door in its north wall, and
+ * the Rhombus mini-game's EXIT door in its east wall. The Hall has none.
  */
 export function devPortals(
   id: RoomId,
   bounds: Footprint,
   metre: number,
 ): Portal[] {
-  if (id === HALL) return [];
-  const z = bounds.maxZ - 1.1 * metre;
-  // Development-room neighbours, with the Hall reached separately.
-  const at = DEV_ROOMS.indexOf(id as DevRoomId);
-  const portals: Portal[] = [];
+  const at = CHAIN.indexOf(id);
+  if (at < 0) return [];
+  const before = CHAIN[at - 1];
+  const after = CHAIN[at + 1];
+  if (id === 'training')
+    return [
+      {
+        to: after,
+        side: 'north',
+        x: bounds.minX + ROOM_DOOR_FROM_WEST * metre,
+        z: bounds.minZ,
+      },
+    ];
   if (id === 'rhombus')
-    return [{ to: HALL, side: 'east', x: bounds.maxX, z: 0 }];
-  if (at > 0)
-    portals.push({
-      to: DEV_ROOMS[at - 1],
-      side: 'west',
-      x: bounds.minX,
-      z,
-    });
-  if (at < DEV_ROOMS.length - 1)
-    portals.push({
-      to: DEV_ROOMS[at + 1],
-      side: 'east',
-      x: bounds.maxX,
-      z,
-    });
-  if (!portals.some((p) => p.to === HALL))
-    portals.push({
-      to: HALL,
-      side: 'west',
-      x: bounds.minX,
-      z: bounds.minZ + 1.6 * metre,
-    });
-  return portals;
+    return [{ to: before, side: 'east', x: bounds.maxX, z: 0 }];
+  const z = bounds.maxZ - 1.1 * metre;
+  return [
+    { to: before, side: 'west', x: bounds.minX, z },
+    { to: after, side: 'east', x: bounds.maxX, z },
+  ];
 }
 
 export interface WallPiece extends Footprint {

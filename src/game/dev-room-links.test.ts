@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
+  CHAIN,
   DEV_ROOMS,
   ROOMS,
-  HALL,
-  STATION_ROOMS,
   devPortals,
   devWalls,
   resolveRoomId,
@@ -11,31 +10,34 @@ import {
 import { slide } from './walk-collision';
 
 const bounds = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 };
-describe('development rooms', () => {
-  it('link each room to its neighbours, both ways, and to the hall', () => {
-    for (const [i, id] of DEV_ROOMS.entries()) {
+describe('the rooms', () => {
+  it('link each room in the chain to its neighbours, both ways', () => {
+    for (const [i, id] of CHAIN.entries()) {
       const to = devPortals(id, bounds, 1).map((p) => p.to);
-      for (const next of [DEV_ROOMS[i - 1], DEV_ROOMS[i + 1]].filter(
-        (room) => room,
-      )) {
-        expect(to).toContain(next);
+      const neighbours = [CHAIN[i - 1], CHAIN[i + 1]].filter((r) => r);
+      expect(to.sort()).toEqual([...neighbours].sort());
+      for (const next of neighbours)
         expect(devPortals(next, bounds, 1).map((p) => p.to)).toContain(id);
-      }
-      expect(to).toContain(HALL);
     }
+  });
+
+  it('give the ends of the chain a single door of their own', () => {
+    expect(CHAIN[0]).toBe('training');
+    expect(CHAIN.at(-1)).toBe('rhombus');
+    expect(devPortals('training', bounds, 1)).toEqual([
+      { to: 'dev0', side: 'north', x: bounds.minX + 2.1, z: bounds.minZ },
+    ]);
     expect(devPortals('rhombus', bounds, 1)).toEqual([
-      { to: HALL, side: 'east', x: bounds.maxX, z: 0 },
+      { to: 'dev7', side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
 
-  it('leaves the hall to its door station, with no wall portals', () => {
-    expect(devPortals(HALL, bounds, 1)).toEqual([]);
-    expect(STATION_ROOMS).not.toContain(HALL);
-    expect(STATION_ROOMS.length).toBe(ROOMS.length - 1);
+  it('leave the Hall out: no portals lead to it or from it', () => {
+    expect(CHAIN).not.toContain('hall');
+    expect(devPortals('hall', bounds, 1)).toEqual([]);
+    for (const id of ROOMS)
+      expect(devPortals(id, bounds, 1).map((p) => p.to)).not.toContain('hall');
     expect(DEV_ROOMS).not.toContain('rhombus');
-    expect(DEV_ROOMS).not.toContain(HALL);
-    expect(DEV_ROOMS).not.toContain('dev4');
-    expect(DEV_ROOMS).not.toContain('dev5');
   });
 
   it('keeps the old Hall and rhombus URLs as aliases', () => {
@@ -43,6 +45,7 @@ describe('development rooms', () => {
     expect(resolveRoomId('dev5')).toBe('rhombus');
     expect(resolveRoomId('hall')).toBe('hall');
     expect(resolveRoomId('rhombus')).toBe('rhombus');
+    expect(resolveRoomId('training')).toBe('training');
     expect(resolveRoomId('unknown')).toBeUndefined();
   });
 

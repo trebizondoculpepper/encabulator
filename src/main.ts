@@ -42,6 +42,8 @@ const openRoom = async () => {
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
   if (room === 'rhombus')
     start = (await import('./rendering/plinth-room')).startPlinthRoom;
+  else if (room === 'training')
+    start = (await import('./rendering/training-room')).startTrainingRoom;
   else if (room === 'hall')
     start = (await import('./rendering/hall-room')).startHallRoom;
   else if (room === 'dev6')

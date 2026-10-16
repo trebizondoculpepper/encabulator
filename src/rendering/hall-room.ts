@@ -12,12 +12,10 @@ import {
   Vector2,
   Vector3,
 } from 'three';
-import type { Mesh, Object3D } from 'three';
+import type { Object3D } from 'three';
 import { kelvinToRgb } from '../game/colour-temperature';
-import { HALL, STATION_ROOMS } from '../game/dev-room-links';
 import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
-import { createDoorStation } from '../scene/door-station';
 import {
   DOOR_STYLES,
   createBigDoor,
@@ -61,10 +59,10 @@ import { knobDirection } from '../scene/rotary-knob';
  * Dev4, the Hall: the great enclosed concrete hall the game will take
  * place in (`src/scene/industrial-hall.ts`), to try out the environment.
  * Polished concrete reflects the skylights, windows and lamps; overcast daylight blooms white and
- * a haze gives the distance depth. A door station in the middle of the
- * nave leads to the other dev rooms. Around the edges stand the plant's
- * ephemera: shipping containers, palletised cargo, drums and IBC totes,
- * a forklift and the janitor's things. A console desk by the door station
+ * a haze gives the distance depth. It is no longer a hub: no portal leads
+ * in or out, and it is reached only by its URL. Around the edges stand the
+ * plant's ephemera: shipping containers, palletised cargo, drums and IBC
+ * totes, a forklift and the janitor's things. A console desk in the nave
  * sets the building's materials, the floor's shine and the light.
  */
 export function startHallRoom(canvas: HTMLCanvasElement) {
@@ -94,10 +92,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const hall = createIndustrialHall(surfaces);
   hall.group.scale.setScalar(m);
   scene.add(hall.group);
-
-  // The door station in the middle of the nave.
-  const station = createDoorStation(HALL, STATION_ROOMS, m);
-  scene.add(station.group);
 
   // ---- The ephemera round the edges, in metres ---------------------------
   const props = createProps();
@@ -535,9 +529,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       for (const sz of [-1, 1])
         marks.striped(sx * 48.5, sz * 8.5, 3, 3, 'hazard');
     marks.stencil('BAY 1 · RESERVED', -38, 0, 1.1, Math.PI / 2);
-    // The door station's work cell.
-    marks.outline(0, 2.5, 18, 12, 'white', 0.1);
-    marks.stencil('DOOR STATION', 0, -2.6, 0.5, 0, '#ecebe6');
     // Storage locations in the side halls, outlined in white with labels.
     const north = -W / 2 + 1.2;
     const south = W / 2 - 1.2;
@@ -682,11 +673,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     pointer.set(x, y);
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(
-      [
-        ...desk.uses.keys(),
-        ...station.uses.keys(),
-        ...openable.map((o) => o.door.leaf),
-      ],
+      [...desk.uses.keys(), ...openable.map((o) => o.door.leaf)],
       true,
     )[0];
     if (!hit) return;
@@ -695,8 +682,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
       swing.door.open = !swing.door.open;
       return;
     }
-    const doorway = station.uses.get(hit.object as Mesh);
-    if (doorway) return doorway();
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
       const work = desk.uses.get(o);
       if (work) return work(knobDirection(o, hit.point, camera));
@@ -706,7 +691,7 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   const notes = document.createElement('div');
   notes.id = 'hall-notes';
   notes.textContent =
-    "The Hall: the door station in the middle of the nave leads to the other rooms · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
+    "The Hall · the console desk sets materials and light (click a knob's left half to turn it down, right half up) · WASD: walk · Shift: run · Esc: cursor";
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',
@@ -719,21 +704,20 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
   });
   canvas.parentElement?.append(notes);
 
-  const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
     canvas,
     camera,
     metre: m,
     floorY: 0,
     fov: 60,
-    start: station.arrival(params.get('from')) ?? {
+    start: {
       x: 0,
       z: 14 * m,
       yaw: 0,
       pitch: 0.05,
     },
-    solids: () => [
-      ...[
+    solids: () =>
+      [
         ...hall.solids,
         ...propSolids,
         deskSolid,
@@ -744,8 +728,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
         minZ: s.minZ * m,
         maxZ: s.maxZ * m,
       })),
-      ...station.solids(),
-    ],
     use,
   });
   const resize = () => {
@@ -803,7 +785,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
-    station.update(delta, walk.walker.x, walk.walker.z);
     desk.update(delta);
     // Doors swing to where they have been put.
     for (const { door } of openable) {
@@ -825,7 +806,6 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     void renderer.setAnimationLoop(null);
     observer.disconnect();
     walk.dispose();
-    station.dispose();
     disposeKit(kit, desk.group);
     notes.remove();
     hall.dispose();
@@ -841,10 +821,5 @@ export function startHallRoom(canvas: HTMLCanvasElement) {
     pipeline.dispose();
     void renderer.dispose();
   };
-  return Object.assign(dispose, {
-    enter(previous: string | null) {
-      const pose = station.arrival(previous);
-      if (pose) walk.place(pose.x, pose.z, pose.yaw, pose.pitch);
-    },
-  });
+  return dispose;
 }

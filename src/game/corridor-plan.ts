@@ -9,7 +9,7 @@ export const CORRIDOR_BOUNDS: Footprint = {
 };
 
 export const CORRIDOR_ZONES = [
-  // A six-leg dogleg linking the old dev room at the south west to the Hall.
+  // A six-leg dogleg from the south-west entrance to the north-west exit.
   { name: 'entry', minX: -16, maxX: -7, minZ: 9, maxZ: 12 },
   { name: 'south turn', minX: -10, maxX: -7, minZ: 2, maxZ: 12 },
   { name: 'long south corridor', minX: -10, maxX: 10, minZ: 2, maxZ: 5 },
