@@ -31,3 +31,5 @@ So the chase was solved exactly (`skittish-chase.py`). In the frame turning with
 | 2.0         | 1.71                 |
 
 The stand runs at 1.8 times the player's speed (`ORBIT_RATIO`), above the ratio of about 1.67 at which the best chaser would reach 1.2 m, and the best chaser comes no nearer than 1.42 m: 3.6 m/s against a walking player, 7.6 m/s against a running one. A test chases it with seven strategies (pure pursuit, two lead pursuits, the lion keeping level on a radius, running head-on round the loop, ambushing ahead and a change of plan), walking and running from six starts; none comes within 1.7 m.
+
+The physical controller now eases changes of SKITTISH speed with a 0.10-second response and coasts along the same circle while stopping. The table above describes the constant-speed pursuit model; it does not model acceleration. The same multi-strategy chase regression still checks the actual eased controller against the button's catching distance.

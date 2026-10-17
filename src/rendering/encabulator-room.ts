@@ -135,7 +135,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
         return () => work?.();
       }
       // Each part says what a click on it does: a latch opens its door,
-      // a button presses. Nothing else on a door takes a click.
+      // a button presses, and a rear cover closes an open door.
       const work = mcc.parts.uses.get(object);
       if (work) {
         const at = object;
@@ -153,12 +153,16 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     lineup: { x: 0, z: 1.0 * m, yaw: 0, pitch: 0.05 },
     controls: { x: 0, z: -1.2 * m, yaw: 0, pitch: 0 },
     plc: { x: 0.7 * m, z: -1.9 * m, yaw: 0, pitch: 0 },
+    backs: { x: 3 * m, z: -1.2 * m, yaw: -0.857, pitch: -0.1 },
   };
+  // Explicit development preview only; every ordinary start keeps doors closed.
+  if (params.get('doors') === 'open') mcc.openAll(true);
   const walk = createFirstPerson({
     canvas,
     camera,
     metre: m,
     floorY: 0,
+    objects: scene,
     start:
       views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ??
@@ -180,6 +184,15 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   resize();
   (window as unknown as { devEncabulator: unknown }).devEncabulator = {
     openAll: mcc.openAll,
+    world: mcc.world,
+    components: () =>
+      mcc.components.map((device) => ({
+        name: device.object.name,
+        kind: device.kind,
+        active: device.active.value,
+        faulted: device.faulted.value,
+        value: device.value.value,
+      })),
     /** Stand with the eye at (x, y, z), looking at (tx, ty, tz), in metres. */
     view(x: number, y: number, z: number, tx: number, ty: number, tz: number) {
       const dx = tx - x;

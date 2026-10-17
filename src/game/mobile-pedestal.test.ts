@@ -220,11 +220,7 @@ describe('the wandering button', () => {
     expect(s.x).toBeLessThan(-0.5);
   });
 
-  it('turns towards the room centre during the final approach to every corner', () => {
-    const centre = {
-      x: (floor.minX + floor.maxX) / 2,
-      z: (floor.minZ + floor.maxZ) / 2,
-    };
+  it('turns towards the off-centre player during the final approach to every corner', () => {
     for (const x of [floor.minX + WALL_MARGIN, floor.maxX - WALL_MARGIN]) {
       for (const z of [floor.minZ + WALL_MARGIN, floor.maxZ - WALL_MARGIN]) {
         const target = { x, z };
@@ -234,11 +230,11 @@ describe('the wandering button', () => {
           heading: facing(0, 0, x, z),
           speed: 0,
         };
-        const v = viewer(0, 0, -1);
+        const v = viewer(0, 0, -1, 0, -2, 1);
         const initialError = Math.abs(
           Math.atan2(
-            Math.sin(facing(s.x, s.z, centre.x, centre.z) - s.heading),
-            Math.cos(facing(s.x, s.z, centre.x, centre.z) - s.heading),
+            Math.sin(facing(s.x, s.z, v.x, v.z) - s.heading),
+            Math.cos(facing(s.x, s.z, v.x, v.z) - s.heading),
           ),
         );
         s = stepStand(s, 'terrified', v, floor, home, 0.1, {
@@ -248,8 +244,8 @@ describe('the wandering button', () => {
         expect(Math.hypot(s.x - x, s.z - z)).toBeGreaterThan(0.1);
         const error = Math.abs(
           Math.atan2(
-            Math.sin(facing(s.x, s.z, centre.x, centre.z) - s.heading),
-            Math.cos(facing(s.x, s.z, centre.x, centre.z) - s.heading),
+            Math.sin(facing(s.x, s.z, v.x, v.z) - s.heading),
+            Math.cos(facing(s.x, s.z, v.x, v.z) - s.heading),
           ),
         );
         expect(error).toBeLessThan(initialError);
@@ -258,18 +254,97 @@ describe('the wandering button', () => {
             target,
             surrendered: false,
           });
-        expect(
-          Math.cos(s.heading - facing(s.x, s.z, centre.x, centre.z)),
-        ).toBeCloseTo(1);
+        expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
       }
     }
   });
 
-  it('does not delay skittish flight or the return home', () => {
+  it('watches the player at the start of a terrified escape and after surrender', () => {
+    const v = viewer(0, 0, -1, 0, 2, 4);
+    let s = { x: -1, z: -1, heading: facing(-1, -1, v.x, v.z), speed: 0 };
+    for (let i = 0; i < 10; i++) {
+      s = stepStand(s, 'terrified', v, floor, home, 0.05, {
+        target: { x: -7.7, z: -5.7 },
+        surrendered: false,
+      });
+      expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
+    }
+    const stopped = {
+      x: floor.minX + WALL_MARGIN,
+      z: floor.minZ + WALL_MARGIN,
+      heading: 0,
+      speed: 0,
+    };
+    s = stopped;
+    for (let i = 0; i < 50; i++)
+      s = stepStand(s, 'terrified', v, floor, home, 0.05, {
+        target: stopped,
+        surrendered: true,
+      });
+    expect(s.x).toBe(stopped.x);
+    expect(s.z).toBe(stopped.z);
+    expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
+  });
+
+  it('ramps up and brakes smoothly when returning home', () => {
+    const move = createStandMotion();
+    const v = viewer(0, 0, -1, 0, -5, 4);
+    let s = { x: 2, z: 0, heading: 0, speed: 0 };
+    const speeds: number[] = [];
+    for (let i = 0; i < 480; i++) {
+      s = move(s, 'normal', v, floor, home, 1 / 60);
+      speeds.push(s.speed);
+    }
+    expect(speeds[0]).toBeGreaterThan(0);
+    expect(speeds[0]).toBeLessThan(speeds[5]);
+    expect(Math.max(...speeds)).toBeCloseTo(CREEP_SPEED);
+    expect(
+      speeds.some(
+        (speed, i) => i > 180 && speed > 0.001 && speed < CREEP_SPEED / 2,
+      ),
+    ).toBe(true);
+    expect(Math.hypot(s.x, s.z)).toBeLessThan(0.002);
+    expect(s.speed).toBe(0);
+  });
+
+  it('coasts to a halt on the skittish loop after the player backs away', () => {
+    const move = createStandMotion();
+    const loop = orbitOf(floor);
+    let s = { x: loop.x + loop.radius, z: loop.z, heading: 0, speed: 0 };
+    const near = viewer(0, 0, -1, 2, s.x - 1, s.z - 1);
+    for (let i = 0; i < 12; i++)
+      s = move(s, 'skittish', near, floor, home, 1 / 60);
+    const before = s.speed;
+    const far = viewer(0, 0, -1, 0, 0, 0);
+    s = move(s, 'skittish', far, floor, home, 1 / 60);
+    expect(s.speed).toBeGreaterThan(0);
+    expect(s.speed).toBeLessThan(before);
+    for (let i = 0; i < 90; i++)
+      s = move(s, 'skittish', far, floor, home, 1 / 60);
+    expect(s.speed).toBe(0);
+    expect(Math.hypot(s.x - loop.x, s.z - loop.z)).toBeCloseTo(loop.radius);
+  });
+
+  it('accelerates its terrified turn rather than jumping to full angular speed', () => {
+    const move = createStandMotion();
+    const v = viewer(0, 0, -1, 0, 3, 4);
+    let s = { x: -1, z: -1, heading: facing(3, 4, -1, -1), speed: 0 };
+    const changes: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const before = s.heading;
+      s = move(s, 'terrified', v, floor, home, 1 / 60);
+      changes.push(Math.abs(s.heading - before));
+    }
+    expect(changes[0]).toBeGreaterThan(0);
+    expect(changes[0]).toBeLessThan(changes[4]);
+    expect(changes[4]).toBeLessThan(6 / 60);
+  });
+
+  it('starts skittish flight and the return home immediately, with eased acceleration', () => {
     const move = createStandMotion(() => 2 / 3);
     const s = { x: 0, z: 1.5, heading: 0 };
     const v = viewer(0, 0, -1, 2);
-    expect(move(s, 'skittish', v, floor, home, 0.1).speed).toBeGreaterThan(2);
+    expect(move(s, 'skittish', v, floor, home, 0.1).speed).toBeGreaterThan(0);
     expect(move(s, 'normal', v, floor, home, 0.1).speed).toBeGreaterThan(0);
   });
 
@@ -351,6 +426,33 @@ describe('the wandering button', () => {
     const later = run({ x: 0, z: 0, heading: 0 }, 'eager', v, 30);
     expect(later.x).toBeLessThan(-1);
     expect(later.z).toBeCloseTo(3, 0);
+  });
+
+  it('faces a stationary player while skittish, even when waiting out of reach', () => {
+    const loop = orbitOf(floor);
+    const on = { x: loop.x + loop.radius, z: loop.z, heading: 0 };
+    const v = viewer(1, 0, 0, 0.01, 0, 1);
+    const s = run(on, 'skittish', v, 1);
+    expect(s.speed).toBe(0);
+    expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
+  });
+
+  it('faces away again when a nearby player starts moving', () => {
+    const loop = orbitOf(floor);
+    const on = { x: loop.x + loop.radius, z: loop.z, heading: 0 };
+    const v = viewer(1, 0, 0, 2, on.x - 1, on.z);
+    const toward = facing(on.x, on.z, v.x, v.z);
+    const s = stepStand(
+      { ...on, heading: toward },
+      'skittish',
+      v,
+      floor,
+      home,
+      0.1,
+    );
+    const away = facing(v.x, v.z, s.x, s.z);
+    expect(Math.cos(s.heading - away)).toBeGreaterThan(Math.cos(toward - away));
+    expect(s.speed).toBeGreaterThan(v.speed);
   });
 
   it('waits on its loop, skittish, and runs round it only when the player is near', () => {
@@ -525,7 +627,7 @@ describe('the wandering button', () => {
       for (let i = 0; i < 240; i++) tick();
       const target = move.escape()!.target;
       expect(Math.hypot(s.x - target.x, s.z - target.z)).toBeLessThan(0.05);
-      expect(s.heading).toBeCloseTo(facing(s.x, s.z, 0, 0));
+      expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
     };
     tick();
     arrive();
@@ -552,7 +654,7 @@ describe('the wandering button', () => {
     expect(s.x).toBeCloseTo(stopped.x);
     expect(s.z).toBeCloseTo(stopped.z);
     expect(s.speed).toBe(0);
-    expect(s.heading).toBeCloseTo(facing(s.x, s.z, 0, 0));
+    expect(Math.cos(s.heading - facing(s.x, s.z, v.x, v.z))).toBeCloseTo(1);
     move(s, 'normal', v, floor, home, 0.05);
     expect(move.escape()).toBeNull();
     move(s, 'terrified', v, floor, home, 0.05);

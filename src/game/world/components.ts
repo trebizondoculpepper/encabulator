@@ -68,7 +68,10 @@ export type PartEvent =
   | 'blow'
   /** A capacitor bulging, and venting. */
   | 'bulge'
-  | 'vent';
+  | 'vent'
+  | 'pick-up'
+  | 'drop'
+  | 'impact';
 
 /** What a part's state sound can depend on. */
 export interface PartState {

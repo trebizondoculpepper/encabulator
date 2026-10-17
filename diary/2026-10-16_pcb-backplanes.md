@@ -1,0 +1,11 @@
+# Trial procedural PCB backplanes
+
+Added green FR4 backplanes to the PLC and large drive cabinets in dev6, with the same passive board views behind the processor and power-stage exhibits in dev0. Existing working components stay separate and at their real dimensions. Boards have 2.4 mm thickness, stand-offs and screws, header pins, subdued copper traces under solder mask, plated via dots and printed assembly markings. These are custom illustrative assemblies, not claimed replicas of Allen-Bradley backplane artwork or electrically routed netlists.
+
+Adapted ArtBIT's MIT-licensed Circuit Board Painter trace generator to a deterministic local-seed implementation without its editor or flow-field dependencies. Retained the full licence under `src/scene/vendor/` and recorded attribution in `CREDITS.md`. Textures are generated once per board and registered with the existing kit for disposal. They add no per-frame generator work. Boards are children of bucket interior groups, so shut doors hide and exclude them together with the equipment.
+
+All doors still default closed. An explicit `?room=dev6&view=plc&doors=open` development preview opens them to inspect the boards. Visually checked this in Chrome. Added checks for seeded repeatability, edge clearance, distinct trace cells and backplane interior culling.
+
+Promoted PCB BACKPLANE REV C to a composite machine part with its own bus component and seven independent card components, shared between dev6 and a dedicated eighteenth dev0 plinth. Individual card use actions, sound/event propagation, updates and disposal are composed through a PartSet. Cards slide fully clear when removed, showing their green PCB, edge contacts and chip packages. The supply and processor interlocks remain active during withdrawal and reinsertion; bus fault/disconnect propagates to every card. Added a direct gallery inspection start `?room=dev0&view=backplane` and tests using actual assembly use actions, withdrawal geometry and electrical propagation.
+
+Verified a processor card withdrawal through the shared E/use control in Chrome, with the card event visible in the room log. Typecheck, lint, formatting, all 288 tests and the production build passed. Changes remain uncommitted.

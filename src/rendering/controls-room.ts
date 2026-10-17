@@ -25,7 +25,11 @@ import {
   createDisplaysBoard,
 } from './test-boards';
 import type { TestFitting } from './test-boards';
-import { createPedestals, PEDESTAL_WIDTH } from './device-pedestals';
+import {
+  createMachineGallery,
+  MACHINE_GALLERY_LAYOUT,
+  MACHINE_PLINTH_WIDTH,
+} from './machine-gallery';
 
 /**
  * Dev0, Controls and Displays: the kinds of controls, displays and working
@@ -33,13 +37,12 @@ import { createPedestals, PEDESTAL_WIDTH } from './device-pedestals';
  * centre in Rockwell's Retro Encabulator film (an Allen-Bradley CENTERLINE
  * line-up). On the north wall, the CONTROLS board of 30 mm pilot devices
  * and the DISPLAYS board of indicators and displays, each driven by test
- * controls. Along the south wall, a pedestal for each working part of a
- * motor control unit, with a test panel to put it through what it does,
+ * controls. Eighteen plinths exhibit the shared machine inventory, each with a test panel to put it through what it does,
  * failures included. Every control is a component.
  */
 export function startControlsRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
-  const half = { x: 6, z: 5 };
+  const half = { x: 10, z: 8 };
   const bounds: Footprint = {
     minX: -half.x * m,
     maxX: half.x * m,
@@ -100,7 +103,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   const passages = createPortals('dev0', doors, 0, m);
   scene.add(passages.group);
 
-  // The boards on the north wall and the pedestals along the south.
+  // The north/east wall boards and the freestanding machine gallery.
   const kit = createPanelKit();
   const fittings: TestFitting[] = [];
   const footprints: Footprint[] = [];
@@ -145,15 +148,14 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     minZ: (cabinetZ - 1.75) * m,
     maxZ: (cabinetZ + 1.75) * m,
   });
-  const pedestalZ = half.z - 1.9;
-  createPedestals(kit).forEach((pedestal, i) => {
-    const x = -4.6 + i * 1.6;
-    const reach = PEDESTAL_WIDTH / 2 + 0.05;
-    place(pedestal, x, 0, pedestalZ, Math.PI, {
+  createMachineGallery(kit).forEach((plinth, i) => {
+    const { x, z } = MACHINE_GALLERY_LAYOUT[i];
+    const reach = MACHINE_PLINTH_WIDTH / 2 + 0.15;
+    place(plinth, x, 0, z, 0, {
       minX: (x - reach) * m,
       maxX: (x + reach) * m,
-      minZ: (pedestalZ - reach - 0.1) * m,
-      maxZ: (pedestalZ + reach) * m,
+      minZ: (z - reach) * m,
+      maxZ: (z + reach) * m,
     });
   });
 
@@ -247,10 +249,12 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
       yaw: Math.PI / 2,
       pitch: -0.1,
     },
+    backplane: { x: 5 * m, z: 4.85 * m, yaw: 0, pitch: -0.3 },
+    components: { x: -6.8 * m, z: 6.2 * m, yaw: 0.35, pitch: -0.17 },
     pedestals: {
-      x: -0.6 * m,
-      z: (pedestalZ - 2.6) * m,
-      yaw: Math.PI,
+      x: -5 * m,
+      z: -1 * m,
+      yaw: 0,
       pitch: -0.3,
     },
   };
@@ -267,6 +271,15 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     camera,
     metre: m,
     floorY: 0,
+    objects: scene,
+    supports: () =>
+      MACHINE_GALLERY_LAYOUT.map(({ x, z }) => ({
+        minX: x - 0.47,
+        maxX: x + 0.47,
+        minZ: z - 0.47,
+        maxZ: z + 0.47,
+        top: 0.98,
+      })),
     start: startView ??
       passages.arrival(params.get('from')) ?? { x: 0, z: 0, yaw: 0 },
     solids: () => [
@@ -278,7 +291,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   });
   const notes = document.createElement('div');
   notes.textContent =
-    'DEV0 · Controls and Displays: controls and displays on the north wall, working parts on pedestals to the south · Portals: the training room west, dev1 east';
+    'DEV0 · Controls and Displays: controls and displays on the north wall, machine components on eighteen plinths · Portals: the training room west, dev1 east';
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

@@ -1095,3 +1095,64 @@ export function createDoorLeaf(
   );
   return group;
 }
+
+/** Protective rear skin of an instrument door, with ventilation louvres. */
+export function createDoorRearCover(
+  kit: PanelKit,
+  layout: {
+    width: number;
+    height: number;
+    panWidth: number;
+    panHeight: number;
+    panX: number;
+    flangeDepth: number;
+    panDepth: number;
+    opening: { x: number; y: number; width: number; height: number } | null;
+  },
+  paint: Material,
+) {
+  const group = new Group();
+  const {
+    width,
+    height,
+    panWidth,
+    panHeight,
+    panX,
+    flangeDepth,
+    panDepth,
+    opening,
+  } = layout;
+  const rim = createDoorLeaf(width, height, 0.0006, paint, {
+    x: panX,
+    y: 0,
+    width: panWidth,
+    height: panHeight,
+  });
+  rim.position.z = -flangeDepth / 2 - 0.0007;
+  group.add(rim);
+  const pan = createDoorLeaf(
+    panWidth,
+    panHeight,
+    0.0006,
+    paint,
+    opening && { ...opening, x: opening.x - panX },
+  );
+  pan.position.set(panX, 0, -flangeDepth / 2 - panDepth - 0.0007);
+  group.add(pan);
+  // Keep the PLC viewing aperture clear; its upper cover still has vents.
+  const ventHeight = Math.min(0.072, panHeight * 0.22);
+  const ventWidth = Math.min(0.24, panWidth - 0.04);
+  for (const y of opening
+    ? [panHeight / 2 - ventHeight / 2 - 0.02]
+    : [
+        -panHeight / 2 + ventHeight / 2 + 0.018,
+        panHeight / 2 - ventHeight / 2 - 0.018,
+      ]) {
+    const vent = createLouvres(kit, ventWidth, ventHeight, paint);
+    vent.name = 'Door rear ventilation';
+    vent.rotation.y = Math.PI;
+    vent.position.set(panX, y, -flangeDepth / 2 - panDepth - 0.001);
+    group.add(vent);
+  }
+  return group;
+}

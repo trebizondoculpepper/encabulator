@@ -26,6 +26,10 @@ This is the central credit record for the project's sound effects. New recording
 
 ## Procedural effects
 
-Control clicks, hums and other synthesised sounds are original procedural patches in `src/audio/`. They use Web Audio and [ZzFX](https://github.com/KilledByAPixel/ZzFX), by [Frank Force](https://github.com/KilledByAPixel), MIT.
+Control clicks, hums, dropped-board clatters and other synthesised sounds are original procedural patches in `src/audio/`. They use Web Audio and [ZzFX](https://github.com/KilledByAPixel/ZzFX), by [Frank Force](https://github.com/KilledByAPixel), MIT.
 
 The fire alarm sounder (`src/audio/fire-alarm.ts`), copied from the VX3 Simulator, is synthesised from scratch. Its arrangement was taken, by measurement only, from [Hausalarm Auslösen German fire alarm](https://www.youtube.com/watch?v=B7Mqzvsw7iU) by [USfireFan](https://www.youtube.com/@USfireFan), supplied by the owner: a ~3.1 kHz piezo pulsing half a second on and off, a two-note buzzer in its gaps, and a far sounder sweeping down from ~3.25 to ~2.1 kHz. Pitches and timings were read from a spectrogram; no audio from the video is included or played, and our pitches differ.
+
+## Procedural circuit boards
+
+The cabinet backplane trace generator (`src/scene/vendor/circuit-traces.ts`) is adapted from [Circuit Board Painter](https://github.com/ArtBIT/circuitboard-painter) by ArtBIT, copyright 2025, under the MIT licence. The full notice is retained in `src/scene/vendor/circuitboard-painter.LICENSE`. Adaptations remove the editor and flow-field dependency, use a local seeded RNG, reserve board-edge clearance and draw static solder-mask, via and silkscreen textures for Three.js. Backplane geometry and assembly markings are original project work.

@@ -1,4 +1,6 @@
-import type { PerspectiveCamera } from 'three';
+import type { Object3D, PerspectiveCamera } from 'three';
+import { createObjectHandling } from './object-handling';
+import type { SupportSurface } from './object-handling';
 import { slide } from '../game/walk-collision';
 import type { Footprint } from '../game/walk-collision';
 import { PAD, controlsHelp, deadZone } from '../game/controls';
@@ -93,6 +95,9 @@ export interface FirstPersonOptions {
   start: { x: number; z: number; yaw?: number; pitch?: number };
   /** Solid footprints on the floor plan, in scene units. */
   solids?: () => readonly Footprint[];
+  /** World objects for the shared pickup/drop interaction. */
+  objects?: Object3D;
+  supports?: () => readonly SupportSurface[];
   /** Use whatever is at a normalised screen point (centre is 0, 0). */
   use: (x: number, y: number) => void;
   /** Whether something usable is under the crosshair. */
@@ -104,6 +109,18 @@ export interface FirstPersonOptions {
 
 export function createFirstPerson(options: FirstPersonOptions) {
   const { canvas, camera, metre, floorY } = options;
+  const handling = options.objects
+    ? createObjectHandling(
+        options.objects,
+        camera,
+        metre,
+        floorY,
+        options.supports,
+      )
+    : null;
+  const use = (x: number, y: number) => {
+    if (!handling?.use(x, y)) options.use(x, y);
+  };
   const walker = {
     x: options.start.x,
     z: options.start.z,
@@ -251,7 +268,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       walker.crouched = true;
       walker.lowCrouched = !walker.lowCrouched;
     }
-    if (event.code === 'KeyE') options.use(0, 0);
+    if (event.code === 'KeyE') use(0, 0);
   };
   const keyup = (event: KeyboardEvent) => keys.delete(event.code);
   const forget = () => {
@@ -310,7 +327,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     }
     if (event.pointerType === 'mouse' && !lockRefused) {
       if (event.button !== 0) return;
-      if (locked()) options.use(0, 0);
+      if (locked()) use(0, 0);
       else void Promise.resolve(canvas.requestPointerLock()).catch(refuseLock);
       return;
     }
@@ -351,7 +368,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (!drag) return;
     // A tap works what the finger first touched, not where it lifted:
     // a fingertip wobbles off a small control as it comes away.
-    if (!drag.moved) options.use(...screenPoint(drag.x, drag.y));
+    if (!drag.moved) use(...screenPoint(drag.x, drag.y));
     drag = null;
   };
   // The wheel zooms and Alt+wheel raises and lowers the eye. A trackpad
@@ -422,9 +439,9 @@ export function createFirstPerson(options: FirstPersonOptions) {
       Math.abs(zoom) > 0.05 ||
       pad.buttons.some((b) => b.pressed);
     if (active) setInput('gamepad');
-    if (went(PAD.use)) options.use(0, 0);
-    if (went(PAD.knobDown)) turningKnobs(-1, () => options.use(0, 0));
-    if (went(PAD.knobUp)) turningKnobs(1, () => options.use(0, 0));
+    if (went(PAD.use)) use(0, 0);
+    if (went(PAD.knobDown)) turningKnobs(-1, () => use(0, 0));
+    if (went(PAD.knobUp)) turningKnobs(1, () => use(0, 0));
     if (went(PAD.crouch)) {
       walker.crouched = !walker.crouched;
       walker.lowCrouched = false;
@@ -526,12 +543,15 @@ export function createFirstPerson(options: FirstPersonOptions) {
         camera.fov = fov;
         camera.updateProjectionMatrix();
       }
-      if (locked() && options.aimed)
-        crosshair.style.borderColor = options.aimed()
-          ? '#ffb43a'
-          : 'rgba(233, 225, 200, 0.85)';
+      handling?.update(delta);
+      if (locked() && (options.aimed || handling))
+        crosshair.style.borderColor =
+          handling?.aimed() || options.aimed?.()
+            ? '#ffb43a'
+            : 'rgba(233, 225, 200, 0.85)';
     },
     dispose() {
+      handling?.dispose();
       document.removeEventListener('keydown', keydown);
       document.removeEventListener('keyup', keyup);
       window.removeEventListener('blur', forget);

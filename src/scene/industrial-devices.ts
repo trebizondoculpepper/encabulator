@@ -96,9 +96,9 @@ export function createMotorUnit(
   name = 'UNIT 1A\nCONVEYOR M1',
 ): MotorUnitView {
   const group = new Group();
-  const w = 0.5;
-  const h = 0.36;
-  const d = 0.32;
+  const w = 0.508;
+  const h = 0.3302;
+  const d = 0.508;
   const grey = kitPaint(kit, '#a5aaa6', 0.15);
   const inside = kitPaint(kit, '#bfc1b9');
   // The box, open at the front.
@@ -279,16 +279,16 @@ export function createContactorView(kit: PanelKit): ContactorView {
   const body = box(
     group,
     0.045,
-    0.08,
-    0.075,
+    0.077,
+    0.065,
     kitPaint(kit, '#5f6366'),
     0,
     0,
-    0.0375,
+    0.0325,
   );
   body.name = 'Contactor body';
-  box(group, 0.045, 0.03, 0.02, kitPaint(kit, '#4a4d50'), 0, 0, 0.083);
-  box(group, 0.016, 0.07, 0.06, kitPaint(kit, '#6c7073'), 0.031, -0.004, 0.03);
+  box(group, 0.045, 0.03, 0.02, kitPaint(kit, '#4a4d50'), 0, 0, 0.073);
+  box(group, 0.016, 0.07, 0.06, kitPaint(kit, '#6c7073'), 0.013, -0.004, 0.03);
   const brass = kitPaint(kit, '#c9a34c', 0.6);
   for (const x of [-0.014, 0, 0.014])
     for (const y of [0.036, -0.036]) {
@@ -309,7 +309,7 @@ export function createContactorView(kit: PanelKit): ContactorView {
     height: 0.0022,
     ink: '#e9e5da',
   });
-  label.position.set(0, 0.02, 0.0751);
+  label.position.set(0, 0.02, 0.0831);
   group.add(label);
   const window = box(
     group,
@@ -319,7 +319,7 @@ export function createContactorView(kit: PanelKit): ContactorView {
     kitPaint(kit, '#141415'),
     0,
     0,
-    0.094,
+    0.084,
   );
   window.name = 'Armature window';
   const tab = box(
@@ -330,7 +330,7 @@ export function createContactorView(kit: PanelKit): ContactorView {
     kitPaint(kit, '#efece2'),
     0,
     0.003,
-    0.0945,
+    0.0845,
   );
   let target = 0.003;
   return {
@@ -368,7 +368,7 @@ export function createOverloadRelayView(
   scale = '1   2   3   4   5 A',
 ): OverloadRelayView {
   const group = new Group();
-  box(group, 0.045, 0.05, 0.07, kitPaint(kit, '#6a6e71'), 0, 0, 0.035);
+  box(group, 0.045, 0.066, 0.062, kitPaint(kit, '#6a6e71'), 0, 0, 0.035);
   const brass = kitPaint(kit, '#c9a34c', 0.6);
   for (const x of [-0.014, 0, 0.014])
     box(group, 0.01, 0.006, 0.012, brass, x, -0.022, 0.066);
@@ -468,17 +468,17 @@ export function createFuseHolderView(
   rating = '2 A',
 ): FuseHolderView {
   const group = new Group();
-  box(group, 0.09, 0.03, 0.02, kitPaint(kit, '#1d1d1e'), 0, 0, 0.01);
+  box(group, 0.06, 0.03, 0.02, kitPaint(kit, '#1d1d1e'), 0, 0, 0.01);
   const brass = kitPaint(kit, '#c9a34c', 0.65);
-  for (const x of [-0.03, 0.03])
+  for (const x of [-0.0158, 0.0158])
     box(group, 0.012, 0.022, 0.018, brass, x, 0, 0.028);
   const cartridge = new Group();
   cartridge.position.z = 0.03;
   group.add(cartridge);
-  const barrel = rod(cartridge, 0.0055, 0.05, kitPaint(kit, '#c9b48a'), 'x');
+  const barrel = rod(cartridge, 0.00515, 0.0251, kitPaint(kit, '#c9b48a'), 'x');
   barrel.name = 'Fuse cartridge';
-  for (const x of [-0.028, 0.028])
-    rod(cartridge, 0.006, 0.008, kitPaint(kit, '#d8d9da', 0.7), 'x', x);
+  for (const x of [-0.0158, 0.0158])
+    rod(cartridge, 0.00515, 0.0065, kitPaint(kit, '#d8d9da', 0.7), 'x', x);
   const label = createMicroLabel(kit, rating, {
     height: 0.0035,
     ink: '#2a2418',
@@ -550,7 +550,7 @@ function boardTexture(kit: PanelKit) {
   c.globalAlpha = 1;
   c.fillStyle = '#f2f0e4';
   c.font = 'bold 10px monospace';
-  c.fillText('POWER BD  REV C', 8, 184);
+  c.fillText('PEPPERDYNE POWER BD  REV C', 8, 184);
   c.fillText('C1', 52, 30);
   c.fillText('C2', 140, 30);
   c.fillText('!  DC BUS', 200, 16);
@@ -616,8 +616,8 @@ export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
     const can = new Group();
     can.position.set(-0.05 + i * 0.07, 0.004, -0.02);
     group.add(can);
-    const r = 0.018;
-    const height = 0.06;
+    const r = 0.0175;
+    const height = 0.05;
     const body = rod(
       can,
       r,
@@ -630,7 +630,7 @@ export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
       20,
     );
     body.name = `Capacitor C${i + 1}`;
-    const stripe = createMicroLabel(kit, `C${i + 1}\n2200µF\n400V`, {
+    const stripe = createMicroLabel(kit, `C${i + 1}\n680µF\n400V`, {
       height: 0.0035,
       ink: '#eef0f4',
     });
@@ -731,8 +731,8 @@ export function createMotorView(
   const group = new Group();
   const frame = kitPaint(kit, '#b9bdbf', 0.55);
   const dark = kitPaint(kit, '#4c5054', 0.3);
-  const r = 0.085;
-  const cy = 0.11;
+  const r = 0.07;
+  const cy = 0.09;
   rod(group, r, 0.24, frame, 'x', 0, cy, 0, 24);
   for (let i = 0; i < 12; i++) {
     const fin = box(group, 0.22, 0.008, 0.012, frame, 0, cy, 0);
@@ -742,7 +742,7 @@ export function createMotorView(
   rod(group, r * 0.95, 0.03, frame, 'x', 0.135, cy, 0, 24);
   rod(group, r * 0.97, 0.07, dark, 'x', -0.155, cy, 0, 24);
   rod(group, r * 0.6, 0.004, kitPaint(kit, '#1d4f9e'), 'x', -0.191, cy, 0, 24);
-  const badge = createMicroLabel(kit, 'A·B', { height: 0.022, ink: '#f4f6fa' });
+  const badge = createMicroLabel(kit, 'ABB', { height: 0.022, ink: '#f4f6fa' });
   badge.position.set(-0.194, cy, 0);
   badge.rotation.y = -Math.PI / 2;
   group.add(badge);

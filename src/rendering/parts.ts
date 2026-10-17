@@ -26,6 +26,7 @@ import type {
   Readable,
 } from '../game/world/components';
 import {
+  createDoorRearCover,
   createFlangeHandle,
   createPushbuttonStation,
 } from '../scene/cabinet-fittings';
@@ -509,6 +510,8 @@ export function disconnectHandle(
   kit: PanelKit,
   props: Common & {
     colour?: 'black' | 'red';
+    /** Reuse an internal breaker's one mechanism and event stream. */
+    shared?: ReturnType<typeof createOperatingHandle>;
     initial?: HandlePosition;
     bound?: Binding<HandlePosition>;
     latch?: Readable<boolean>;
@@ -521,18 +524,21 @@ export function disconnectHandle(
   const a = beginPart(kit, props.name ?? 'disconnect handle');
   const view = createFlangeHandle(kit, { colour: props.colour });
   a.object.add(view.group);
-  const handle = createOperatingHandle({
-    initial: props.initial ?? 'on',
-    bound: props.bound,
-    latch: props.latch,
-  });
-  a.voice(handle, { on: HANDLE, off: HANDLE, trip: TRIP, refused: LOCKED });
+  const handle =
+    props.shared ??
+    createOperatingHandle({
+      initial: props.initial ?? 'on',
+      bound: props.bound,
+      latch: props.latch,
+    });
+  if (!props.shared)
+    a.voice(handle, { on: HANDLE, off: HANDLE, trip: TRIP, refused: LOCKED });
   a.uses.set(view.lever, () => handle.operate());
   a.updates.push((delta) => {
     view.set(handle.on.value);
     view.update(delta);
   });
-  a.disposers.push(handle.dispose);
+  if (!props.shared) a.disposers.push(handle.dispose);
   return {
     ...a.part(),
     position: handle.position,
@@ -703,6 +709,23 @@ export function doorLatch(
     open: computed(() => door.state.value),
     door,
   };
+}
+
+/** A vented door back closes the same component that its front latches open. */
+export function doorBack(
+  kit: PanelKit,
+  props: Common & {
+    shared: ReturnType<typeof createSwitch>;
+    material: Material;
+    layout: Parameters<typeof createDoorRearCover>[1];
+  },
+): Part {
+  const a = beginPart(kit, props.name ?? 'door rear cover');
+  a.object.add(createDoorRearCover(kit, props.layout, props.material));
+  a.uses.set(a.object, () => {
+    if (props.shared.state.value) props.shared.flip();
+  });
+  return a.part();
 }
 
 /** A round black boss with a flat wing to turn it by. */
@@ -893,12 +916,18 @@ export function contactor(
  */
 export function overloadRelay(
   kit: PanelKit,
-  props: Common & { current: Readable<number> },
+  props: Common & { current: Readable<number>; settings?: readonly number[] },
 ): Part & { component: ReturnType<typeof createOverloadRelay> } {
   const a = beginPart(kit, props.name ?? 'overload relay');
-  const view = createOverloadRelayView(kit);
+  const view = createOverloadRelayView(
+    kit,
+    props.settings ? '2.5   3   3.5   4 A' : undefined,
+  );
   a.object.add(view.group);
-  const relay = createOverloadRelay({ current: props.current });
+  const relay = createOverloadRelay({
+    current: props.current,
+    settings: props.settings,
+  });
   a.voice(relay, { trip: TRIP, press: PRESS });
   a.voice(relay.dial, { detent: KNOB, refused: LOCKED }, view.dial);
   a.uses.set(view.dial, (direction = 1) => relay.dial.turn(direction));

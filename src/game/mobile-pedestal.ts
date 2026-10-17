@@ -17,12 +17,12 @@ import { createGraph } from './world/graph';
  *   man in the "lion and man" pursuit game. It keeps to a circle round the
  *   middle of the room (the loop) and, when the player comes near, runs
  *   round it away from them, reversing whenever they cut ahead, and turns
- *   its button away. Running `ORBIT_RATIO` times the player's speed, it
+ *   its button away while the player moves, or towards them once they stop. Running `ORBIT_RATIO` times the player's speed, it
  *   can never be caught (`doc/research/skittish-chase.md`). A corner, or a
  *   straight run to the furthest spot, is where it would be.
  * - **Terrified**: first the furthest corner, then three random corner
  *   escapes when approached. After arriving from the third escape it
- *   gives up, faces the viewer and waits to be pressed.
+ *   gives up and waits to be pressed. It turns towards the player throughout.
  *
  * Everything here is in metres on the floor plan; the stand is a disc of
  * `STAND_RADIUS` on the floor, its lens `BUTTON_HEIGHT` up and
@@ -292,12 +292,20 @@ export function stepStand(
   escape?: { target: { x: number; z: number }; surrendered: boolean },
   eagerPose?: Stand,
   orbit: { direction: OrbitDirection } = { direction: 1 },
+  travelSpeed?: number,
 ): Stand & { speed: number } {
   const near = Math.hypot(stand.x - viewer.x, stand.z - viewer.z);
   let next = { x: stand.x, z: stand.z, moved: 0 };
   let heading = stand.heading;
   if (mode === 'normal') {
-    next = towards(stand.x, stand.z, home.x, home.z, CREEP_SPEED, dt);
+    next = towards(
+      stand.x,
+      stand.z,
+      home.x,
+      home.z,
+      travelSpeed ?? CREEP_SPEED,
+      dt,
+    );
   } else if (mode === 'eager') {
     if (eagerPose) {
       next = {
@@ -315,28 +323,19 @@ export function stepStand(
       );
     }
   } else if (mode === 'terrified' && escape) {
-    const speed = Math.max(
-      TERRIFIED_MIN_SPEED,
-      viewer.speed * TERRIFIED_MARGIN,
-    );
+    const speed =
+      travelSpeed ??
+      Math.max(TERRIFIED_MIN_SPEED, viewer.speed * TERRIFIED_MARGIN);
     if (!escape.surrendered) {
       const waypoint = escapeWaypoint(stand, escape.target, viewer, floor);
       next = towards(stand.x, stand.z, waypoint.x, waypoint.z, speed, dt);
     }
-    // Finish every corner journey looking back into the room, and keep
-    // that orientation while waiting or after giving up.
-    const arriving =
-      Math.hypot(next.x - escape.target.x, next.z - escape.target.z) <= 2;
-    const face =
-      arriving || escape.surrendered
-        ? facing(
-            next.x,
-            next.z,
-            (floor.minX + floor.maxX) / 2,
-            (floor.minZ + floor.maxZ) / 2,
-          )
-        : facing(viewer.x, viewer.z, next.x, next.z);
-    heading = turn(heading, face, dt * Math.max(4.5, (speed * Math.PI) / 2));
+    // Keep watching the player throughout the escape, at the corner and after surrender.
+    heading = turn(
+      heading,
+      facing(next.x, next.z, viewer.x, viewer.z),
+      dt * Math.max(4.5, (speed * Math.PI) / 2),
+    );
   } else if (mode === 'skittish') {
     // Near, it runs; left alone, it creeps onto its loop, ready to.
     const threatened = near < FLEE_RADIUS;
@@ -344,22 +343,25 @@ export function stepStand(
     const onLoop =
       Math.abs(Math.hypot(stand.x - loop.x, stand.z - loop.z) - loop.radius) <=
       0.05;
-    if (threatened || !onLoop) {
+    if (threatened || !onLoop || (travelSpeed ?? 0) > 0.001) {
       const to = orbitStep(
         stand,
         viewer,
         floor,
-        threatened ? fleeSpeed(viewer.speed) : CREEP_SPEED,
+        travelSpeed ?? (threatened ? fleeSpeed(viewer.speed) : CREEP_SPEED),
         dt,
         orbit.direction,
       );
       orbit.direction = to.direction;
       next = { ...to, moved: Math.hypot(to.x - stand.x, to.z - stand.z) };
     }
-    if (threatened)
+    const playerStill = viewer.speed < 0.05;
+    if (playerStill || threatened)
       heading = turn(
         heading,
-        facing(viewer.x, viewer.z, next.x, next.z),
+        playerStill
+          ? facing(next.x, next.z, viewer.x, viewer.z)
+          : facing(viewer.x, viewer.z, next.x, next.z),
         dt * 6,
       );
   }
@@ -448,6 +450,8 @@ export interface CornerEscape {
 
 /** Stateful camera reaction, kept outside the stateless movement calculation. */
 export function createStandMotion(random: () => number = Math.random) {
+  let travelRate = 0;
+  let angularRate = 0;
   let escape: CornerEscape | undefined;
   const orbit: { direction: OrbitDirection } = { direction: 1 };
   let previous: Viewer | undefined;
@@ -600,6 +604,50 @@ export function createStandMotion(random: () => number = Math.random) {
         }
       }
     }
+    // EAGER already has integrated smoothstep journeys. The reactive modes
+    // ease their speed towards demand and brake as their destination approaches.
+    let pace: number | undefined;
+    if (mode === 'eager') {
+      travelRate = 0;
+      angularRate = 0;
+    } else {
+      let demand = 0;
+      let remaining = Infinity;
+      const near = Math.hypot(stand.x - viewer.x, stand.z - viewer.z);
+      if (mode === 'normal') {
+        demand = CREEP_SPEED;
+        remaining = Math.hypot(home.x - stand.x, home.z - stand.z);
+      } else if (mode === 'terrified' && escape && !escape.surrendered) {
+        demand = Math.max(TERRIFIED_MIN_SPEED, viewer.speed * TERRIFIED_MARGIN);
+        remaining = Math.hypot(
+          escape.target.x - stand.x,
+          escape.target.z - stand.z,
+        );
+      } else if (mode === 'skittish') {
+        const loop = orbitOf(floor);
+        const radial = Math.abs(
+          Math.hypot(stand.x - loop.x, stand.z - loop.z) - loop.radius,
+        );
+        demand =
+          near < FLEE_RADIUS
+            ? fleeSpeed(viewer.speed)
+            : radial > 0.05
+              ? CREEP_SPEED
+              : 0;
+        if (near >= FLEE_RADIUS && radial > 0.05) remaining = radial;
+      }
+      const ramp = mode === 'skittish' ? 0.1 : 0.22;
+      demand = Math.min(demand, remaining / ramp);
+      const decay = Math.exp(-dt / ramp);
+      const distance = demand * dt + (travelRate - demand) * ramp * (1 - decay);
+      travelRate = demand + (travelRate - demand) * decay;
+      if (travelRate < 0.001 && demand === 0) travelRate = 0;
+      pace = dt > 0 ? Math.max(0, distance / dt) : 0;
+      if (remaining < 0.002) {
+        pace = dt > 0 ? remaining / dt : 0;
+        travelRate = 0;
+      }
+    }
     const next = stepStand(
       stand,
       mode,
@@ -610,7 +658,36 @@ export function createStandMotion(random: () => number = Math.random) {
       escape,
       eagerPose,
       orbit,
+      pace,
     );
+    if (mode !== 'eager' && dt > 0) {
+      let desired = next.heading;
+      if (mode === 'terrified' || (mode === 'skittish' && viewer.speed < 0.05))
+        desired = facing(next.x, next.z, viewer.x, viewer.z);
+      else if (
+        mode === 'skittish' &&
+        Math.hypot(next.x - viewer.x, next.z - viewer.z) < FLEE_RADIUS
+      )
+        desired = facing(viewer.x, viewer.z, next.x, next.z);
+      const error = Math.atan2(
+        Math.sin(desired - stand.heading),
+        Math.cos(desired - stand.heading),
+      );
+      const maxTurn =
+        mode === 'terrified' ? Math.max(4.5, ((pace ?? 0) * Math.PI) / 2) : 6;
+      const rate = Math.max(-maxTurn, Math.min(maxTurn, error * 6));
+      const acceleration = maxTurn / 0.18;
+      const previousRate = angularRate;
+      angularRate += Math.max(
+        -acceleration * dt,
+        Math.min(acceleration * dt, rate - angularRate),
+      );
+      const angle = ((previousRate + angularRate) * dt) / 2;
+      if (angle * error >= 0 && Math.abs(angle) >= Math.abs(error)) {
+        next.heading = desired;
+        angularRate = 0;
+      } else next.heading = stand.heading + angle;
+    }
     return {
       ...next,
       speed: dt > 0 ? Math.hypot(next.x - stand.x, next.z - stand.z) / dt : 0,

@@ -41,9 +41,9 @@ export const CONTROL_SCHEME: Record<
     gamepad: 'Right stick: look',
   },
   use: {
-    mouse: 'click or E: use',
-    touch: 'Tap: use',
-    gamepad: 'A: use',
+    mouse: 'click or E: use / pick up / drop',
+    touch: 'Tap: use / pick up / drop',
+    gamepad: 'A: use / pick up / drop',
   },
   knob: {
     mouse: "click a knob's left or right half: turn it down or up",
