@@ -52,6 +52,8 @@ const openRoom = async () => {
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
   else if (room === 'dev12')
     start = (await import('./rendering/tones-room')).startTonesRoom;
+  else if (room === 'dev14')
+    start = (await import('./rendering/bin-room')).startBinRoom;
   else if (room === 'dev13')
     start = (await import('./rendering/beeps-room')).startBeepsRoom;
   else if (room === 'dev11')

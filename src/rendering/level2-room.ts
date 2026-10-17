@@ -18,7 +18,8 @@ import { signal } from '@preact/signals-core';
 import { createLevel2Voice } from '../audio/level2-voice';
 import { partAudio } from '../audio/part-audio';
 import { devWalls } from '../game/dev-room-links';
-import { LEVEL2_CUES } from '../game/level2-cues';
+import { LEVEL2_BETAFORM, LEVEL2_CUES } from '../game/level2-cues';
+import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import type { PortableObject } from './object-handling';
@@ -128,6 +129,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const oil = device('section3.bucket1');
   const drive = device('section6.bucket2');
   const hydro = device('section7.bucket2');
+  // The small breaker inside Automation Control, the cards' own cabinet:
+  // the cards come out only once it is off. The rest of the machine stays
+  // on, so the player is saving a machine that is still running.
+  const automation = device('section5.bucket1');
   oil.position.set('off');
   hydro.position.set('off');
 
@@ -245,7 +250,46 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let endingCountdown = -1;
   let smokeOn = false;
   let priorOil = false;
-  const priorDrive = drive.closed.value;
+  // Rebooting the betaform amplifier: three operations drawn at random
+  // from ten, each a real control round the machine, set in any order and
+  // latched once done (`LEVEL2_BETAFORM`). No two playthroughs agree on
+  // what routine operation is.
+  const control = (name: string) => mcc.controls.get(name)!.position;
+  /** Something done by doing one thing and then another. */
+  const cycle = (first: () => boolean, then: () => boolean) => {
+    let started = false;
+    return () => {
+      if (first()) started = true;
+      return started && then();
+    };
+  };
+  const checks: Record<BetaformId, () => boolean> = {
+    isolator: cycle(
+      () => !drive.closed.value,
+      () => drive.closed.value,
+    ),
+    speed: () => control('drive.speed').value >= 10,
+    fan: () => control('fan.mode').value === 2,
+    key: () => control('hydraulic.key').value === 0,
+    boost: () => control('fan.boost').value === 1,
+    phase: () => control('incoming.phase').value === 0,
+    kirk: () => control('main.kirk').value === 0,
+    hoa: () => control('feed.hoa').value === 0,
+    test: () => control('annunciator.tests').value > 0,
+    stop: cycle(
+      () => control('auxiliary.stop').value === 1,
+      () => control('auxiliary.stop').value === 0,
+    ),
+  };
+  const drawn = (Object.keys(checks) as BetaformId[])
+    .map((id) => ({ id, order: Math.random() }))
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 3)
+    .map(({ id }) => id);
+  const betaform = new Set<BetaformId>();
+  let listed = false;
+  let nagTime = 0;
+  let nagged = 0;
   let priorHydro = false;
   let idle = 0;
   let optional = 97;
@@ -343,20 +387,28 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     ) {
       const work = mcc.parts.uses.get(object);
       if (!work) continue;
-      return () => {
-        if (
-          main.closed.value &&
-          object!.name.includes('AUTOMATION CONTROL') &&
-          object!.name.includes('latch')
-        ) {
-          voice.interrupt(7);
-          return;
-        }
-        work(knobDirection(object!, hit.point, camera));
-      };
+      return () => work(knobDirection(object!, hit.point, camera));
     }
     return null;
   };
+  /**
+   * A card the player tried to pull while its cabinet is still live: the
+   * pickup refuses it (the card is locked) and the narrator objects.
+   */
+  const liveCardAt = (x: number, y: number) => {
+    if (phase < 10 || !automation.closed.value) return false;
+    raycaster.setFromCamera(pointer.set(x, y), camera);
+    const hit = raycaster.intersectObject(mcc.group, true)[0];
+    if (!hit || hit.distance > 3.2 * m) return false;
+    for (
+      let object: Object3D | null = hit.object;
+      object;
+      object = object.parent
+    )
+      if (cards.some((card) => card.object === object)) return true;
+    return false;
+  };
+  let warned = -Infinity;
   const footprints: Footprint[] = [
     {
       minX: (-MCC_WIDTH / 2 - 0.1) * m,
@@ -380,7 +432,15 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     objects: scene,
     start: { x: 0, z: 1.0 * m, yaw: 0, pitch: 0.05 },
     solids: () => [...walls, ...footprints],
-    use: (x, y) => usableAt(x, y)?.(),
+    use: (x, y) => {
+      if (liveCardAt(x, y)) {
+        // Once, and again only if they keep trying.
+        if (clock - warned > 8) voice.interrupt(7);
+        warned = clock;
+        return;
+      }
+      usableAt(x, y)?.();
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   const resize = () => {
@@ -395,6 +455,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   observer.observe(canvas);
   resize();
   let last = 0;
+  let clock = 0;
   renderer.setAnimationLoop((time) => {
     if (canvas.parentElement?.hidden) {
       last = 0;
@@ -403,6 +464,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     const delta = last ? Math.min(0.1, (time - last) / 1000) : 0;
     last = time;
     ps1Uniforms.time.value = time / 1000;
+    clock += delta;
     walk.update(delta);
     mcc.update(delta);
     partAudio.listen(camera, m);
@@ -422,6 +484,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       if (endingCountdown < 0) {
         advance(12, 92, 93, 94, 95, 96);
         smokeOn = false;
+        // The machine was running all along; now it truly dies. Its main
+        // breaker trips, so everything runs down and every light goes out.
+        main.trip();
         partAudio.play({
           tones: [220, 185, 151, 121, 94, 70].map((hz, i) => ({
             at: i * 0.32,
@@ -452,11 +517,38 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       oilFeed.value = true;
       oilTone.value = true;
       advance(5, 4);
-    } else if (phase === 5 && priorDrive && !drive.closed.value) advance(6);
-    else if (phase === 6 && drive.closed.value) {
-      driveFeed.value = true;
-      driveTone.value = true;
-      advance(7);
+    } else if (phase === 5) {
+      for (const id of drawn)
+        if (!betaform.has(id) && checks[id]()) {
+          betaform.add(id);
+          nagTime = 0;
+          if (betaform.size === drawn.length) {
+            driveFeed.value = true;
+            driveTone.value = true;
+            advance(7);
+            voice.interrupt();
+            voice.say(LEVEL2_BETAFORM.done);
+          } else if (!voice.busy)
+            voice.say(LEVEL2_BETAFORM.acks[(betaform.size - 1) % 3]);
+        }
+      // Before anything, the whole list; after it, one remaining operation
+      // at a time, precisely, until it is done.
+      nagTime += delta;
+      const remaining = drawn.filter((id) => !betaform.has(id));
+      if (phase === 5 && !voice.busy && remaining.length) {
+        if (!listed && nagTime > 6) {
+          listed = true;
+          nagTime = 0;
+          voice.say(LEVEL2_BETAFORM.intro);
+          for (const id of remaining)
+            voice.say(LEVEL2_BETAFORM.operations[id].say);
+          voice.say(LEVEL2_BETAFORM.outro);
+        } else if (listed && nagTime > 15) {
+          nagTime = 0;
+          const id = remaining[nagged++ % remaining.length];
+          voice.say(LEVEL2_BETAFORM.operations[id].remind);
+        }
+      }
     } else if (phase === 7 && hydro.closed.value && !priorHydro) {
       priorHydro = true;
       hydroTone.value = true;
@@ -482,14 +574,18 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       hydroTone.value = false;
       driveTone.value = false;
       voice.interrupt(5, 6);
-    } else if (phase === 8 && smokeOn && !main.closed.value) advance(9);
-    else if (phase === 9 && mcc.isDoorOpen(14)) {
-      advance(10, 8, 9);
-      for (const card of cards)
-        (card.object.userData.portable as PortableObject).component.setLocked(
-          false,
+    } else if (phase === 8 && smokeOn) advance(9);
+    else if (phase === 9 && mcc.isDoorOpen(14)) advance(10, 8, 9);
+    if (phase >= 10)
+      // A card still in its slot comes out only with its cabinet's breaker
+      // off; one already out can always be picked up again.
+      for (const card of cards) {
+        const portable = (card.object.userData.portable as PortableObject)
+          .component;
+        portable.setLocked(
+          portable.phase.value === 'installed' && automation.closed.value,
         );
-    }
+      }
     if (phase === 10) {
       for (const [index, card] of cards.entries()) {
         const state = (card.object.userData.portable as PortableObject)

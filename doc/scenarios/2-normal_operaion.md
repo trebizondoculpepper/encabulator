@@ -50,9 +50,93 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **NARRATOR:** Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.
 
-**PLAYER ACTION — BETAFORM AMPLIFIER:** At the MAIN ENCABULATOR DRIVE VFD-601 cabinet, cycle the DRIVE ISOLATOR to OFF, set the SPEED potentiometer to its marked nominal position, then turn the isolator back ON. In this sequence, the drive supplies the betaform amplifier.
+**PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, three of the ten operations below are drawn at random; the player may do them in any order. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday.
 
-**NARRATOR:** [gives instructionss as to which items to change, sarcastically, tell the user again which item to change]
+**TRIGGER:** If the player has not finished all three about six seconds after the line above, the narrator lists them: the introduction, the three drawn operations, then the sign-off.
+
+**NARRATOR (wearily):** Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.
+
+**NARRATOR:** [The instruction line of each of the three drawn operations, in turn.]
+
+**NARRATOR:** There. That's all it is. That's all it ever was.
+
+**TRIGGER:** Each time the player completes one of the three, the narrator grudgingly acknowledges it, the first, second and third in turn (the last is replaced by the line below when it finishes the set).
+
+**NARRATOR:** Yes. Well done.
+
+**NARRATOR:** There. Was that so hard?
+
+**NARRATOR:** Look at you. Just like yesterday.
+
+**TRIGGER:** Every fifteen seconds without progress, the narrator picks one operation still undone and talks the player through it precisely, sarcastically, with that operation's reminder line.
+
+**TRIGGER:** When all three are done:
+
+**NARRATOR:** Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.
+
+### The ten operations
+
+Each operation has two lines to record: its instruction, used in the list, and its reminder, used when the player has not done it.
+
+**OPERATION 1 — CONTROL:** DRIVE ISOLATOR (section 6, under the drive): its red handle OFF, then ON again.
+
+**NARRATOR (instruction):** Cycle the drive isolator. Off, and on again.
+
+**NARRATOR (reminder):** The drive isolator. Under the drive, second section from the right. The red handle. Off. And then, and this is the part people forget, on again.
+
+**OPERATION 2 — CONTROL:** SPEED knob on MAIN ENCABULATOR DRIVE VFD-601 (section 6): turned all the way up.
+
+**NARRATOR (instruction):** Turn the speed knob on the drive all the way up.
+
+**NARRATOR (reminder):** The speed knob. On the drive. All the way up. Clockwise. The way clocks go. You've seen a clock.
+
+**OPERATION 3 — CONTROL:** LOW OFF HIGH selector on PANENDERMIC FAN (section 7): HIGH.
+
+**NARRATOR (instruction):** Put the panendermic fan on high.
+
+**NARRATOR (reminder):** The panendermic fan, in the far right-hand section. The selector. High. Not low. Not off. High. We sang a little song about it.
+
+**OPERATION 4 — CONTROL:** LOCAL REMOTE key on HYDRAULIC PUMP M-203 (section 3): LOCAL.
+
+**NARRATOR (instruction):** Turn the hydraulic pump key to local.
+
+**NARRATOR (reminder):** The hydraulic pump. Third section along, the little key. Turn it to local. You did this yesterday. You had a biscuit. You held the biscuit in your other hand.
+
+**OPERATION 5 — CONTROL:** Blue BOOST button on PANENDERMIC FAN (section 7): on.
+
+**NARRATOR (instruction):** Press boost on the panendermic fan.
+
+**NARRATOR (reminder):** The blue button. On the panendermic fan. It says boost. It has always said boost. Press it until it is blue.
+
+**OPERATION 6 — CONTROL:** PHASE selector on MAIN INCOMING (section 1, top): turned all the way to the left.
+
+**NARRATOR (instruction):** Set the phase selector on main incoming to the left.
+
+**NARRATOR (reminder):** Main incoming. The very first cabinet, at the top. The little selector beside the meters. Turn it to the left. All the way. It won't hurt.
+
+**OPERATION 7 — CONTROL:** KIRK KEY INTERLOCK on MAIN DISCONNECT (section 1): turned off.
+
+**NARRATOR (instruction):** Turn off the Kirk key on the main disconnect.
+
+**NARRATOR (reminder):** The Kirk key. On the main disconnect. It's a key, in a lock, called Kirk. Turn it off. Nobody knows who Kirk was. We don't talk about Kirk.
+
+**OPERATION 8 — CONTROL:** HAND OFF AUTO selector on FEED MOTOR M-102 (section 2, middle): HAND.
+
+**NARRATOR (instruction):** Put the feed motor into hand.
+
+**NARRATOR (reminder):** The feed motor. Second section, in the middle. The hand off auto switch. Turn it all the way round to hand. Like waving goodbye.
+
+**OPERATION 9 — CONTROL:** TEST button on the annunciator, DISTRIBUTION BUS ENERGIZED (section 1, under the main disconnect): pressed.
+
+**NARRATOR (instruction):** Test the annunciator.
+
+**NARRATOR (reminder):** The annunciator. The panel of little windows, under the main disconnect. Press test. They all light up. Everyone loves that bit. You loved that bit yesterday.
+
+**OPERATION 10 — CONTROL:** Emergency stop on AUXILIARY MOTOR M-103 (section 2, bottom): pushed in, then pulled out again.
+
+**NARRATOR (instruction):** Press the emergency stop on the auxiliary motor, then pull it out again.
+
+**NARRATOR (reminder):** The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.
 
 **MACHINE / SOUND:** The response is unmistakable. A bank of indicators changes state, the main machine note shifts pitch, and a new industrial rhythm locks into the existing hum and oil-pump burble. Let the change establish itself before the next action.
 
@@ -66,27 +150,25 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **NARRATOR:** No, that's not supposed to happen. Could you have a look?
 
-## Conditional interruption — master power still on
-
-**TRIGGER:** The player tries to inspect or open the smoking cabinet without first switching off MASTER POWER.
-
-**NARRATOR:** Are you suicidal? The machine is still on. We covered this yesterday. Switch off the main power.
-
-**PLAYER ACTION:** Switch off MASTER POWER. The sequence waits for the machine to be isolated before continuing the inspection.
-
-**SOUND:** The remaining powered hum dies away. Mechanical sounds coast to a stop. Smoke continues to escape from the cabinet.
-
-_If the player already switched off MASTER POWER, omit the interruption and proceed directly to the cabinet opening._
-
 ## Open the smoking cabinet
 
-**PLAYER ACTION:** Open the cabinet from which smoke is still emerging.
+**PLAYER ACTION:** Open the cabinet from which smoke is still emerging. Nothing stops them: the machine is still running, and it must stay running, because the whole point is to save its life by pulling the rival boards out in a hurry. Its hum and its struggling noises carry on behind everything that follows.
 
 **MACHINE:** A puff of trapped smoke rolls out as the door opens, revealing the main board and its removable cards. Residual smoke continues to rise from inside.
 
 **NARRATOR:** Really not good. Would you mind having a poke around in there? Have a look at what might have blown.
 
 **NARRATOR:** I thought I smelled something awful. Those are Pepperdyne modial-interaction boards in our hydrocoptic phase-control backplane… pull one out. I literally can't believe it.
+
+## Conditional interruption — cabinet still live
+
+**TRIGGER:** The player tries to pull a Pepperdyne card out while the small isolator inside the same cabinet (AUTOMATION CONTROL's own breaker) is still on. The card stays in its slot. Play once; play again only if they keep trying.
+
+**NARRATOR:** Are you suicidal? Those boards are live. We covered this yesterday. Switch off the isolator in that cabinet first.
+
+**PLAYER ACTION:** Switch off the isolator inside the cabinet. Only that cabinet goes dead: the rest of the machine stays on, humming and struggling, so its sounds still make sense while the player works. The cards can now be pulled.
+
+_If the player switched off the cabinet's isolator before reaching for a card, omit the interruption._
 
 ## First card — Betaform Amplifier
 
@@ -270,7 +352,7 @@ _If the player already switched off MASTER POWER, omit the interruption and proc
 
 **NARRATOR:** Team. You, me, and the machine… oh, the machine.
 
-**MACHINE:** The remaining status lights begin to dim and go out, irregularly. The master power remains isolated; this beat uses the machine's lingering indicator lighting.
+**MACHINE:** The remaining status lights begin to dim and go out, irregularly. The machine is still running; its lights fade as if its life were draining away.
 
 **NARRATOR:** Wait, look at the machine… its lights are going out…
 
@@ -352,7 +434,7 @@ _If the player already switched off MASTER POWER, omit the interruption and proc
 
 **NARRATOR:** Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—
 
-**MACHINE / SOUND:** Cut him off mid-word. The machine gives a long, descending sigh, a last faint echo of its running note winding down to nothing. The indicator lights dim and go out one at a time, irregularly; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room.
+**MACHINE / SOUND:** Cut him off mid-word. The machine's main breaker trips with a clunk, and the machine gives a long, descending sigh, a last faint echo of its running note winding down to nothing. The indicator lights dim and go out one at a time, irregularly; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room.
 
 **BEAT:** A long silence. Let it be uncomfortable.
 

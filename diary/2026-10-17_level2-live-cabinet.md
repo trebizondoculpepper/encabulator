@@ -1,0 +1,17 @@
+# Level 2: the machine stays on
+
+| Time      | Branch | Commit                  | Task                                                |
+| --------- | ------ | ----------------------- | --------------------------------------------------- |
+| 17:55 UTC | main   | uncommitted, on a7deeff | Keep the machine running while the cards are pulled |
+
+The owner changed the script and the gameplay so that the machine stays on while the player pulls the Pepperdyne cards. The joke is that the player is hurriedly trying to save a running machine and will fail, so its sounds must keep making sense. Before, the player had to switch off the master power before the smoking Automation Control door would open, and the narrator's "Are you suicidal?" played on the door's latches.
+
+Now the door opens freely. The cards stay locked in their slots until the small breaker inside Automation Control, the cards' own cabinet (`section5.bucket1`), is off; that kills only that cabinet, and the rest of the machine keeps humming. Reaching for a card while it is live plays cue 7, reworded as "Are you suicidal? Those boards are live. We covered this yesterday. Switch off the isolator in that cabinet first.", at most once every eight seconds. The lock applies only to cards still in their slots, so a card already out can always be picked up again. Because the master power is no longer off at the end, the final death now trips the main breaker, so the whole machine runs down and goes dark with the narrator's sigh.
+
+Cue 7 was re-rendered with the same Kokoro-82M `bm_george` settings the other agent used (`/tmp/render_level2.py`, which renders only missing files), after updating `src/game/level2-cues.ts` and both copies of `lines.json`. The script's master-power interruption is replaced by a "cabinet still live" interruption after the cabinet is opened, and the fourth-card and final-death directions now describe a running machine.
+
+## The betaform reboot: no routine operation
+
+The owner had left a note in the script for the narrator to tell the player, sarcastically, which controls to work for the betaform amplifier reboot, implying they had not been paying attention yesterday, when there was no yesterday: Level 2 is the first level. Then the owner refined it: record ten operations and draw three at random each time, so the instructions are always baffling and there is never a routine operation. Every level is to present itself as training in normal operations, fault finding or cold start and be derailed; the humour should be character-led and inexplicable, not programmers' jokes.
+
+The MCC now exposes ten door controls by name (`mcc.controls`), each as a position signal. The room draws three operations, latches each when its control reaches its target (two are cycles: the drive isolator off then on, the auxiliary motor's emergency stop pushed then pulled), acknowledges each, and on the last plays the done line and brings the drive in. Six seconds into the step the narrator recites the introduction, the three drawn instructions and a sign-off; every fifteen seconds without progress he talks the player through one remaining operation with its reminder. All 26 lines are placeholders rendered with the same Kokoro voice (the owner's process: synthesised placeholders for testing, an actor's recordings later) and are written out in full in the script, with each operation's control, so the actor's script can be extracted from it. A test checks every betaform line has a recording.

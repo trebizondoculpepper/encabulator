@@ -7,9 +7,13 @@ import type { SoundRecipe } from '../audio/part-audio';
 import { bootBeep } from '../audio/boot-beep';
 import { PC_POST_CUE, computerCueSound } from '../audio/computer-cues';
 import { createMachinePower } from '../game/machine-power';
+import { FAILURES, failureAt } from '../game/machine-failure';
+import type { Failure, FailureId } from '../game/machine-failure';
 import { ISOLATOR, createIncomingIsolator } from './incoming-isolator';
+import { createShortSpark } from './button-effects';
 import { createPcbBackplane } from './pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
+import type { Signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import type { Material, Object3D } from 'three';
 import { createCircuitBreaker } from '../game/machine-components';
@@ -320,6 +324,38 @@ export interface MccView {
   isDoorOpen(index: number): boolean;
   /** How many unit doors it has. */
   doorCount: number;
+  /**
+   * Door controls a scenario may watch, by name, each as a position:
+   * `drive.speed` (the VFD-601's SPEED knob, 0 to 10), `fan.mode` (the
+   * panendermic fan's LOW OFF HIGH selector, 0 to 2), `fan.boost` (its
+   * BOOST button, 1 on), `hydraulic.key` (the hydraulic pump's LOCAL
+   * REMOTE key, 0 LOCAL), `incoming.phase` (MAIN INCOMING's PHASE
+   * selector, 0 to 2), `main.kirk` (the main disconnect's Kirk key, 1
+   * on), `feed.hoa` (the feed motor's HAND OFF AUTO, 0 HAND),
+   * `annunciator.tests` (how many times its TEST has been pressed),
+   * `auxiliary.stop` (the auxiliary motor's emergency stop, 1 pushed) and
+   * `automation.reset` (how many times Automation Control's RESET has been
+   * pressed; it restarts a stalled machine).
+   */
+  controls: ReadonlyMap<string, { position: Readable<number> }>;
+  /**
+   * How fast the machine runs, as a share of normal, set by a scenario:
+   * every running sound follows it, so its note shifts as a stage comes in.
+   */
+  pitch: Signal<number>;
+  /** The failure playing out, or limping on, if any. */
+  readonly failure: FailureId | null;
+  /**
+   * Make the machine give up, one of `FAILURES`, if it is running: its
+   * sounds sag, sputter and slide away; a fatal one trips its main breaker.
+   */
+  fail(id: FailureId): void;
+  /** Put the machine back as it was, closing a breaker a failure tripped. */
+  recover(): void;
+  /** Whether a sputter has left the machine stalled: powered but stopped. */
+  readonly stalled: boolean;
+  /** Sputter a stalled (or any running) machine back into life. */
+  restart(): void;
 }
 
 /** Smooth wandering readings for the displays, 0 to 1. */
@@ -381,6 +417,19 @@ export function createRetroEncabulatorMcc(
   mainBreaker.position.set('off');
   const mains = computed(() => supply.value && mainBreaker.closed.value);
   const startup = createMachinePower(mains);
+  // How fast the machine runs, as a share of normal: every running sound
+  // follows it, pitch and pace together. `pitch` is set by a scenario (the
+  // note shifting as a stage comes in); `strain` by a failure.
+  const pitch = signal(1);
+  const strain = signal(1);
+  const running = computed(() => pitch.value * strain.value);
+  // A failure can flicker or kill the lamps and displays.
+  const lampsOk = signal(true);
+  // A hiccup trips the sections' own sounds out for a moment.
+  const dropped = signal(false);
+  // A stopped machine is a silent one: its sounds fade as it slows.
+  const audible = computed(() => Math.min(1, strain.value * 3));
+  const lamps = computed(() => startup.lit.value && lampsOk.value);
   // Preserve the former open-door loudness; attenuate the closed cabinet
   // until the difference is 9 dB.
   const openGain = 10 ** (4 / 20);
@@ -388,6 +437,7 @@ export function createRetroEncabulatorMcc(
   let driveReady: Readable<boolean> = mains;
   let driveDoorOpen: Readable<boolean> = signal(false);
   let driveBay: Group | undefined;
+  let plcBay: Group | undefined;
   const hinges: {
     group: Group;
     open: () => boolean;
@@ -396,6 +446,7 @@ export function createRetroEncabulatorMcc(
     alwaysRender: boolean;
   }[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
+  const controls = new Map<string, { position: Readable<number> }>();
   let bootNote = 0;
   const screenReadyBeep = (
     boot: ReturnType<typeof createScreenBoot>,
@@ -478,6 +529,7 @@ export function createRetroEncabulatorMcc(
     const faceW = width - channel - 0.02;
     const faceX = -channel / 2;
     if (bayIndex === 5) driveBay = bay;
+    if (bayIndex === 4) plcBay = bay;
     // Folded steel sides, partition, wireway covers and joining flanges.
     for (const side of [-1, 1])
       box(
@@ -565,7 +617,7 @@ export function createRetroEncabulatorMcc(
           boot.booting
             ? boot.lines(2, 20)
             : MESSAGES[Math.floor(clock / 4) % MESSAGES.length],
-          startup.lit.value,
+          lamps.value,
         ),
       );
     }
@@ -577,8 +629,8 @@ export function createRetroEncabulatorMcc(
         const warn = Math.sin(clock * 0.21) > 0.6;
         stack.set([
           false,
-          startup.lit.value && warn && Math.floor(clock * 2) % 2 === 0,
-          startup.lit.value && !warn,
+          lamps.value && warn && Math.floor(clock * 2) % 2 === 0,
+          lamps.value && !warn,
         ]);
       });
     }
@@ -644,7 +696,7 @@ export function createRetroEncabulatorMcc(
         bucketId,
         mainBreaker,
         incoming || bucketId === 'section1.bucket2' ? supply : feed,
-        incoming ? supply : startup.lit,
+        incoming ? supply : lamps,
         plcReady,
       );
       const hinge = new Group();
@@ -723,10 +775,11 @@ export function createRetroEncabulatorMcc(
         parts,
         doorPaint,
         circuit,
-        incoming ? supply : startup.lit,
+        incoming ? supply : lamps,
         mains,
         (ready) => (toneReady = ready),
         screenReadyBeep,
+        (name, part) => controls.set(name, part),
       );
       if (!spec.fixed) {
         // Quarter-turn wing latches on the flange, by the free edge: the
@@ -797,8 +850,13 @@ export function createRetroEncabulatorMcc(
           ),
           machineTone(
             id,
-            signal(rate),
-            computed(() => level * (doorOpen.value ? openGain : closedGain)),
+            computed(() => rate * running.value),
+            computed(
+              () =>
+                level *
+                (doorOpen.value ? openGain : closedGain) *
+                (dropped.value ? 0 : audible.value),
+            ),
           ),
         );
         parts.add(sound.part());
@@ -820,12 +878,132 @@ export function createRetroEncabulatorMcc(
     driveReady,
     machineTone(
       'motor',
-      signal(1),
-      computed(() => 0.07 * (driveDoorOpen.value ? openGain : closedGain)),
+      running,
+      computed(
+        () =>
+          0.07 * (driveDoorOpen.value ? openGain : closedGain) * audible.value,
+      ),
     ),
   );
   parts.add(drive.part());
   driveBay!.add(drive.object);
+  // A failure: the machine conks out like the Millennium Falcon's
+  // hyperdrive (`src/game/machine-failure.ts`). Its own sounds bend with
+  // `strain`, a thin spooling whine slides down over them, and it coughs.
+  let failing: { failure: Failure; t: number; coughed: number } | null = null;
+  let killed = false;
+  const whining = signal(false);
+  const whine = beginPart(kit, 'Encabulator failure whine');
+  whine.holdWhile(
+    whining,
+    machineTone(
+      'turbine',
+      computed(() => 0.45 * strain.value),
+      0.05,
+      { up: 0.05, down: 0.3, floor: 1 },
+    ),
+  );
+  parts.add(whine.part());
+  drive.object.add(whine.object);
+  const cough: SoundRecipe = {
+    click: {
+      band: 520,
+      q: 0.8,
+      decay: 0.11,
+      level: 0.45,
+      thump: [52, 0.2],
+      repeat: [3, 0.055],
+    },
+  };
+  // Sparks fly from the drive and Automation Control in the final kaput,
+  // with a bang.
+  const sparks = (
+    [
+      [driveBay!, -0.12, 1.55],
+      [driveBay!, 0.16, 0.95],
+      [plcBay!, 0.05, 1.4],
+    ] as const
+  ).map(([bay, x, y]) => {
+    const spark = createShortSpark(kit, 14);
+    spark.group.scale.setScalar(6);
+    spark.group.position.set(x, y, 0.02);
+    bay.add(spark.group);
+    updates.push((delta) => spark.update(delta, false));
+    return spark;
+  });
+  let sparked = 0;
+  const bang: SoundRecipe = {
+    sequence: [
+      {
+        at: 0,
+        click: {
+          band: 2600,
+          q: 0.7,
+          decay: 0.16,
+          level: 0.9,
+          thump: [44, 0.32],
+        },
+      },
+      {
+        at: 0.03,
+        click: {
+          band: 5200,
+          q: 1.2,
+          decay: 0.03,
+          level: 0.5,
+          repeat: [5, 0.035],
+        },
+      },
+    ],
+  };
+  const stepFailure = (delta: number) => {
+    if (!failing) return;
+    failing.t += delta;
+    const { failure, t } = failing;
+    const now = failureAt(failure.id, t);
+    strain.value = now.speed;
+    lampsOk.value = now.lit;
+    dropped.value = Boolean(
+      failure.dropout && t >= failure.dropout[0] && t < failure.dropout[1],
+    );
+    whining.value =
+      t < failure.seconds && failure.ends !== 'running' && mains.value;
+    while (
+      failing.coughed < failure.coughs.length &&
+      failure.coughs[failing.coughed] <= t
+    ) {
+      failing.coughed++;
+      if (mains.value) partAudio.play(cough, drive.object);
+    }
+    while (sparked < failure.sparks.length && failure.sparks[sparked] <= t) {
+      const spark = sparks[sparked % sparks.length];
+      spark.fire();
+      if (
+        sparked === 0 ||
+        failure.sparks[sparked] - failure.sparks[sparked - 1] > 1
+      )
+        partAudio.play(bang, spark.group);
+      sparked++;
+    }
+    if (t < failure.seconds) return;
+    if (failure.ends === 'dead' && !killed) {
+      killed = true;
+      // The breaker trips: everything runs down and every lamp goes out.
+      mainBreaker.trip();
+      whining.value = false;
+    }
+    if (failure.ends === 'running') {
+      failing = null;
+      dropped.value = false;
+    }
+  };
+  /** Start a failure, or a restart, from the beginning. */
+  const begin = (id: FailureId) => {
+    failing = { failure: FAILURES.find((f) => f.id === id)!, t: 0, coughed: 0 };
+    sparked = 0;
+    killed = false;
+  };
+  let lastReset = 0;
   let clock = 0;
   for (const update of updates) update(0, 0);
   parts.update(0);
@@ -837,6 +1015,17 @@ export function createRetroEncabulatorMcc(
     update(delta) {
       clock += delta;
       startup.step(delta);
+      const resets = controls.get('automation.reset')!.position.value;
+      if (resets !== lastReset) {
+        lastReset = resets;
+        if (
+          failing?.failure.ends === 'stalled' &&
+          failing.t >= failing.failure.seconds &&
+          mains.value
+        )
+          begin('restart');
+      }
+      stepFailure(delta);
       for (const update of updates) update(delta, clock);
       parts.update(delta);
       for (const hinge of hinges) {
@@ -860,6 +1049,34 @@ export function createRetroEncabulatorMcc(
     },
     isDoorOpen(index) {
       return hinges[index]?.open() ?? false;
+    },
+    controls,
+    pitch,
+    get failure() {
+      return failing?.failure.id ?? null;
+    },
+    get stalled() {
+      return (
+        failing?.failure.ends === 'stalled' &&
+        failing.t >= failing.failure.seconds
+      );
+    },
+    fail(id) {
+      if (mains.value) begin(id);
+    },
+    restart() {
+      if (mains.value) begin('restart');
+    },
+    recover() {
+      failing = null;
+      strain.value = 1;
+      lampsOk.value = true;
+      dropped.value = false;
+      whining.value = false;
+      if (killed && mainBreaker.position.value === 'tripped') {
+        mainBreaker.position.set('on');
+      }
+      killed = false;
     },
     get doorCount() {
       return hinges.length;
@@ -892,6 +1109,8 @@ function dressDoor(
     from: Object3D,
     chosen?: SoundRecipe,
   ) => void,
+  /** Name a control a scenario may watch (see `MccView.controls`). */
+  register: (name: string, part: { position: Readable<number> }) => void,
 ) {
   // The raised panel's middle, where the fittings are centred.
   const lit = computed(() => circuit.powered.value && startup.value);
@@ -1043,7 +1262,7 @@ function dressDoor(
           view.update(delta);
         });
       }
-      selector(3, cx + 0.13, -0.03, 0.9, 1);
+      register('incoming.phase', selector(3, cx + 0.13, -0.03, 0.9, 1));
       legend('PHASE', cx + 0.13, 0.0);
       break;
     case 'main': {
@@ -1070,7 +1289,15 @@ function dressDoor(
       });
       put(danger, cx - 0.1, top - 0.24);
       danger.position.z += 0.001;
-      place(keySwitch(kit, { initial: true }), cx - 0.1, top - 0.36, 1.2);
+      const kirk = place(
+        keySwitch(kit, { initial: true }),
+        cx - 0.1,
+        top - 0.36,
+        1.2,
+      );
+      register('main.kirk', {
+        position: computed(() => (kirk.state.value ? 1 : 0)),
+      });
       caption('KIRK KEY INTERLOCK', cx - 0.1, top - 0.41);
       louvres(0.3, 0.1, cx - 0.04, -height / 2 + 0.09);
       break;
@@ -1113,13 +1340,12 @@ function dressDoor(
         alarms.test = clock < testUntil;
         panel.set(alarms.lit(clock).map((on) => lit.value && on));
       });
-      button(
-        'black',
-        'TEST',
-        cx - 0.12,
-        top - 0.3,
-        () => (testUntil = now + 2),
-      );
+      const tests = signal(0);
+      register('annunciator.tests', { position: tests });
+      button('black', 'TEST', cx - 0.12, top - 0.3, () => {
+        testUntil = now + 2;
+        tests.value++;
+      });
       button('amber', 'ACK', cx - 0.02, top - 0.3, () => {
         acked = now;
         alarms.acknowledge();
@@ -1151,6 +1377,7 @@ function dressDoor(
       const starter = createSoftStarter(kit);
       put(starter.group, cx - 0.045, top - 0.06, 0.95);
       const hoa = selector(3, cx - 0.09, -0.05, 0.9, 2);
+      register('feed.hoa', hoa);
       updates.push((_, clock) => {
         // It starts, ramps up over three seconds, runs, and stops again;
         // HAND runs it, OFF stops it.
@@ -1176,11 +1403,14 @@ function dressDoor(
       break;
     }
     case 'estop': {
-      place(
+      const stop = place(
         mushroomStop(kit, { bound: circuit.emergency }),
         cx - 0.07,
         top - 0.06,
       );
+      register('auxiliary.stop', {
+        position: computed(() => (stop.pushed.value ? 1 : 0)),
+      });
       meter('A  AC', cx - 0.07, -0.06, 4, 50);
       lamp('green', cx - 0.11, -0.2, running);
       lamp('red', cx - 0.03, -0.2, (t) => !running(t));
@@ -1207,7 +1437,7 @@ function dressDoor(
       break;
     }
     case 'small-key': {
-      selector(2, cx - 0.11, -0.04, 0.8, 1, true);
+      register('hydraulic.key', selector(2, cx - 0.11, -0.04, 0.8, 1, true));
       legend('LOCAL REMOTE', cx - 0.11, -0.01, 0.06);
       lamp(
         'amber',
@@ -1358,6 +1588,13 @@ function dressDoor(
         });
       });
       caption('PANELVIEW 1000', cx, height * 0.2 - 0.1);
+      // The system RESET: pressed after a failure, it sputters a stalled
+      // machine back into life (`MccView.restart`).
+      const resets = signal(0);
+      register('automation.reset', { position: resets });
+      button('blue', 'RESET', cx + 0.24, height * 0.2 - 0.13, () => {
+        resets.value++;
+      });
       break;
     }
     case 'terminations': {
@@ -1393,7 +1630,7 @@ function dressDoor(
           lit.value,
         );
       });
-      pot(cx + 0.07, 0.04);
+      register('drive.speed', pot(cx + 0.07, 0.04));
       legend('SPEED', cx + 0.07, 0.07);
       for (const [colour, dx, on] of [
         ['#3dff5a', 0.05, true],
@@ -1449,15 +1686,18 @@ function dressDoor(
       const hours = createHourMeterView(kit);
       put(hours.group, cx + 0.06, 0.03);
       updates.push(() => hours.show(8812.2 + operatingHours));
-      selector(3, cx + 0.06, -0.1, 0.85, 1);
+      register('fan.mode', selector(3, cx + 0.06, -0.1, 0.85, 1));
       legend('LOW OFF HIGH', cx + 0.06, -0.07, 0.065);
       // Wired to nothing yet: it toggles its own light all the same.
-      place(
+      const boost = place(
         ledPushbutton(kit, { colour: 'blue', legend: 'BOOST', power: lit }),
         cx - 0.08,
         -0.13,
         0.9,
       );
+      register('fan.boost', {
+        position: computed(() => (boost.state.value ? 1 : 0)),
+      });
       break;
     }
     case 'grammeter': {

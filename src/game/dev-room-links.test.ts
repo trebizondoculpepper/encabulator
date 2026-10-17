@@ -28,7 +28,7 @@ describe('the rooms', () => {
       { to: 'dev0', side: 'north', x: bounds.minX + 2.1, z: bounds.minZ },
     ]);
     expect(devPortals('rhombus', bounds, 1)).toEqual([
-      { to: 'dev13', side: 'east', x: bounds.maxX, z: 0 },
+      { to: 'dev14', side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
 

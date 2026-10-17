@@ -33,6 +33,11 @@ export function createObjectHandling(
   metre: number,
   floorY: number,
   supports: () => readonly SupportSurface[] = () => [],
+  /**
+   * A room's chance to take a released object itself (a toss into a bin):
+   * return true and the object is the room's to move; it is not dropped.
+   */
+  divert?: (object: Object3D, portable: PortableObject) => boolean,
 ) {
   const fixedSupports: SupportSurface[] = [];
   root.updateMatrixWorld(true);
@@ -107,6 +112,10 @@ export function createObjectHandling(
     const { object } = held;
     const portable = records.get(object)!.portable;
     portable.component.drop();
+    if (divert?.(object, portable)) {
+      held = null;
+      return;
+    }
     const profile = portable.component.dropProfile;
     assertDropProfile(profile);
     const forward = camera.getWorldDirection(new Vector3());

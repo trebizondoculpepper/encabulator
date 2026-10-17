@@ -23,7 +23,8 @@ export type DevRoomId =
   | 'dev10'
   | 'dev11'
   | 'dev12'
-  | 'dev13';
+  | 'dev13'
+  | 'dev14';
 export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training' | 'level2';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
@@ -48,6 +49,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev11',
   'dev12',
   'dev13',
+  'dev14',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -76,6 +78,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev11: 'DEV11 · THE BUTTON GALLERY',
   dev12: 'DEV12 · MACHINE TONES',
   dev13: 'DEV13 · COMPUTER BEEPS',
+  dev14: 'DEV14 · PUTTING THINGS IN THE BIN',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
@@ -95,6 +98,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev11: '#b0a4d8',
   dev12: '#4f9bb3',
   dev13: '#8fa9c5',
+  dev14: '#7d9a5c',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',

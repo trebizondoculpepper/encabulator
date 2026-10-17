@@ -31,8 +31,8 @@ export const LEVEL2_CUES = [
     text: "No, that's not supposed to happen. Could you have a look?",
   },
   {
-    section: 'Conditional interruption — master power still on',
-    text: 'Are you suicidal? The machine is still on. We covered this yesterday. Switch off the main power.',
+    section: 'Conditional interruption — cabinet still live',
+    text: 'Are you suicidal? Those boards are live. We covered this yesterday. Switch off the isolator in that cabinet first.',
   },
   {
     section: 'Open the smoking cabinet',
@@ -439,3 +439,84 @@ export const LEVEL2_CUES = [
     text: 'Go on then, what are you waiting for… pull it. Take out the trash.',
   },
 ] as const;
+
+/** One operation of the betaform reboot: what to do, and how to nag. */
+export interface BetaformOperation {
+  /** Its line in the opening list. */
+  say: string;
+  /** A precise, sarcastic reminder, for a player who has not done it. */
+  remind: string;
+}
+
+/**
+ * Rebooting the betaform amplifier, which "we practised yesterday". There
+ * was no yesterday, and there is no routine operation: each time, three of
+ * these ten operations are drawn at random (`level2-room.ts`), each a real
+ * control on the machine, set in any order. Placeholder lines, until
+ * they are recorded.
+ */
+export const LEVEL2_BETAFORM = {
+  intro:
+    "Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.",
+  outro: "There. That's all it is. That's all it ever was.",
+  operations: {
+    isolator: {
+      say: 'Cycle the drive isolator. Off, and on again.',
+      remind:
+        'The drive isolator. Under the drive, second section from the right. The red handle. Off. And then, and this is the part people forget, on again.',
+    },
+    speed: {
+      say: 'Turn the speed knob on the drive all the way up.',
+      remind:
+        "The speed knob. On the drive. All the way up. Clockwise. The way clocks go. You've seen a clock.",
+    },
+    fan: {
+      say: 'Put the panendermic fan on high.',
+      remind:
+        'The panendermic fan, in the far right-hand section. The selector. High. Not low. Not off. High. We sang a little song about it.',
+    },
+    key: {
+      say: 'Turn the hydraulic pump key to local.',
+      remind:
+        'The hydraulic pump. Third section along, the little key. Turn it to local. You did this yesterday. You had a biscuit. You held the biscuit in your other hand.',
+    },
+    boost: {
+      say: 'Press boost on the panendermic fan.',
+      remind:
+        'The blue button. On the panendermic fan. It says boost. It has always said boost. Press it until it is blue.',
+    },
+    phase: {
+      say: 'Set the phase selector on main incoming to the left.',
+      remind:
+        "Main incoming. The very first cabinet, at the top. The little selector beside the meters. Turn it to the left. All the way. It won't hurt.",
+    },
+    kirk: {
+      say: 'Turn off the Kirk key on the main disconnect.',
+      remind:
+        "The Kirk key. On the main disconnect. It's a key, in a lock, called Kirk. Turn it off. Nobody knows who Kirk was. We don't talk about Kirk.",
+    },
+    hoa: {
+      say: 'Put the feed motor into hand.',
+      remind:
+        'The feed motor. Second section, in the middle. The hand off auto switch. Turn it all the way round to hand. Like waving goodbye.',
+    },
+    test: {
+      say: 'Test the annunciator.',
+      remind:
+        'The annunciator. The panel of little windows, under the main disconnect. Press test. They all light up. Everyone loves that bit. You loved that bit yesterday.',
+    },
+    stop: {
+      say: 'Press the emergency stop on the auxiliary motor, then pull it out again.',
+      remind:
+        'The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.',
+    },
+  } satisfies Record<string, BetaformOperation>,
+  acks: [
+    'Yes. Well done.',
+    'There. Was that so hard?',
+    'Look at you. Just like yesterday.',
+  ],
+  done: 'Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.',
+} as const;
+
+export type BetaformId = keyof typeof LEVEL2_BETAFORM.operations;

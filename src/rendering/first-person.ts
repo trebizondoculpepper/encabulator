@@ -1,6 +1,6 @@
 import type { Object3D, PerspectiveCamera } from 'three';
 import { createObjectHandling } from './object-handling';
-import type { SupportSurface } from './object-handling';
+import type { PortableObject, SupportSurface } from './object-handling';
 import { slide } from '../game/walk-collision';
 import type { Footprint } from '../game/walk-collision';
 import { PAD, controlsHelp, deadZone } from '../game/controls';
@@ -98,6 +98,8 @@ export interface FirstPersonOptions {
   /** World objects for the shared pickup/drop interaction. */
   objects?: Object3D;
   supports?: () => readonly SupportSurface[];
+  /** Take a released object instead of dropping it (`createObjectHandling`). */
+  divert?: (object: Object3D, portable: PortableObject) => boolean;
   /** Use whatever is at a normalised screen point (centre is 0, 0). */
   use: (x: number, y: number) => void;
   /** Whether something usable is under the crosshair. */
@@ -116,6 +118,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
         metre,
         floorY,
         options.supports,
+        options.divert,
       )
     : null;
   const use = (x: number, y: number) => {
