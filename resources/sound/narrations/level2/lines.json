@@ -1,5 +1,9 @@
 {
-  "cue_001": "Today we're going to cover normal Encabulation operations. In the previous session, we introduced the cold-start and basic safety procedures, so this should be absolutely no trouble for you. Begin by turning on the master power.",
+  "intro_1": "Welcome back. Encabulation. Few words carry such weight.",
+  "intro_2": "Since the first Encabulator was switched on, in a converted dairy outside Wolverhampton in nineteen twenty-eight, nobody has been entirely sure what it does. But everyone agrees it must keep on doing it.",
+  "intro_3": "Today, an Encabulator stands quietly behind almost everything you rely on. The railways. The shipping forecast. The tides, quite possibly. You will never see one, which is how you know they're working.",
+  "intro_4": "On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.",
+  "cue_001": "So. Let's begin. Turn on the master power.",
   "cue_002": "Excellent. The delta readout on the main bus controller now shows zero point seven two, which means we're ready to prime the oil pumps.",
   "cue_003": "Hmm. That's the right switch. Give it another go?",
   "cue_004": "Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.",

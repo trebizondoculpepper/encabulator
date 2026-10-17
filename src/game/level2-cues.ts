@@ -3,7 +3,7 @@ export const LEVEL2_CUES = [
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "Today we're going to cover normal Encabulation operations. In the previous session, we introduced the cold-start and basic safety procedures, so this should be absolutely no trouble for you. Begin by turning on the master power.",
+    text: "So. Let's begin. Turn on the master power.",
   },
   {
     section:
@@ -540,3 +540,15 @@ export const LEVEL2_SKIP = {
   appears:
     "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.",
 } as const;
+
+/**
+ * The introduction, before the player does anything: the importance and
+ * history of Encabulation, and today's lesson built on day one's (there
+ * was no day one). Played as the title fades, before cue 1.
+ */
+export const LEVEL2_INTRO = [
+  'Welcome back. Encabulation. Few words carry such weight.',
+  'Since the first Encabulator was switched on, in a converted dairy outside Wolverhampton in nineteen twenty-eight, nobody has been entirely sure what it does. But everyone agrees it must keep on doing it.',
+  "Today, an Encabulator stands quietly behind almost everything you rely on. The railways. The shipping forecast. The tides, quite possibly. You will never see one, which is how you know they're working.",
+  'On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.',
+] as const;

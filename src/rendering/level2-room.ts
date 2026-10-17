@@ -21,6 +21,7 @@ import { devWalls } from '../game/dev-room-links';
 import {
   LEVEL2_BETAFORM,
   LEVEL2_CUES,
+  LEVEL2_INTRO,
   LEVEL2_RESET,
   LEVEL2_SKIP,
 } from '../game/level2-cues';
@@ -322,7 +323,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     if (started) return;
     started = true;
     window.setTimeout(jingle, 0);
-    introTimer = window.setTimeout(() => voice.queue(1), 1450);
+    introTimer = window.setTimeout(() => {
+      for (const line of LEVEL2_INTRO) voice.say(line);
+      voice.queue(1);
+    }, 1450);
   };
   window.addEventListener('pointerdown', startNarration, { capture: true });
   window.addEventListener('keydown', startNarration, { capture: true });

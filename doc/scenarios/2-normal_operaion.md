@@ -26,7 +26,23 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **MUSIC:** An optimistic training-film melody or jingle plays. The caption fades away.
 
-**NARRATOR:** Today we're going to cover normal Encabulation operations. In the previous session, we introduced the cold-start and basic safety procedures, so this should be absolutely no trouble for you. Begin by turning on the master power.
+## Introduction
+
+**TRIGGER:** As the caption fades, before the player does anything. If the player turns on the master power during it, it is cut off and the narration moves on.
+
+**DIRECTION:** Grand, fond and a little misty, like the opening of a corporate history film. He believes every word. There was no day one.
+
+**NARRATOR:** Welcome back. Encabulation. Few words carry such weight.
+
+**NARRATOR:** Since the first Encabulator was switched on, in a converted dairy outside Wolverhampton in nineteen twenty-eight, nobody has been entirely sure what it does. But everyone agrees it must keep on doing it.
+
+**NARRATOR:** Today, an Encabulator stands quietly behind almost everything you rely on. The railways. The shipping forecast. The tides, quite possibly. You will never see one, which is how you know they're working.
+
+**NARRATOR:** On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.
+
+## Master power
+
+**NARRATOR:** So. Let's begin. Turn on the master power.
 
 **PLAYER ACTION:** Turn the red operating handle on MAIN DISCONNECT to ON. This is the master-power control; the sequence waits for this handle.
 
