@@ -29,6 +29,13 @@ export function turningKnobs(direction: -1 | 1, act: () => void) {
   }
 }
 
+/**
+ * Whether this use is a knob turn (a gamepad's LB or RB) rather than the
+ * use itself (a click, E, a tap or A), for a room whose use is not a
+ * knob's and should answer only the use itself.
+ */
+export const turningKnob = () => given !== null;
+
 /** Screen left/right stays correct even when the panel or knob is rotated. */
 export function knobDirection(shaft: Object3D, point: Vector3, camera: Camera) {
   if (given) return given;
