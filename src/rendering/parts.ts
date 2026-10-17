@@ -4,6 +4,7 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import type { Material, Object3D } from 'three';
 import { click, partAudio, recording } from '../audio/part-audio';
 import type { LoopRecipe, SoundRecipe } from '../audio/part-audio';
+import { largeDoorMovement } from '../audio/door-sounds';
 import { MAINS_HUM, MOTOR_HUM, RELAY_HOLD } from '../audio/part-loops';
 import {
   createCapacitor,
@@ -132,12 +133,13 @@ export function beginPart(kit: PanelKit, name: string) {
      */
     voice(
       component: { onEvent(listener: PartListener): unknown },
-      sounds: Partial<Record<PartEvent, SoundRecipe>>,
+      sounds: Partial<Record<PartEvent, SoundRecipe | (() => SoundRecipe)>>,
       from: Object3D = object,
     ) {
       component.onEvent((event) => {
         const sound = sounds[event];
-        if (sound) partAudio.play(sound, from);
+        if (sound)
+          partAudio.play(typeof sound === 'function' ? sound() : sound, from);
         for (const listener of listeners) listener(event, name);
       });
     },
@@ -249,8 +251,8 @@ const TRIP = click({
   thump: [150, 0.05],
 });
 /** A steel cabinet door swinging open, and shutting on its latches. */
-const DOOR_OPEN = recording(asset('door-open.wav'), 0.05);
-const DOOR_SHUT = recording(asset('door-close.wav'), 0.06);
+const DOOR_OPEN = recording(asset('door-open.wav'), 0.015);
+const DOOR_SHUT = recording(asset('door-close.wav'), 0.018);
 
 // ---- Push button -------------------------------------------------------------
 
@@ -683,6 +685,8 @@ export function doorLatch(
     initial?: boolean;
     bound?: Binding<boolean>;
     latch?: Readable<boolean>;
+    /** Full-height and larger cabinet leaves use varied metal movement sounds. */
+    large?: boolean;
     /** Another piece that works the same door, sharing its state. */
     shared?: ReturnType<typeof createSwitch>;
   },
@@ -700,7 +704,11 @@ export function doorLatch(
       latch: props.latch,
     });
   if (!props.shared) {
-    a.voice(door, { on: DOOR_OPEN, off: DOOR_SHUT, refused: LOCKED });
+    a.voice(door, {
+      on: props.large ? largeDoorMovement : DOOR_OPEN,
+      off: props.large ? largeDoorMovement : DOOR_SHUT,
+      refused: LOCKED,
+    });
     a.disposers.push(door.dispose);
   }
   a.uses.set(a.object, () => door.flip());

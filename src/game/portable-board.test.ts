@@ -39,3 +39,35 @@ it.each([1 / 120, 1 / 30, 0.1])(
     expect(impacts).toBeLessThanOrEqual(3);
   },
 );
+
+it('reports diminishing collision speeds at increasingly short intervals', () => {
+  const fall = createBoardFall(0, 1.5, 0, 0.65, 0.2);
+  const board = createPortableBoard();
+  board.pickUp();
+  board.drop();
+  const speeds: number[] = [];
+  const times: number[] = [];
+  let time = 0;
+  while (!fall.body.settled && time < 3) {
+    fall.step(
+      1 / 120,
+      () => 0,
+      (speed, slip) => {
+        board.impact(speed, slip);
+        speeds.push(board.impactSpeed.value);
+        times.push(time);
+      },
+    );
+    time += 1 / 120;
+  }
+  expect(speeds.length).toBeGreaterThan(1);
+  expect(board.impacts.value).toBe(speeds.length);
+  for (let i = 1; i < speeds.length; i++) {
+    expect(speeds[i]).toBeLessThan(speeds[i - 1] * 0.25);
+    if (i > 1)
+      expect(times[i] - times[i - 1]).toBeLessThan(times[i - 1] - times[i - 2]);
+  }
+  board.pickUp();
+  board.drop();
+  expect(board.impacts.value).toBe(0);
+});

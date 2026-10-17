@@ -330,18 +330,19 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     1.4,
     'CALL POINT (KEY TO RESET)',
   );
-  // The voice alarm does the talking; the sounder-beacons only flash.
+  // Speech comes from the ceiling speaker; evacuation tones come from
+  // the wall sounders, pausing while the announcement is spoken.
+  const voice = voiceAlarm(kit, {
+    voice: F.voice,
+    announcement: F.announcement,
+  });
   fit(
-    sounderBeacon(kit, { sounding: F.sounding, voice: false }),
+    sounderBeacon(kit, { sounding: F.sounding, tone: voice.evacuationTone }),
     'east',
     -4.0,
     2.2,
   );
-  onCeiling(
-    voiceAlarm(kit, { voice: F.voice, announcement: F.announcement }),
-    6.5,
-    -2,
-  );
+  onCeiling(voice, 6.5, -2);
   // The joke: a waste-paper bin under the smoke detector, and a button on
   // a pedestal beside it that sets it alight.
   const bin = burningBin(kit, { size: F.flames, smoke: F.smokeShown });
@@ -566,9 +567,9 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
   );
   fit(heldFireDoor(kit, { held: F.doorsHeld }), 'east', 4.2, 0);
   onWall(createCaption(kit, 'FIRE DOOR ON HOLDER'), 'east', 4.2, 2.3);
-  // A second sounder-beacon, silent, on the west wall.
+  // The second sounder follows the same evacuation/speech sequence.
   fit(
-    sounderBeacon(kit, { sounding: F.sounding, voice: false }),
+    sounderBeacon(kit, { sounding: F.sounding, tone: voice.evacuationTone }),
     'west',
     2.5,
     2.2,

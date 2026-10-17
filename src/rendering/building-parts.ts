@@ -2,6 +2,7 @@ import { computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { click, partAudio, recording, tone } from '../audio/part-audio';
 import type { SoundRecipe } from '../audio/part-audio';
+import { largeDoorMovement } from '../audio/door-sounds';
 import {
   ALARM_BUZZER,
   CRACKLE,
@@ -72,8 +73,8 @@ const asset = (file: string) =>
 const ROCKER = recording(asset('rocker-click.wav'), 0.08);
 const PRESS = recording(asset('button-press.wav'), 0.07);
 const DETENT = recording(asset('switch-click.wav'), 0.05);
-const DOOR_OPEN = recording(asset('door-open.wav'), 0.05);
-const DOOR_SHUT = recording(asset('door-close.wav'), 0.07);
+const DOOR_OPEN = largeDoorMovement;
+const DOOR_SHUT = largeDoorMovement;
 const KEY_TURN = click({
   band: 5200,
   q: 4,
@@ -339,14 +340,20 @@ export function callPoint(
 /** A sounder-beacon; `voice` gives it the sounder's sound. */
 export function sounderBeacon(
   kit: PanelKit,
-  props: { sounding: Readable<boolean>; voice?: boolean },
+  props: {
+    sounding: Readable<boolean>;
+    voice?: boolean;
+    /** A voice-alarm sequence can pause the tone while speech plays. */
+    tone?: Readable<boolean>;
+  },
 ): Part {
   const a = beginPart(kit, 'sounder-beacon');
   const view = createSounderBeacon(kit);
   a.object.add(view.group);
   show(a, () => view.set(props.sounding.value));
   a.updates.push(view.update);
-  if (props.voice !== false) a.holdWhile(props.sounding, FIRE_SOUNDER);
+  if (props.voice !== false)
+    a.holdWhile(props.tone ?? props.sounding, FIRE_SOUNDER);
   return a.part();
 }
 
@@ -480,7 +487,7 @@ export function sprinklerHead(
 /**
  * The voice alarm, heard from its ceiling speaker. In the alert stage it
  * sounds the intermittent alert tone and the alert message, every half
- * minute; in evacuation, the evacuation signal (the fire alarm) and the
+ * minute; in evacuation, it cues the wall sounders, alternating with the
  * evacuation message, over and over; once over, the false alarm or the
  * all-clear, after a chime. Silenced, it stops at once.
  */
@@ -493,11 +500,13 @@ export function voiceAlarm(
       n: number;
     }>;
   },
-): Part {
+): Part & { evacuationTone: ReadonlySignal<boolean> } {
   const a = beginPart(kit, 'voice alarm');
   const view = createCeilingSpeaker(kit);
   a.object.add(view.group);
-  const owner = {};
+  const evacuationTone = signal(false);
+  let audible = true;
+  let announcementTimer: ReturnType<typeof setTimeout> | undefined;
   let stopMessage = () => {};
   let mode: 'alert' | 'evacuate' | null = null;
   let clock = 0;
@@ -508,7 +517,8 @@ export function voiceAlarm(
   };
   const quiet = () => {
     stopMessage();
-    partAudio.hold(owner, null);
+    evacuationTone.value = false;
+    clearTimeout(announcementTimer);
   };
   show(a, () => {
     const next = props.voice.value;
@@ -523,9 +533,10 @@ export function voiceAlarm(
     const { kind, n } = props.announcement.value;
     if (!kind || n === heard) return;
     heard = n;
+    if (!audible) return;
     quiet();
-    play(CHIME, a.object);
-    setTimeout(
+    say(CHIME);
+    announcementTimer = setTimeout(
       () => say(kind === 'false-alarm' ? FALSE_ALARM : ALL_CLEAR),
       1200,
     );
@@ -533,20 +544,30 @@ export function voiceAlarm(
   // The sequence, step by step: [seconds to wait, what to do].
   const sequences: Record<'alert' | 'evacuate', [number, () => void][]> = {
     alert: [
-      [0, () => play(ALERT_TONE, a.object)],
+      [0, () => say(ALERT_TONE)],
       [6.2, () => say(ALERT)],
       [12, () => {}],
       [12, () => {}],
     ],
     evacuate: [
-      [0, () => partAudio.hold(owner, FIRE_SOUNDER, a.object)],
-      [5, () => partAudio.hold(owner, null)],
+      [
+        0,
+        () => {
+          evacuationTone.value = true;
+        },
+      ],
+      [
+        5,
+        () => {
+          evacuationTone.value = false;
+        },
+      ],
       [0.6, () => say(EVACUATE)],
       [11, () => {}],
     ],
   };
   a.updates.push((delta) => {
-    if (!mode) return;
+    if (!mode || !audible) return;
     clock -= delta;
     if (clock > 0) return;
     const sequence = sequences[mode];
@@ -556,7 +577,19 @@ export function voiceAlarm(
     clock = sequence[step][0] || 0.01;
   });
   a.disposers.push(quiet);
-  return a.part();
+  const part = a.part();
+  return {
+    ...part,
+    evacuationTone,
+    setAudible(on) {
+      if (on === audible) return;
+      audible = on;
+      quiet();
+      clock = 0;
+      step = 0;
+      part.setAudible(on);
+    },
+  };
 }
 
 /** An electric fire bell, ringing while water flows in the sprinklers. */

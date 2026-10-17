@@ -1,7 +1,8 @@
 import { Box3, Vector3 } from 'three';
 import type { Object3D } from 'three';
 import { createPortableBoard } from '../game/portable-board';
-import { click } from '../audio/part-audio';
+import { click, partAudio } from '../audio/part-audio';
+import { boardImpact, boardScrape } from '../audio/board-impact';
 import { createSmokeEmitter } from '../scene/smoke-emitter';
 import type { beginPart } from './parts';
 import type { PortableObject } from './object-handling';
@@ -21,17 +22,13 @@ export function makeBoardPortable(
     scale = new Vector3();
   a.voice(component, {
     'pick-up': click({ band: 1600, q: 1.5, decay: 0.04, level: 0.14 }),
-    impact: click({
-      band: 2400,
-      q: 1.2,
-      decay: 0.08,
-      level: 0.45,
-      thump: [160, 0.06],
-      repeat: [3, 0.055],
-    }),
+    impact: () =>
+      boardImpact(component.impactSpeed.value, component.impacts.value),
   });
   component.onEvent((event) => {
     if (event !== 'impact') return;
+    if (component.impacts.value === 1 && component.slipSpeed.value > 0.05)
+      partAudio.play(boardScrape(component.slipSpeed.value), a.object);
     a.object.updateMatrixWorld(true);
     const bounds = new Box3().setFromObject(a.object);
     bounds.getCenter(position);

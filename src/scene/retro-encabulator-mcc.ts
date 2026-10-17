@@ -576,6 +576,7 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
         const latch = parts.add(
           doorLatch(kit, {
             material: dark,
+            large: h >= 0.6,
             shared,
             name: `${leaf.name} latch`,
           }),

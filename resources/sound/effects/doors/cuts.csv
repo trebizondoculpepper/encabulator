@@ -1,0 +1,11 @@
+asset,source,start_seconds,duration_seconds
+door-large-01.wav,0616-metal-door-original.wav,0.05,1.1
+door-large-02.wav,0616-metal-door-original.wav,5.23,1.1
+door-large-03.wav,0616-metal-door-original.wav,7.43,1.35
+door-large-04.wav,0616-metal-door-original.wav,14.92,1.55
+door-large-05.wav,0616-metal-door-original.wav,16.92,0.9
+door-large-06.wav,0616-metal-door-original.wav,19.05,1.75
+door-large-07.wav,0616-metal-door-original.wav,23.71,1.68
+door-large-08.wav,0616-metal-door-original.wav,26.07,1.18
+door-large-09.wav,0616-metal-door-original.wav,30.36,1.35
+door-large-10.wav,rubberduck-door-open-01.ogg,0,0.433
