@@ -84,11 +84,15 @@ _If the player already switched off MASTER POWER, omit the interruption and proc
 
 **NARRATOR:** Really not good. Would you mind having a poke around in there? Have a look at what might have blown.
 
+**NARRATOR:** I thought I smelled something awful. Those are Pepperdyne modial-interaction boards in our hydrocoptic phase-control backplane… pull one out. I literally can't believe it.
+
 ## First card — Betaform Amplifier
 
 **PLAYER ACTION:** Remove the Betaform Amplifier and hold it for inspection. Its markings read PEPPERDYNE / BETAFORM AMPLIFIER / MODIAL INTERACTION; a smaller role label identifies the module. If another card was selected, use its actual name instead.
 
 **NARRATOR:** A Pepperdyne betaform amplifier. A modial-interaction board.
+
+**NARRATOR:** Who put this here? Shoddy, second-rate goods. Honestly, this kind of thing gets good people killed.
 
 **NARRATOR:** Get rid of it. I can't stand to even look at it. Horrible, insidious, evil thing. Pernicious. Stop the rot now.
 
