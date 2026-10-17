@@ -1201,6 +1201,14 @@ export function createPartSet() {
       });
       return part;
     },
+    /** Take a part out again, for one a room does away with, and free it. */
+    remove(part: Part) {
+      const at = parts.indexOf(part);
+      if (at < 0) return;
+      parts.splice(at, 1);
+      for (const [object] of part.uses) uses.delete(object);
+      part.dispose();
+    },
     update(delta: number) {
       for (const part of parts) part.update(delta);
     },

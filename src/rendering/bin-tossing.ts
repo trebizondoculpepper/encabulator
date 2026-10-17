@@ -144,6 +144,15 @@ export function createBinTossing({
       bins.push(entry);
       return entry;
     },
+    /** Take a bin away; anything on its way into it lands nowhere. */
+    remove(bin: TossBin) {
+      const at = bins.findIndex((b) => b === bin);
+      if (at >= 0) bins.splice(at, 1);
+      for (let i = tosses.length - 1; i >= 0; i--)
+        if (tosses[i].bin === bin) tosses.splice(i, 1);
+    },
+    /** Whether anything is on its way into `bin`. */
+    incoming: (bin: TossBin) => tosses.some((t) => t.bin === bin),
     /** For `createFirstPerson`: take a released object into a bin, or not. */
     divert(object: Object3D, portable: PortableObject) {
       camera.getWorldPosition(eye).divideScalar(m);

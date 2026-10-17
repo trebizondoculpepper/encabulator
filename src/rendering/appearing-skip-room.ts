@@ -12,6 +12,7 @@ import {
   PointLight,
   Raycaster,
   Scene,
+  SpotLight,
   Vector2,
   Vector3,
 } from 'three';
@@ -20,10 +21,16 @@ import { partAudio } from '../audio/part-audio';
 import { skipToVanish } from '../game/appearing-skips';
 import type { AppearingSkip } from '../game/appearing-skips';
 import { devPortals, devWalls } from '../game/dev-room-links';
+import {
+  CARD_DESIGNATIONS,
+  EXPANSION_CARD_KINDS,
+} from '../game/machine-components';
+import type { MachineComponentKind } from '../game/machine-components';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import { createSectionBoard } from '../scene/building-fittings';
 import {
+  createMicroLabel,
   createPanelKit,
   disposeKit,
   kitPaint,
@@ -31,7 +38,13 @@ import {
 import { createPortals } from '../scene/portals';
 import { turningKnob } from '../scene/rotary-knob';
 import { createSkip } from '../scene/skip';
+import { createBinTossing } from './bin-tossing';
+import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
+import { machineComponent } from './machine-components';
+import type { MachineDevice } from './machine-components';
+import type { PortableObject } from './object-handling';
+import { createPartSet } from './parts';
 import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
@@ -41,6 +54,23 @@ const CEILING = 3.2;
 const BEHIND = [2.4, 3.2, 4.2];
 /** Turns off straight behind to try when straight behind will not do. */
 const TURNS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05];
+/** The one plinth, where it stands, metres, and its size. */
+const PLINTH = { x: 0, z: -1.5, w: 0.5, h: 0.95, d: 0.5 };
+/** The boards it offers, one after another: dev14's eight. */
+const KINDS: readonly MachineComponentKind[] = [
+  ...EXPANSION_CARD_KINDS,
+  'plc-comms',
+  'capacitors',
+  'drive-power',
+];
+const TITLES: Partial<Record<MachineComponentKind, string>> = {
+  capacitors: 'DC BUS CAPACITORS',
+  'drive-power': 'DRIVE POWER STAGE',
+};
+const title = (kind: MachineComponentKind) =>
+  (kind in CARD_DESIGNATIONS
+    ? CARD_DESIGNATIONS[kind as keyof typeof CARD_DESIGNATIONS].name
+    : TITLES[kind])!.toUpperCase();
 
 /**
  * Dev15, The Appearing Skip: the trick Level 2 plays once, played over
@@ -49,7 +79,9 @@ const TURNS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05];
  * facing them, so it is there when they turn round; and whenever they
  * look away from a skip while there is more than one, the oldest skip out
  * of view quietly goes (`src/game/appearing-skips.ts`), so no skip is
- * ever seen to come or go.
+ * ever seen to come or go, and whatever was thrown into it goes with it.
+ * A single plinth offers one board at a time: throw it in a skip and the
+ * next appears on the plinth.
  */
 export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -109,7 +141,75 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
   sign.position.set(-2.2, 2.5, FLOOR.minZ + 0.154);
   room.add(sign);
 
+  // ---- The plinth and its board ---------------------------------------------
+  const parts = createPartSet();
+  const plinth = new Group();
+  plinth.position.set(PLINTH.x, 0, PLINTH.z);
+  room.add(plinth);
+  const body = new Mesh(
+    new BoxGeometry(PLINTH.w, PLINTH.h - 0.03, PLINTH.d),
+    kitPaint(kit, '#d9d6cc'),
+  );
+  body.position.y = (PLINTH.h - 0.03) / 2;
+  plinth.add(body);
+  // A dark deck that a dropped board can land on.
+  const deck = new Mesh(
+    new BoxGeometry(PLINTH.w + 0.02, 0.03, PLINTH.d + 0.02),
+    kitPaint(kit, '#2b2d30'),
+  );
+  deck.position.y = PLINTH.h - 0.015;
+  deck.userData.boardSupport = true;
+  plinth.add(deck);
+  const spot = new SpotLight('#fff3e2', 8 * m * m, 0, 0.3, 0.6, 2);
+  spot.position.set(PLINTH.x * m, (CEILING - 0.1) * m, (PLINTH.z + 0.6) * m);
+  spot.target.position.set(PLINTH.x * m, PLINTH.h * m, PLINTH.z * m);
+  scene.add(spot, spot.target);
+  let label: Object3D | null = null;
+  let offered = 0;
+  const boards = new Map<Object3D, MachineDevice>();
+  /** Put the next board on the plinth, labelled on its front. */
+  const stock = () => {
+    const kind = KINDS[offered++ % KINDS.length];
+    const device = parts.add(
+      machineComponent(kit, kind, {
+        name: `${title(kind)} on plinth`,
+        attachment: 'detachable',
+      }),
+    );
+    // A card stands as it does in its slot: turned to show its face.
+    if (kind.startsWith('plc-')) device.object.rotation.y = Math.PI / 2;
+    device.object.updateMatrixWorld(true);
+    const envelope = new Box3().setFromObject(device.object);
+    device.object.position.set(
+      -(envelope.min.x + envelope.max.x) / 2,
+      PLINTH.h - envelope.min.y,
+      -(envelope.min.z + envelope.max.z) / 2,
+    );
+    plinth.add(device.object);
+    boards.set(device.object, device);
+    if (label) plinth.remove(label);
+    label = createMicroLabel(kit, title(kind), {
+      height: 0.018,
+      ink: '#1d1f21',
+      maxWidth: PLINTH.w - 0.04,
+    });
+    label.position.set(0, PLINTH.h - 0.12, PLINTH.d / 2 + 0.001);
+    plinth.add(label);
+  };
+  stock();
+
   // ---- The skips ------------------------------------------------------------
+  /** What has landed in each skip, to go with it when it goes. */
+  const contents = new Map<TossBin, Object3D[]>();
+  const tossing = createBinTossing({
+    camera,
+    metre: m,
+    // In a skip: the plinth offers the next board.
+    onLanded: (object, bin) => {
+      contents.get(bin)?.push(object);
+      stock();
+    },
+  });
   // One model, cloned: every skip shares its geometry and paint.
   const model = createSkip(kit);
   const half = { x: model.footprint.x / 2, z: model.footprint.z / 2 };
@@ -117,7 +217,14 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     group: Object3D;
     box: Box3;
     plan: Footprint;
+    bin: TossBin;
   })[] = [];
+  const plinthPlan = {
+    minX: PLINTH.x - PLINTH.w / 2,
+    maxX: PLINTH.x + PLINTH.w / 2,
+    minZ: PLINTH.z - PLINTH.d / 2,
+    maxZ: PLINTH.z + PLINTH.d / 2,
+  };
   let born = 0;
   let nextId = 0;
   const frustum = new Frustum();
@@ -160,12 +267,12 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
           plan.maxX < FLOOR.maxX - 0.2 &&
           plan.minZ > FLOOR.minZ + 0.2 &&
           plan.maxZ < FLOOR.maxZ - 0.2;
-        const clear = skips.every(
+        const clear = [plinthPlan, ...skips.map((o) => o.plan)].every(
           (other) =>
-            plan.maxX < other.plan.minX - 0.1 ||
-            plan.minX > other.plan.maxX + 0.1 ||
-            plan.maxZ < other.plan.minZ - 0.1 ||
-            plan.minZ > other.plan.maxZ + 0.1,
+            plan.maxX < other.minX - 0.1 ||
+            plan.minX > other.maxX + 0.1 ||
+            plan.maxZ < other.minZ - 0.1 ||
+            plan.minZ > other.maxZ + 0.1,
         );
         if (!inside || !clear) continue;
         group.position.set(x, 0, z);
@@ -175,7 +282,19 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
           room.remove(group);
           continue;
         }
-        skips.push({ id: nextId++, born: born++, group, box, plan });
+        // Boards heaped above the rim count as the skip, for being seen.
+        box.max.y += 0.3 * m;
+        const id = nextId++;
+        const bin = tossing.add({
+          name: `skip ${id}`,
+          group,
+          shape: model.shape,
+          footprint: model.footprint,
+          x,
+          z,
+        });
+        contents.set(bin, []);
+        skips.push({ id, born: born++, group, box, plan, bin });
         return true;
       }
     return false;
@@ -209,12 +328,19 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     metre: m,
     floorY: 0,
     objects: scene,
+    divert: tossing.divert,
     start:
       views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ??
       views.room,
     solids: () => [
       ...outer,
+      {
+        minX: (plinthPlan.minX - 0.07) * m,
+        maxX: (plinthPlan.maxX + 0.07) * m,
+        minZ: (plinthPlan.minZ - 0.07) * m,
+        maxZ: (plinthPlan.maxZ + 0.07) * m,
+      },
       ...skips.map((skip) => ({
         minX: (skip.plan.minX - 0.05) * m,
         maxX: (skip.plan.maxX + 0.05) * m,
@@ -252,6 +378,23 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     },
     /** Conjure a skip behind the player, as a use does. */
     conjure,
+    /** Throw the plinth's board straight into the newest skip. */
+    throw() {
+      const board = [...boards.values()].find(
+        (device) =>
+          (device.object.userData.portable as PortableObject).component.phase
+            .value === 'installed',
+      );
+      const newest = skips.at(-1);
+      if (!board || !newest) return false;
+      const portable = board.object.userData.portable as PortableObject;
+      portable.component.pickUp();
+      portable.detach();
+      scene.attach(board.object);
+      portable.component.drop();
+      tossing.toss(board.object, portable, newest.bin.name);
+      return true;
+    },
     /** The skips there now, oldest first, and which are in view. */
     skips: () =>
       skips.map((skip) => ({
@@ -274,19 +417,35 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
+    tossing.update(delta);
+    parts.update(delta);
     // Whatever is out of view may go: the oldest, when one is looked away
     // from and there is more than one.
     updateFrustum();
+    // A skip with a board on its way into it counts as seen: it stays.
     const inView = new Set(
       skips
-        .filter((skip) => frustum.intersectsBox(skip.box))
+        .filter(
+          (skip) =>
+            frustum.intersectsBox(skip.box) || tossing.incoming(skip.bin),
+        )
         .map((skip) => skip.id),
     );
     const gone = skipToVanish(skips, seen, inView);
     if (gone !== null) {
       const at = skips.findIndex((skip) => skip.id === gone);
-      room.remove(skips[at].group);
+      const skip = skips[at];
+      room.remove(skip.group);
       skips.splice(at, 1);
+      tossing.remove(skip.bin);
+      // What was thrown in it goes with it.
+      for (const object of contents.get(skip.bin) ?? []) {
+        object.removeFromParent();
+        const device = boards.get(object);
+        if (device) parts.remove(device);
+        boards.delete(object);
+      }
+      contents.delete(skip.bin);
     }
     seen = inView;
     portals.update(delta, walk.walker.x, walk.walker.z);
@@ -298,6 +457,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     observer.disconnect();
     walk.dispose();
     portals.dispose();
+    parts.dispose();
     for (const skip of skips) room.remove(skip.group);
     room.add(model.group);
     disposeKit(kit, scene as unknown as Group);

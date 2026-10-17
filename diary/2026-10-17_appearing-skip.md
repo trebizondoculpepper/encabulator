@@ -26,3 +26,7 @@ All five checks pass (473 tests). In Chrome: conjured a skip facing north (it ap
 ## Next Steps
 
 The owner to try it. A skip appearing 2.4 m behind fills the lower view on turning round; a longer distance is a one-line change (`BEHIND`).
+
+## Later: a plinth, and boards to throw
+
+The owner asked for dev15 to have a single plinth, with a new object appearing on it whenever one is thrown into a skip. The plinth (dev14's design) stands 1.5 m north of the middle and offers dev14's eight boards in turn. Each skip is now a bin in the shared bin tossing, added as it is conjured; the tossing gained `remove` (dropping any board still flying to it) and `incoming`, and `PartSet` gained `remove`, so a vanishing skip can take its boards with it. A skip with a board on its way in counts as seen, so it cannot vanish under a board in flight. The plinth restocks from the landing callback, so the next board appears while the player is still facing the skip, behind them. Checked in Chrome: a thrown board landed in the skip behind, the Modial Interaction Controller replaced the Betaform Amplifier on the plinth, and when that skip vanished its board went with it.
