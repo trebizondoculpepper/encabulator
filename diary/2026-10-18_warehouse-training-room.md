@@ -1,0 +1,5 @@
+# Guildford warehouse training room
+
+Built the owner's additional mostly empty industrial training room as dev17, linked between the graffiti gallery and Rhombus. The agreed shell is 30 × 30 m: natural-grey power-floated concrete, painted blockwork and a grey protective band, pale profiled metal cladding, exposed perimeter columns and roof trusses, ten skylights and suspended lighting. A tall galvanised folding loading door occupies one wall; opposing pedestrian exits link the development rooms. Closed labelled utility doors imply toilets, accessible WC, first aid and building services without rendering their interiors.
+
+Reused existing UK safety fitting views, added surface-mounted services and radiant heaters, generated deterministic concrete/masonry/zinc textures, and batched static geometry. Kept the original office training room and the existing Level 2 scenario unchanged. Inspection starts cover the room, roof, loading door, utilities and floor. Checked the appearance in Chrome; tests cover rooflight/truss clearance, room dimensions and the added portal links. No scenario apparatus or training props were added.
