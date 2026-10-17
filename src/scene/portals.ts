@@ -45,7 +45,9 @@ export function createPortals(
   const textures: Texture[] = [];
   const width = PORTAL_WIDTH * metre;
   const height = PORTAL_HEIGHT * metre;
-  const face = (WALL_THICKNESS / 2) * metre + 0.01 * metre;
+  // Portals stand 2 mm off the wall's face, drawn over it at any distance
+  // (by polygon offset), so whatever covers the wall runs on under them.
+  const face = (WALL_THICKNESS / 2) * metre + 0.002 * metre;
   let leaving = false;
   const uses = new Map<Mesh, () => void>();
   const travel = (to: RoomId) => {
@@ -214,6 +216,9 @@ export function createPortals(
       true,
       true,
     );
+    glow.polygonOffset = true;
+    glow.polygonOffsetFactor = -1;
+    glow.polygonOffsetUnits = -4;
     materials.push(glow);
     const patch = new Mesh(new PlaneGeometry(width, height), glow);
     patch.position.y = height / 2;
@@ -229,6 +234,9 @@ export function createPortals(
     });
     textures.push(label.texture);
     const sign = createPs1Material({ map: label.texture }, true, true);
+    sign.polygonOffset = true;
+    sign.polygonOffsetFactor = -1;
+    sign.polygonOffsetUnits = -4;
     materials.push(sign);
     const plate = new Mesh(
       new PlaneGeometry(

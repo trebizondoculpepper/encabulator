@@ -48,6 +48,11 @@ const openRoom = async () => {
     start = (await import('./rendering/hall-room')).startHallRoom;
   else if (room === 'dev6')
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
+  else if (room === 'dev11')
+    start = (await import('./rendering/button-gallery-room'))
+      .startButtonGalleryRoom;
+  else if (room === 'dev10')
+    start = (await import('./rendering/waking-room')).startWakingRoom;
   else if (room === 'dev9')
     start = (await import('./rendering/wandering-room')).startWanderingRoom;
   else if (room === 'dev8')

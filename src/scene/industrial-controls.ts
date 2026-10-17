@@ -1,3 +1,5 @@
+import type { LensDamage } from '../game/lens-damage';
+import { createLensDamage } from './lens-damage';
 import {
   BoxGeometry,
   Color,
@@ -240,6 +242,8 @@ export interface PushButtonView {
   press(): void;
   /** Light it, for an illuminated button. */
   setLit(on: boolean): void;
+  /** How damaged its lens is, for an illuminated button (`src/game/lens-damage.ts`). */
+  setDamage(damage: LensDamage): void;
   update(delta: number): void;
 }
 
@@ -251,7 +255,11 @@ export interface PushButtonView {
 export function createPushButton(
   kit: PanelKit,
   colour: OperatorColour,
-  { head = 'flush' as 'flush' | 'extended' | 'illuminated' } = {},
+  {
+    head = 'flush' as 'flush' | 'extended' | 'illuminated',
+    /** Lays out how its lens cracks, so no two break alike. */
+    damageSeed = 1,
+  } = {},
 ): PushButtonView {
   const group = new Group();
   const lit = head === 'illuminated';
@@ -306,6 +314,12 @@ export function createPushButton(
     40,
     lit ? 0.0117 : 0.0122,
   );
+  // Damage to a lens lies over its face, and moves with it.
+  const damage = lit ? createLensDamage(kit, 0.0117, damageSeed) : null;
+  if (damage) {
+    damage.mesh.position.z = capDepth + 0.0002;
+    cap.add(damage.mesh);
+  }
   const rest = lit ? 0.0035 : 0.006 + (head === 'flush' ? -0.002 : 0);
   cap.position.z = rest;
   const litColour = base.clone().lerp(new Color('#ffffff'), 0.25);
@@ -321,6 +335,10 @@ export function createPushButton(
       if (!lens) return;
       lens.color.copy(on ? litColour : darkColour);
       lens.emissiveIntensity = on ? 1.8 : 0;
+      damage?.setLit(on);
+    },
+    setDamage(level) {
+      damage?.set(level);
     },
     update(delta) {
       held = Math.max(0, held - delta);

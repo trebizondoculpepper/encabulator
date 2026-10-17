@@ -139,6 +139,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
   const tapped = new Set<string>();
   const nudge = { forward: 0, right: 0 };
   let lockRefused = false;
+  // While held, the room has the camera: no input walks or looks.
+  let holding = false;
 
   const crosshair = document.createElement('div');
   crosshair.setAttribute('aria-hidden', 'true');
@@ -278,6 +280,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
   const look = (event: MouseEvent) => {
     if (!locked()) return;
     setInput('mouse');
+    if (holding) return;
     // Looking slows as the view zooms in, so small controls stay easy to aim at.
     const rate = LOOK_RADIANS_PER_PIXEL / walker.zoom;
     walker.yaw += event.movementX * rate;
@@ -357,7 +360,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     // before it counts as a drag rather than a tap.
     const slop = event.pointerType === 'mouse' ? 5 : 12;
     if (Math.hypot(dx, dy) > slop) drag.moved = true;
-    if (!drag.moved) return;
+    if (!drag.moved || holding) return;
     walker.yaw = drag.yaw - (dx * 0.004) / walker.zoom;
     walker.pitch = clampPitch(drag.pitch + (dy * 0.003) / walker.zoom);
   };
@@ -466,29 +469,44 @@ export function createFirstPerson(options: FirstPersonOptions) {
       sticks?.reset();
       showHelp();
     },
+    /**
+     * Hold the player still, or let go: while held, no input walks or
+     * looks, and the room moves the camera (by `place`) as it needs to. It
+     * binds nothing; uses still reach the room.
+     */
+    hold(on: boolean) {
+      holding = on;
+      forget();
+      nudge.forward = 0;
+      nudge.right = 0;
+      sticks?.reset();
+    },
     /** Walk and look for `delta` seconds, then place the camera. */
     update(delta: number) {
       const pad = readGamepad();
       const held = (...codes: string[]) =>
         codes.some((code) => keys.has(code) || tapped.has(code));
       // The keys and the walk stick add; the stick's push sets the pace.
+      const still = holding ? 0 : 1;
       const ahead =
-        (held('KeyW', 'ArrowUp') ? 1 : 0) -
-        (held('KeyS', 'ArrowDown') ? 1 : 0) -
-        (sticks?.move.y ?? 0) -
-        pad.move.y;
+        still *
+        ((held('KeyW', 'ArrowUp') ? 1 : 0) -
+          (held('KeyS', 'ArrowDown') ? 1 : 0) -
+          (sticks?.move.y ?? 0) -
+          pad.move.y);
       const aside =
-        (held('KeyD', 'ArrowRight') ? 1 : 0) -
-        (held('KeyA', 'ArrowLeft') ? 1 : 0) +
-        (sticks?.move.x ?? 0) +
-        pad.move.x;
-      if (sticks) {
+        still *
+        ((held('KeyD', 'ArrowRight') ? 1 : 0) -
+          (held('KeyA', 'ArrowLeft') ? 1 : 0) +
+          (sticks?.move.x ?? 0) +
+          pad.move.x);
+      if (sticks && !holding) {
         // The look stick turns the head, slower as the view zooms in.
         const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
         walker.yaw += sticks.look.x * turn;
         walker.pitch = clampPitch(walker.pitch - sticks.look.y * turn * 0.75);
       }
-      {
+      if (!holding) {
         const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
         walker.yaw += pad.look.x * turn;
         walker.pitch = clampPitch(walker.pitch - pad.look.y * turn * 0.75);
@@ -509,8 +527,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
         (walker.lowCrouched ? 0.3 : walker.crouched ? 0.5 : 1) *
         delta;
       tapped.clear();
-      const forward = (ahead / length) * speed + nudge.forward;
-      const right = (aside / length) * speed + nudge.right;
+      const forward = (ahead / length) * speed + still * nudge.forward;
+      const right = (aside / length) * speed + still * nudge.right;
       nudge.forward = 0;
       nudge.right = 0;
       const next = slide(

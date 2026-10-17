@@ -32,6 +32,7 @@ import {
   createPushbuttonStation,
 } from '../scene/cabinet-fittings';
 import type { PanelKit } from '../scene/eighties-controls';
+import type { LensDamage } from '../game/lens-damage';
 import {
   createCamSelector,
   createLegendPlate,
@@ -268,6 +269,12 @@ export function pushButton(
     head?: 'flush' | 'extended' | 'illuminated';
     /** Independent lamp drive for illuminated momentary buttons. */
     lamp?: Readable<boolean>;
+    /**
+     * How damaged an illuminated button's lens is, and `damageSeed` how it
+     * cracks: made worse (by a blast, say) by changing what this reads.
+     */
+    damage?: Readable<LensDamage>;
+    damageSeed?: number;
     action?: () => void;
     power?: Readable<boolean>;
     latch?: Readable<boolean>;
@@ -279,9 +286,11 @@ export function pushButton(
   );
   const view = createPushButton(kit, props.colour, {
     head: props.head ?? (props.colour === 'red' ? 'extended' : 'flush'),
+    damageSeed: props.damageSeed,
   });
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
+  let damaged: LensDamage = 'intact';
   const button = createMomentary({
     action: props.action,
     lamp: props.lamp,
@@ -295,6 +304,8 @@ export function pushButton(
   });
   a.updates.push((delta) => {
     view.setLit(button.lit.value);
+    const damage = props.damage?.value ?? 'intact';
+    if (damage !== damaged) view.setDamage((damaged = damage));
     view.update(delta);
   });
   a.disposers.push(button.dispose);
