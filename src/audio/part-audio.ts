@@ -42,6 +42,7 @@ export type SoundRecipe =
   | { recording: URL; level: number }
   | { click: Click }
   | { tone: Tone }
+  | { tones: (Tone & { at: number })[] }
   | { sequence: { at: number; click: Click }[] };
 
 /** A recorded sound, at `level`. */
@@ -56,12 +57,14 @@ export const tone = (spec: Tone): SoundRecipe => ({ tone: spec });
 
 /**
  * A sound a part holds for as long as its state calls for it: builds its
- * nodes into `out` and returns the sources to stop.
+ * nodes into `out` and returns the sources to stop. A source with a
+ * `release` dies away by itself over that many seconds once told to stop
+ * (a machine running down), and is let go only when it has.
  */
 export type LoopRecipe = (
   context: AudioContext,
   out: AudioNode,
-) => Pick<AudioScheduledSourceNode, 'stop'>[];
+) => (Pick<AudioScheduledSourceNode, 'stop'> & { release?: number })[];
 
 let context: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -174,23 +177,31 @@ export const partAudio = {
     const none = () => {};
     if (!context || context.state !== 'running') return none;
     const out = placed(from);
+    const playTone = (spec: Tone, at: number) => {
+      const osc = context!.createOscillator();
+      osc.type = spec.type ?? 'square';
+      osc.frequency.value = spec.hz;
+      const gain = context!.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(spec.level, at + 0.005);
+      gain.gain.setValueAtTime(spec.level, at + spec.seconds - 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + spec.seconds);
+      osc.connect(gain).connect(out);
+      osc.start(at);
+      osc.stop(at + spec.seconds + 0.02);
+    };
     if ('tone' in recipe) {
       const spec = recipe.tone;
       const [count, gap] = spec.repeat ?? [1, 0];
       for (let i = 0; i < count; i++) {
         const at = context.currentTime + 0.005 + i * (spec.seconds + gap);
-        const osc = context.createOscillator();
-        osc.type = spec.type ?? 'square';
-        osc.frequency.value = spec.hz;
-        const gain = context.createGain();
-        gain.gain.setValueAtTime(0.0001, at);
-        gain.gain.exponentialRampToValueAtTime(spec.level, at + 0.005);
-        gain.gain.setValueAtTime(spec.level, at + spec.seconds - 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, at + spec.seconds);
-        osc.connect(gain).connect(out);
-        osc.start(at);
-        osc.stop(at + spec.seconds + 0.02);
+        playTone(spec, at);
       }
+      return none;
+    }
+    if ('tones' in recipe) {
+      const startAt = context.currentTime + 0.005;
+      for (const spec of recipe.tones) playTone(spec, startAt + spec.at);
       return none;
     }
     if ('sequence' in recipe) {
@@ -265,10 +276,15 @@ export const partAudio = {
         panner.positionZ.value = position.z;
       },
       stop() {
-        gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-        const end = ctx.currentTime + 0.5;
+        const release = Math.max(0, ...sources.map((s) => s.release ?? 0));
+        // A source that runs down fades itself; anything else fades now.
+        if (!release) gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+        const end = ctx.currentTime + Math.max(0.5, release);
         for (const source of sources) source.stop(end);
-        window.setTimeout(() => gain.disconnect(), 600);
+        window.setTimeout(
+          () => gain.disconnect(),
+          (Math.max(0.5, release) + 0.1) * 1000,
+        );
       },
     });
   },

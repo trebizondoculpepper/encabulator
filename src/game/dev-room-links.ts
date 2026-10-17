@@ -21,8 +21,10 @@ export type DevRoomId =
   | 'dev8'
   | 'dev9'
   | 'dev10'
-  | 'dev11';
-export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training';
+  | 'dev11'
+  | 'dev12'
+  | 'dev13';
+export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training' | 'level2';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: RoomId;
@@ -44,13 +46,15 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev9',
   'dev10',
   'dev11',
+  'dev12',
+  'dev13',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
 export const CHAIN: readonly RoomId[] = ['training', ...DEV_ROOMS, 'rhombus'];
 
 /** Every room with a URL of its own. */
-export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall'];
+export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall', 'level2'];
 
 /** Historic URLs remain usable without changing the address bar. */
 export function resolveRoomId(id: string | null): RoomId | undefined {
@@ -70,9 +74,12 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev9: 'DEV9 · THE WANDERING BUTTON',
   dev10: 'DEV10 · WAKING UP FROM THE DREAM',
   dev11: 'DEV11 · THE BUTTON GALLERY',
+  dev12: 'DEV12 · MACHINE TONES',
+  dev13: 'DEV13 · COMPUTER BEEPS',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
+  level2: 'MODULE 2 · STANDARD ENCABULATION OPERATION',
 };
 /** Each room's portal colour, so a portal says where it goes. */
 export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
@@ -86,9 +93,12 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev9: '#c7542f',
   dev10: '#6f9a3a',
   dev11: '#b0a4d8',
+  dev12: '#4f9bb3',
+  dev13: '#8fa9c5',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',
+  level2: '#8c99a6',
 };
 export const PORTAL_WIDTH = 1.2;
 export const PORTAL_HEIGHT = 2.2;

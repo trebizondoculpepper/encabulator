@@ -3,8 +3,10 @@ import {
   BoxGeometry,
   CylinderGeometry,
   Group,
+  LatheGeometry,
   Mesh,
   PlaneGeometry,
+  Vector2,
 } from 'three';
 import type {
   BufferGeometry,
@@ -219,16 +221,18 @@ export function createCrtMonitor(
 
   const drawTrend = () => {
     const ink = '#6dff8a';
+    const plotTop = 34;
+    const plotBottom = H - 38;
     c.fillStyle = '#031006';
     c.fillRect(0, 0, W, H);
     c.strokeStyle = '#0f3a19';
     c.lineWidth = 1;
     c.beginPath();
     for (let x = 20; x < W; x += 30) {
-      c.moveTo(x + 0.5, 34);
-      c.lineTo(x + 0.5, H - 20);
+      c.moveTo(x + 0.5, plotTop);
+      c.lineTo(x + 0.5, plotBottom);
     }
-    for (let y = 34; y < H - 18; y += 26) {
+    for (let y = plotTop; y <= plotBottom; y += 26) {
       c.moveTo(20, y + 0.5);
       c.lineTo(W - 10, y + 0.5);
     }
@@ -246,7 +250,7 @@ export function createCrtMonitor(
       c.beginPath();
       series.forEach((value, i) => {
         const x = W - 10 - (series.length - 1 - i) * 4.2;
-        const y = 34 + (1 - value) * (H - 56);
+        const y = plotTop + (1 - value) * (plotBottom - plotTop);
         if (i === 0) c.moveTo(x, y);
         else c.lineTo(x, y);
       });
@@ -257,7 +261,7 @@ export function createCrtMonitor(
     c.fillText(
       `PV ${(wander(clock, seed) * 100).toFixed(1)}%   SP 50.0%`,
       10,
-      H - 5,
+      H - 13,
     );
   };
 
@@ -777,15 +781,35 @@ export function createFlangeHandle(
   const grip = kitPaint(kit, colour === 'red' ? '#b8231b' : '#16171a', 0.2);
   const lever = add(
     pivot,
-    new BoxGeometry(0.026, 0.13, 0.02),
+    new LatheGeometry(
+      [
+        [0.008, 0],
+        [0.012, 0.008],
+        [0.012, 0.029],
+        [0.01, 0.044],
+        [0.01, 0.078],
+        [0.014, 0.091],
+        [0.017, 0.108],
+        [0.018, 0.128],
+        [0.014, 0.14],
+        [0.007, 0.147],
+        [0, 0.149],
+      ].map(([radius, height]) => new Vector2(radius, height)),
+      20,
+    ),
     grip,
+  );
+  add(
+    pivot,
+    new CylinderGeometry(0.014, 0.014, 0.01, 20),
+    kitPaint(kit, '#343538', 0.5),
     0,
-    0.065,
+    0.031,
     0,
   );
-  add(pivot, new BoxGeometry(0.032, 0.03, 0.026), grip, 0, 0.125, 0.004);
-  // ON leans up and out from the door; OFF swings down past the boss.
-  const angle = (on: boolean) => (on ? -0.55 : Math.PI + 0.55);
+  // Positive X rotation sends +Y toward +Z (out of the cabinet). Both
+  // throws, and the entire sweep between them, must stay in front.
+  const angle = (on: boolean) => (on ? 0.55 : Math.PI - 0.55);
   let target = angle(initial);
   pivot.rotation.x = target;
   return {
@@ -796,6 +820,152 @@ export function createFlangeHandle(
     },
     update(delta) {
       pivot.rotation.x += (target - pivot.rotation.x) * Math.min(1, delta * 9);
+    },
+  };
+}
+
+/** Lever operator based on the Allen-Bradley 1494F-M2 800 A frame handle. */
+export function createHeavyDutyThrowHandle(
+  kit: PanelKit,
+  { on: initial = true } = {},
+): FlangeHandleView {
+  const group = new Group();
+  const housing = kitPaint(kit, '#777a7c', 0.48);
+  const edge = kitPaint(kit, '#55585a', 0.48);
+  const dark = kitPaint(kit, '#151719', 0.32);
+  const red = kitPaint(kit, '#b72a24', 0.32);
+  const steel = kitPaint(kit, '#aeb0af', 0.55);
+  // The manufacturer's large handle has a roughly 7½-inch base. The
+  // escutcheon is tall and narrow, with a shallow circular pivot cover.
+  add(group, new BoxGeometry(0.065, 0.19, 0.014), housing, 0, 0, 0.007);
+  add(group, new BoxGeometry(0.053, 0.172, 0.003), edge, 0, 0, 0.0155);
+  add(
+    group,
+    new CylinderGeometry(0.032, 0.032, 0.005, 32),
+    housing,
+    0,
+    -0.032,
+    0.019,
+  ).rotation.x = Math.PI / 2;
+  for (const [word, y] of [
+    ['ON', 0.071],
+    ['OFF', -0.077],
+  ] as const) {
+    const mark = createMicroLabel(kit, word, { height: 0.007, ink: '#f3f1e8' });
+    mark.position.set(-0.02, y, 0.018);
+    group.add(mark);
+  }
+  const pivot = new Group();
+  pivot.position.set(0, -0.032, 0.032);
+  group.add(pivot);
+  add(
+    pivot,
+    new CylinderGeometry(0.019, 0.019, 0.012, 24),
+    steel,
+    0,
+    0,
+    0.006,
+  ).rotation.x = Math.PI / 2;
+  const lever = add(
+    pivot,
+    new BoxGeometry(0.029, 0.106, 0.024),
+    dark,
+    0,
+    0.064,
+    0.02,
+  );
+  add(pivot, new BoxGeometry(0.033, 0.012, 0.026), red, 0, 0.122, 0.021);
+  // The lever throws between upper ON and lower OFF. Its pivot and grip
+  // remain ahead of the plate throughout the arc.
+  const angle = (on: boolean) => (on ? 0 : Math.PI);
+  let target = angle(initial);
+  pivot.rotation.z = target;
+  return {
+    group,
+    lever,
+    set(on) {
+      target = angle(on);
+    },
+    update(delta) {
+      pivot.rotation.z += (target - pivot.rotation.z) * Math.min(1, delta * 9);
+    },
+  };
+}
+
+/**
+ * The rotary handle of an enclosed main switch, after Eaton's P3-100/I5
+ * (SVB): a red pistol grip on a round yellow locking ring, turned a
+ * quarter turn clockwise from 0 (OFF, the grip pointing left) to I (ON,
+ * pointing up), with a padlock tab on the ring at OFF. It faces +z, its
+ * centre on the axis.
+ */
+export function createRotaryIsolatorHandle(
+  kit: PanelKit,
+  { on: initial = false } = {},
+): FlangeHandleView {
+  const group = new Group();
+  const yellow = kitPaint(kit, '#efbd0f', 0);
+  const red = kitPaint(kit, '#c1221b', 0);
+  const ink = '#141414';
+  const ring = add(
+    group,
+    new CylinderGeometry(0.043, 0.045, 0.008, 40),
+    yellow,
+    0,
+    0,
+    0.004,
+  );
+  ring.rotation.x = Math.PI / 2;
+  // The padlock tab, at OFF.
+  add(
+    group,
+    new BoxGeometry(0.018, 0.022, 0.004),
+    yellow,
+    -0.052,
+    -0.012,
+    0.004,
+  );
+  for (const [word, x, y] of [
+    ['0', -0.034, 0.021],
+    ['I', 0.0, 0.036],
+  ] as const) {
+    const mark = createMicroLabel(kit, word, { height: 0.007, ink });
+    mark.position.set(x, y, 0.0085);
+    group.add(mark);
+  }
+  const pivot = new Group();
+  pivot.position.z = 0.008;
+  group.add(pivot);
+  add(
+    pivot,
+    new CylinderGeometry(0.02, 0.022, 0.016, 28),
+    red,
+    0,
+    0,
+    0.008,
+  ).rotation.x = Math.PI / 2;
+  // The grip, broad at the hub and narrowing to its tip.
+  const lever = add(
+    pivot,
+    new BoxGeometry(0.03, 0.05, 0.022),
+    red,
+    0,
+    0.03,
+    0.012,
+  );
+  add(pivot, new BoxGeometry(0.022, 0.036, 0.02), red, 0, 0.068, 0.012);
+  // ON points the grip up; OFF a quarter turn anticlockwise, to the left.
+  const angle = (on: boolean) => (on ? 0 : Math.PI / 2);
+  let target = angle(initial);
+  pivot.rotation.z = target;
+  return {
+    group,
+    lever,
+    set(on) {
+      target = angle(on);
+    },
+    update(delta) {
+      pivot.rotation.z += (target - pivot.rotation.z) * Math.min(1, delta * 14);
     },
   };
 }
@@ -916,7 +1086,7 @@ export function createPowerMonitor(kit: PanelKit): PowerMonitorView {
     0,
     0.01,
   );
-  const rows = [0.03, 0.008, -0.014].map((y, i) => {
+  const rows = [0.021, 0, -0.021].map((y, i) => {
     const digits = createSevenSegment(kit, 4, { digitHeight: 0.011 });
     digits.group.position.set(-0.01, y, 0.0202);
     group.add(digits.group);
@@ -934,14 +1104,14 @@ export function createPowerMonitor(kit: PanelKit): PowerMonitorView {
       new BoxGeometry(0.012, 0.007, 0.004),
       kitPaint(kit, '#5b5e61'),
       -0.03 + k * 0.02,
-      -0.036,
+      -0.042,
       0.021,
     );
   const brand = createMicroLabel(kit, 'POWERMONITOR', {
     height: 0.0032,
     ink: '#8d9091',
   });
-  brand.position.set(0, 0.043, 0.0202);
+  brand.position.set(0, 0.042, 0.0202);
   group.add(brand);
   return {
     group,

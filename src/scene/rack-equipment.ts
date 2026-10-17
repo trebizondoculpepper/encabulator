@@ -177,6 +177,46 @@ export interface RackUnitView {
   faceWidth: number;
 }
 
+export type RackStatus = 'off' | 'starting' | 'running' | 'fault';
+
+/** One rectangular lens on a rack front, shared by its three status colours. */
+export function createRackStatusIndicator(kit: PanelKit) {
+  const group = new Group();
+  group.name = 'Rack status indicator';
+  box(group, 0.049, 0.022, 0.003, kitPaint(kit, '#101214'), 0, 0, 0);
+  const materials = {
+    off: kitPaint(kit, '#252a26'),
+    amber: kitGlow(kit, '#d58b22'),
+    green: kitGlow(kit, '#42b65a'),
+    red: kitGlow(kit, '#c6372d'),
+  };
+  const lens = add(
+    group,
+    new PlaneGeometry(0.038, 0.012),
+    materials.off,
+    0,
+    0,
+    0.002,
+  );
+  lens.name = 'Rack status lens';
+  return {
+    group,
+    set(state: RackStatus, seconds: number) {
+      const lit =
+        state === 'running' ||
+        (state === 'starting' && Math.floor(seconds * 2.5) % 2 === 0) ||
+        (state === 'fault' && Math.floor(seconds * 4) % 2 === 0);
+      lens.material = lit
+        ? materials[
+            state === 'starting' ? 'amber' : state === 'fault' ? 'red' : 'green'
+          ]
+        : materials.off;
+      lens.userData.status = state;
+      lens.userData.lit = lit;
+    },
+  };
+}
+
 /**
  * A rack-mount unit: a front panel with ears and their screws, a chassis
  * behind it, and a face to suit its style.

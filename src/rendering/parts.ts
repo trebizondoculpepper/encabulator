@@ -31,6 +31,8 @@ import type {
 import {
   createDoorRearCover,
   createFlangeHandle,
+  createHeavyDutyThrowHandle,
+  createRotaryIsolatorHandle,
   createPushbuttonStation,
 } from '../scene/cabinet-fittings';
 import type { PanelKit } from '../scene/eighties-controls';
@@ -245,6 +247,59 @@ const HANDLE = click({
   level: 0.9,
   thump: [70, 0.12],
 });
+/** A restrained enclosed-switch click, without the contact crash or bass impact. */
+const ISOLATOR_CLICK = click({
+  band: 700,
+  q: 0.8,
+  decay: 0.045,
+  level: 0.2,
+});
+/**
+ * A heavy switch's quick-make mechanism: the handle charges a spring (a
+ * short grinding ratchet), which then throws the contacts home all at
+ * once, a loud metallic clack with a deep thump, the contacts bouncing
+ * once and the steel box ringing after it.
+ */
+const CONTACTS_CLOSE: SoundRecipe = {
+  sequence: [
+    {
+      at: 0,
+      click: {
+        band: 1400,
+        q: 2,
+        decay: 0.012,
+        level: 0.25,
+        repeat: [4, 0.018],
+      },
+    },
+    {
+      at: 0.085,
+      click: { band: 2600, q: 1.1, decay: 0.045, level: 1, thump: [58, 0.16] },
+    },
+    { at: 0.093, click: { band: 4200, q: 2.5, decay: 0.02, level: 0.45 } },
+    { at: 0.1, click: { band: 5600, q: 9, decay: 0.16, level: 0.22 } },
+  ],
+};
+/** And breaking: the same spring, the contacts flung apart, a little lighter. */
+const CONTACTS_OPEN: SoundRecipe = {
+  sequence: [
+    {
+      at: 0,
+      click: { band: 1300, q: 2, decay: 0.012, level: 0.22, repeat: [3, 0.02] },
+    },
+    {
+      at: 0.07,
+      click: {
+        band: 2200,
+        q: 1.1,
+        decay: 0.04,
+        level: 0.85,
+        thump: [70, 0.12],
+      },
+    },
+    { at: 0.08, click: { band: 5200, q: 9, decay: 0.12, level: 0.16 } },
+  ],
+};
 /** A breaker tripping: a sharp spring-loaded snap. */
 const TRIP = click({
   band: 3600,
@@ -525,6 +580,8 @@ export function disconnectHandle(
   kit: PanelKit,
   props: Common & {
     colour?: 'black' | 'red';
+    style?: 'flange' | 'heavy-throw' | 'rotary';
+    sound?: 'standard' | 'soft-click';
     /** Reuse an internal breaker's one mechanism and event stream. */
     shared?: ReturnType<typeof createOperatingHandle>;
     initial?: HandlePosition;
@@ -537,7 +594,14 @@ export function disconnectHandle(
   trip(): void;
 } {
   const a = beginPart(kit, props.name ?? 'disconnect handle');
-  const view = createFlangeHandle(kit, { colour: props.colour });
+  const view =
+    props.style === 'heavy-throw'
+      ? createHeavyDutyThrowHandle(kit)
+      : props.style === 'rotary'
+        ? createRotaryIsolatorHandle(kit, {
+            on: (props.initial ?? 'on') === 'on',
+          })
+        : createFlangeHandle(kit, { colour: props.colour });
   a.object.add(view.group);
   const handle =
     props.shared ??
@@ -546,8 +610,27 @@ export function disconnectHandle(
       bound: props.bound,
       latch: props.latch,
     });
+  // A heavy-throw switch makes and breaks with a quick-make mechanism.
+  const heavy = props.style === 'heavy-throw';
+  const onSound =
+    props.sound === 'soft-click'
+      ? ISOLATOR_CLICK
+      : heavy
+        ? CONTACTS_CLOSE
+        : HANDLE;
+  const offSound =
+    props.sound === 'soft-click'
+      ? ISOLATOR_CLICK
+      : heavy
+        ? CONTACTS_OPEN
+        : HANDLE;
   if (!props.shared)
-    a.voice(handle, { on: HANDLE, off: HANDLE, trip: TRIP, refused: LOCKED });
+    a.voice(handle, {
+      on: onSound,
+      off: offSound,
+      trip: TRIP,
+      refused: LOCKED,
+    });
   a.uses.set(view.lever, () => handle.operate());
   a.updates.push((delta) => {
     view.set(handle.on.value);

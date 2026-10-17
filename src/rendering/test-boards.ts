@@ -1,7 +1,12 @@
 import { computed, signal } from '@preact/signals-core';
 import { BoxGeometry, Group, Mesh } from 'three';
 import type { Object3D } from 'three';
+import { partAudio } from '../audio/part-audio';
+import type { SoundRecipe } from '../audio/part-audio';
+import { bootBeep } from '../audio/boot-beep';
+import { PC_POST_CUE, computerCueSound } from '../audio/computer-cues';
 import { createAnnunciator } from '../game/annunciator';
+import { createScreenBoot } from '../game/screen-boot';
 import {
   createDrive,
   driveDisplay,
@@ -38,6 +43,7 @@ import {
   createStackLight,
 } from '../scene/industrial-displays';
 import { createPanelMeter } from '../scene/panel-instruments';
+import { drawBootScreen } from '../scene/boot-screen';
 import { MCC_BLUE, createWornPaint } from '../scene/worn-paint';
 import {
   contactor,
@@ -148,6 +154,22 @@ function fitting(
   };
 }
 
+/** One spatial beep when a display completes each power-on self-test. */
+function readyBeep(
+  updates: ((delta: number) => void)[],
+  boot: ReturnType<typeof createScreenBoot>,
+  from: Object3D,
+  hz: number,
+  chosen?: SoundRecipe,
+) {
+  let wasReady = false;
+  updates.push(() => {
+    const ready = boot.ready.value;
+    if (ready && !wasReady) partAudio.play(chosen ?? bootBeep(hz), from);
+    wasReady = ready;
+  });
+}
+
 /**
  * The CONTROLS board: one of each kind of 30 mm pilot device, three times
  * life size, each under its legend with what it is below. Every one is a
@@ -242,9 +264,9 @@ const MESSAGES: [string, string][] = [
 ];
 
 /**
- * The DISPLAYS board: one of each kind of indicator and display, twice
- * life size, each driven by test controls under it, so every reading on
- * it is a value someone set. A BOARD POWER selector feeds them all.
+ * The DISPLAYS board: indicators, meters and the message display, twice
+ * life size, each driven by test controls. A BOARD POWER selector feeds
+ * the board; the message display also has its own power button.
  */
 export function createDisplaysBoard(kit: PanelKit): TestFitting {
   const board = createBoard(kit, {
@@ -266,6 +288,14 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
   const message = createMessageDisplay(kit);
   board.at(message.group, -0.47, 0.19);
   board.caption('MESSAGE DISPLAY, VACUUM FLUORESCENT', -0.47, 0.13);
+  const messageSwitch = board.place(
+    ledPushbutton(kit, { colour: 'green', legend: 'POWER', power }),
+    -0.72,
+    0.07,
+    small,
+  );
+  const messagePower = computed(() => power.value && messageSwitch.state.value);
+  const messageBoot = createScreenBoot(messagePower, 'DATALINE');
   let shown = 0;
   board.place(
     pushButton(kit, {
@@ -277,7 +307,14 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
     0.07,
     small,
   );
-  updates.push(() => message.show(MESSAGES[shown], power.value));
+  updates.push((delta) => {
+    messageBoot.step(delta);
+    message.show(
+      messageBoot.booting ? messageBoot.lines(2, 20) : MESSAGES[shown],
+      messagePower.value,
+    );
+  });
+  readyBeep(updates, messageBoot, message.group, 280);
 
   // The stack light on its bracket, and its mode.
   const stack = createStackLight(kit);
@@ -294,46 +331,6 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
     const m = mode.position.value;
     stack.set(
       power.value ? [m === 3, m === 2, m === 1] : [false, false, false],
-    );
-  });
-
-  // The operator terminal: its keys drive its little program.
-  const program = createTerminal();
-  const terminal = board.place(
-    operatorTerminal(kit, {
-      power,
-      onKey: (key) => pressTerminalKey(program, key),
-    }),
-    0.15,
-    0.16,
-  ).view;
-  board.caption('OPERATOR TERMINAL', 0.15, 0.06);
-
-  // The drive keypad and its drive; the terminal's MAIN screen shows its speed.
-  const drive = createDrive();
-  const keypad = board.place(
-    driveKeypad(kit, { power, onKey: (key) => pressDriveKey(drive, key) }),
-    0.5,
-    0.17,
-  ).view;
-  board.caption('DRIVE KEYPAD (HIM)', 0.5, 0.1);
-  updates.push((delta) => {
-    if (!power.value) drive.running = drive.jogging = false;
-    stepDrive(drive, delta);
-    keypad.show(driveDisplay(drive), power.value);
-    terminal.draw(
-      power.value
-        ? (c, w) => {
-            const lines = terminalLines(program, driveRpm(drive));
-            c.fillRect(0, 0, w, 18);
-            c.fillStyle = '#26476e';
-            c.fillText(lines[0], 6, 3);
-            c.fillStyle = '#e6eef4';
-            lines
-              .slice(1)
-              .forEach((line, i) => c.fillText(line, 6, 24 + i * 16));
-          }
-        : null,
     );
   });
 
@@ -392,11 +389,17 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
   meter('A  AC', 50, 0.85, 'TEST AMPS', -0.33, 'AMMETER 0-50 A', 10);
   meter('V  AC', 600, 0.9, 'TEST VOLTS', -0.19, 'VOLTMETER 0-600 V', 12);
 
-  // A digital panel meter, red LEDs, showing the drive's speed.
+  // A digital panel meter, red LEDs, with its own test speed setting.
   const dpm = createSevenSegment(kit, 4, { digitHeight: 0.016 });
   board.at(dpm.group, -0.03, -0.12);
+  const rpm = board.place(
+    potentiometer(kit, { legend: 'TEST RPM', steps: 18 }),
+    -0.03,
+    -0.21,
+    small,
+  );
   updates.push(() =>
-    dpm.show(power.value ? String(Math.round(driveRpm(drive))) : ''),
+    dpm.show(power.value ? String(Math.round(rpm.share.value * 1800)) : ''),
   );
   board.caption('DIGITAL PANEL METER: DRIVE RPM', -0.03, -0.155, 0.0045);
 
@@ -424,14 +427,14 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
  * as on a real unit. The disconnect handle feeds the soft starter, which
  * the pushbutton station starts and stops; the power monitor, the chart
  * recorder and the contactor behind the viewing window follow it; the
- * annunciator flashes its alarms until acknowledged; the CRT shows each
- * of its pictures in turn. Swatches show the worn pale-blue paint of a
- * door and of the plinth.
+ * annunciator flashes its alarms until acknowledged. The CRT, operator
+ * terminal and drive keypad have separate power switches and boot cycles.
+ * Swatches show the worn pale-blue paint of a door and of the plinth.
  */
 export function createCabinetBoard(kit: PanelKit): TestFitting {
   const board = createBoard(kit, {
     title: 'CABINET FITTINGS',
-    width: 1.7,
+    width: 2.5,
     height: 0.75,
     scale: 2,
     captionScale: 1.5,
@@ -451,6 +454,15 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
   };
 
   const power = lever('BOARD POWER', -0.66, -0.2, 1);
+  const screenPower = (name: string, x: number, y: number) => {
+    const button = board.place(
+      ledPushbutton(kit, { colour: 'green', legend: name, power }),
+      x,
+      y,
+      small,
+    );
+    return computed(() => power.value && button.state.value);
+  };
 
   // The CRT and the knob that chooses its picture.
   const crt = createCrtMonitor(kit, { width: 0.3 });
@@ -463,19 +475,92 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
     small,
   );
   board.caption('TREND  MIMIC  LOG  VECTOR', -0.66, -0.085, 0.0035);
+  const crtSupply = screenPower('CRT POWER', -0.91, -0.05);
+  const crtBoot = createScreenBoot(crtSupply, 'ENCABULATOR SYSTEMS');
   updates.push((delta) => {
-    crt.setOn(power.value);
+    crtBoot.step(delta);
+    crt.setOn(crtSupply.value);
+    crt.setBoot(crtBoot.booting ? crtBoot.lines() : null);
     crt.setMode(CRT_MODES[mode.position.value]);
     crt.update(delta);
   });
+  readyBeep(updates, crtBoot, crt.group, 314);
+
+  // The terminal and drive HIM are cabinet fittings, each with its own
+  // supply. Their controls cannot work while their screens are off.
+  const program = createTerminal();
+  const drive = createDrive();
+  const terminalSupply = screenPower('TERMINAL POWER', 1.13, 0.03);
+  const himSupply = screenPower('HIM POWER', 1.13, -0.19);
+  const terminalPart = board.place(
+    operatorTerminal(kit, {
+      power: terminalSupply,
+      onKey: (key) => pressTerminalKey(program, key),
+    }),
+    0.98,
+    0.19,
+  );
+  board.caption('OPERATOR TERMINAL', 0.98, 0.08);
+  const keypadPart = board.place(
+    driveKeypad(kit, {
+      power: himSupply,
+      onKey: (key) => pressDriveKey(drive, key),
+    }),
+    0.98,
+    -0.18,
+  );
+  board.caption('DRIVE KEYPAD (HIM)', 0.98, -0.27);
+  const terminalBoot = createScreenBoot(
+    terminalSupply,
+    'AUTOMATION CONTROL',
+    'controller',
+  );
+  const himBoot = createScreenBoot(himSupply, 'VFD-601 HIM');
+  updates.push((delta) => {
+    terminalBoot.step(delta);
+    himBoot.step(delta);
+    if (!himSupply.value) drive.running = drive.jogging = false;
+    stepDrive(drive, delta);
+    keypadPart.view.show(
+      himBoot.booting ? himBoot.lines(2, 16) : driveDisplay(drive),
+      himSupply.value,
+    );
+    terminalPart.view.draw(
+      !terminalSupply.value
+        ? null
+        : terminalBoot.booting
+          ? (c, w, h) => drawBootScreen(c, w, h, terminalBoot.lines())
+          : (c, w) => {
+              const lines = terminalLines(program, driveRpm(drive));
+              c.fillRect(0, 0, w, 18);
+              c.fillStyle = '#26476e';
+              c.fillText(lines[0], 6, 3);
+              c.fillStyle = '#e6eef4';
+              lines
+                .slice(1)
+                .forEach((line, i) => c.fillText(line, 6, 24 + i * 16));
+            },
+    );
+  });
+  readyBeep(
+    updates,
+    terminalBoot,
+    terminalPart.object,
+    374,
+    computerCueSound(PC_POST_CUE),
+  );
+  readyBeep(updates, himBoot, keypadPart.object, 420);
 
   // The disconnect, the soft starter and its pushbutton station.
   const disconnect = board.place(
-    disconnectHandle(kit, { name: 'DISCONNECT handle' }),
+    disconnectHandle(kit, {
+      name: 'Red disconnect throw handle',
+      colour: 'red',
+    }),
     0.4,
     -0.16,
   );
-  board.caption('DISCONNECT HANDLE', 0.4, -0.31);
+  board.caption('RED DISCONNECT THROW HANDLE', 0.4, -0.31);
   const fed = computed(() => power.value && disconnect.on.value);
   const running = signal(false);
   const fault = signal(false);

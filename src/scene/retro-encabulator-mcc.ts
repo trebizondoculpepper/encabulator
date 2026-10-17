@@ -1,7 +1,13 @@
 import { createScreenBoot } from '../game/screen-boot';
 import { drawBootScreen } from './boot-screen';
-import { machineHum } from '../audio/machine-hum';
+import { machineTone } from '../audio/machine-tones';
+import type { MachineToneId } from '../audio/machine-tones';
+import { partAudio } from '../audio/part-audio';
+import type { SoundRecipe } from '../audio/part-audio';
+import { bootBeep } from '../audio/boot-beep';
+import { PC_POST_CUE, computerCueSound } from '../audio/computer-cues';
 import { createMachinePower } from '../game/machine-power';
+import { ISOLATOR, createIncomingIsolator } from './incoming-isolator';
 import { createPcbBackplane } from './pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
@@ -86,6 +92,9 @@ const DOOR_FRONT = FLANGE / 2;
 const SPACE = (MCC_HEIGHT - 2 * WIREWAY) / 12;
 export const BAY_WIDTHS = [0.635, 0.508, 0.508, 0.508, 0.762, 0.635, 0.508];
 export const MCC_WIDTH = BAY_WIDTHS.reduce((sum, width) => sum + width, 0);
+/** The middle of the incoming isolator, to the left of the line-up. */
+export const MCC_ISOLATOR_X =
+  -MCC_WIDTH / 2 - ISOLATOR.gap - ISOLATOR.width / 2;
 
 /** Which fittings a unit's door wears; see `dressDoor`. */
 type Face =
@@ -118,6 +127,19 @@ type Bucket = {
   label: string;
   kind: 'main' | 'starter' | 'small' | 'control' | 'plc' | 'drive' | 'aux';
   face: Face;
+  /**
+   * What it sounds like while the machine has power, if anything: one of
+   * the machine tones (`src/audio/machine-tones.ts`, heard in dev12), at a
+   * rate (slower for a bigger machine) and a level, held from inside the
+   * bucket, so it is heard from there. Only what would have cooling or
+   * something turning sounds; the rest are quiet.
+   */
+  tone?: { id: MachineToneId; rate: number; level: number };
+  /**
+   * A fixed cover, bolted shut, instead of a door: not every unit opens.
+   * Its fittings are on the cover; its works are inside, never seen.
+   */
+  fixed?: boolean;
 };
 const BAYS: Bucket[][] = [
   [
@@ -126,8 +148,15 @@ const BAYS: Bucket[][] = [
       label: 'MAIN INCOMING\n480 VAC 3 PH',
       kind: 'main',
       face: 'meters',
+      fixed: true,
     },
-    { spaces: 5, label: 'MAIN DISCONNECT\n800 A', kind: 'main', face: 'main' },
+    {
+      spaces: 5,
+      label: 'MAIN DISCONNECT\n100 A',
+      kind: 'main',
+      face: 'main',
+      fixed: true,
+    },
     {
       spaces: 5,
       label: 'DISTRIBUTION\nBUS ENERGIZED',
@@ -141,6 +170,7 @@ const BAYS: Bucket[][] = [
       label: 'MAIN DRIVE MOTOR\nM-101',
       kind: 'starter',
       face: 'film',
+      tone: { id: 'motor', rate: 0.8, level: 0.055 },
     },
     { spaces: 4, label: 'FEED MOTOR\nM-102', kind: 'starter', face: 'smc' },
     {
@@ -164,6 +194,8 @@ const BAYS: Bucket[][] = [
     label: face === 'blank' ? 'SPARE\nSPACE' : `${label}\nM-${201 + i}`,
     kind: 'small' as const,
     face,
+    tone:
+      i === 0 ? { id: 'pump' as const, rate: 0.6, level: 0.045 } : undefined,
   })),
   [
     {
@@ -171,6 +203,7 @@ const BAYS: Bucket[][] = [
       label: 'ENCABULATOR\nCONTROL',
       kind: 'control',
       face: 'crt-trend',
+      tone: { id: 'cabinet-fan', rate: 0.85, level: 0.045 },
     },
     { spaces: 3, label: 'MODIAL\nINTERACTION', kind: 'control', face: 'chart' },
     {
@@ -187,6 +220,7 @@ const BAYS: Bucket[][] = [
       label: 'PLC-5 / 1771\nAUTOMATION CONTROL',
       kind: 'plc',
       face: 'plc',
+      tone: { id: 'cabinet-fan', rate: 1.15, level: 0.04 },
     },
     {
       spaces: 4,
@@ -201,6 +235,7 @@ const BAYS: Bucket[][] = [
       label: 'MAIN ENCABULATOR\nDRIVE VFD-601',
       kind: 'drive',
       face: 'drive',
+      tone: { id: 'drive-fan', rate: 1, level: 0.07 },
     },
     {
       spaces: 4,
@@ -216,8 +251,20 @@ const BAYS: Bucket[][] = [
       kind: 'aux',
       face: 'crt-log',
     },
-    { spaces: 3, label: 'HYDROCOPTIC\nPUMP', kind: 'aux', face: 'matrix' },
-    { spaces: 3, label: 'PANENDERMIC\nFAN', kind: 'aux', face: 'fan' },
+    {
+      spaces: 3,
+      label: 'HYDROCOPTIC\nPUMP',
+      kind: 'aux',
+      face: 'matrix',
+      tone: { id: 'pump', rate: 0.9, level: 0.06 },
+    },
+    {
+      spaces: 3,
+      label: 'PANENDERMIC\nFAN',
+      kind: 'aux',
+      face: 'fan',
+      tone: { id: 'blower', rate: 1, level: 0.06 },
+    },
     { spaces: 3, label: 'CARDINAL\nGRAMMETER', kind: 'aux', face: 'grammeter' },
   ],
 ];
@@ -270,6 +317,7 @@ export interface MccView {
   openAll(open: boolean): void;
   /** Open or shut one unit's door, as its latches would, silently. */
   door(index: number): void;
+  isDoorOpen(index: number): boolean;
   /** How many unit doors it has. */
   doorCount: number;
 }
@@ -297,6 +345,10 @@ const MESSAGES: readonly (readonly string[])[] = [
  * dimensions are metres.
  */
 export interface MccOptions {
+  incomingOn?: boolean;
+  toneEnabled?: Partial<Record<string, Readable<boolean>>>;
+  /** Scripted training sequences can hold a bucket's feed until its cue. */
+  bucketFeed?: Partial<Record<string, Readable<boolean>>>;
   /** Bucket IDs such as section5.bucket1; windowed PLC buckets default to always. */
   interiorVisibility?: Partial<Record<string, 'always' | 'when-open'>>;
 }
@@ -314,17 +366,28 @@ export function createRetroEncabulatorMcc(
   const parts = createPartSet();
   const components: MachineDevice[] = [];
   const world = createGraph();
+  // The supply comes in through the isolator to the left of the line-up
+  // and lands in MAIN INCOMING, live whenever the isolator is on; the main
+  // disconnect, after it, feeds everything else (`mains`).
+  const isolator = createIncomingIsolator(
+    kit,
+    options.incomingOn ? 'on' : 'off',
+  );
+  isolator.group.position.x = MCC_ISOLATOR_X;
+  group.add(isolator.group);
+  parts.add(isolator.handle);
+  const supply = isolator.handle.on;
   const mainBreaker = createCircuitBreaker(world, 'section1.bucket2.breaker');
   mainBreaker.position.set('off');
-  const startup = createMachinePower(mainBreaker.closed);
-  const drive = beginPart(kit, 'Encabulator drive train');
-  drive.object.position.set(0, 0.7, -0.25);
-  drive.holdWhile(
-    computed(() => startup.speed.value > 0),
-    machineHum(startup.speed),
-  );
-  parts.add(drive.part());
-  group.add(drive.object);
+  const mains = computed(() => supply.value && mainBreaker.closed.value);
+  const startup = createMachinePower(mains);
+  // Preserve the former open-door loudness; attenuate the closed cabinet
+  // until the difference is 9 dB.
+  const openGain = 10 ** (4 / 20);
+  const closedGain = openGain / 10 ** (9 / 20);
+  let driveReady: Readable<boolean> = mains;
+  let driveDoorOpen: Readable<boolean> = signal(false);
+  let driveBay: Group | undefined;
   const hinges: {
     group: Group;
     open: () => boolean;
@@ -333,6 +396,20 @@ export function createRetroEncabulatorMcc(
     alwaysRender: boolean;
   }[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
+  let bootNote = 0;
+  const screenReadyBeep = (
+    boot: ReturnType<typeof createScreenBoot>,
+    from: Object3D,
+    chosen?: SoundRecipe,
+  ) => {
+    const hz = 280 * 2 ** (bootNote++ / 12);
+    let wasReady = false;
+    updates.push(() => {
+      const ready = boot.ready.value;
+      if (ready && !wasReady) partAudio.play(chosen ?? bootBeep(hz), from);
+      wasReady = ready;
+    });
+  };
   let seed = 0;
   const worn = (
     width: number,
@@ -400,6 +477,7 @@ export function createRetroEncabulatorMcc(
     const channel = 0.105;
     const faceW = width - channel - 0.02;
     const faceX = -channel / 2;
+    if (bayIndex === 5) driveBay = bay;
     // Folded steel sides, partition, wireway covers and joining flanges.
     for (const side of [-1, 1])
       box(
@@ -479,8 +557,9 @@ export function createRetroEncabulatorMcc(
       message.group.scale.setScalar(0.95);
       message.group.position.set(-0.02, MCC_HEIGHT - WIREWAY / 2, 0.006);
       bay.add(message.group);
-      const boot = createScreenBoot(mainBreaker.closed, 'DATALINE');
+      const boot = createScreenBoot(mains, 'DATALINE');
       updates.push((delta) => boot.step(delta));
+      screenReadyBeep(boot, message.group);
       updates.push((_, clock) =>
         message.show(
           boot.booting
@@ -508,10 +587,20 @@ export function createRetroEncabulatorMcc(
       const h = spec.spaces * SPACE;
       const cy = top - h / 2;
       top -= h;
+      // MAIN INCOMING is before the main disconnect: live from the isolator.
+      const bucketId = `section${bayIndex + 1}.bucket${bucketIndex + 1}`;
+      const incoming = bayIndex === 0 && bucketIndex === 0;
+      const baseFeed = incoming ? supply : mains;
+      const gate = options.bucketFeed?.[bucketId];
+      const feed = gate
+        ? computed(() => baseFeed.value && gate.value)
+        : baseFeed;
+      let toneReady: Readable<boolean> = feed;
+      let doorOpen: Readable<boolean> = signal(false);
+      const plcReady = signal(false);
       // Cull the entire bucket contents, including its parts, while shut.
       const interior = new Group();
-      interior.name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} contents`;
-      const bucketId = `section${bayIndex + 1}.bucket${bucketIndex + 1}`;
+      interior.name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} ${spec.fixed ? 'sealed works' : 'contents'}`;
       const alwaysRender =
         (options.interiorVisibility?.[bucketId] ??
           (spec.face === 'plc' ? 'always' : 'when-open')) === 'always';
@@ -554,7 +643,9 @@ export function createRetroEncabulatorMcc(
         world,
         bucketId,
         mainBreaker,
-        startup.lit,
+        incoming || bucketId === 'section1.bucket2' ? supply : feed,
+        incoming ? supply : startup.lit,
+        plcReady,
       );
       const hinge = new Group();
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
@@ -564,38 +655,57 @@ export function createRetroEncabulatorMcc(
         spec.face === 'plc'
           ? { x: 0, y: -h * 0.23, width: faceW * 0.74, height: h * 0.42 }
           : null;
-      const leaf = createDoorLeaf(
-        faceW - 0.006,
-        h - 0.006,
-        FLANGE,
-        doorPaint,
-        opening,
-      );
-      leaf.position.set(faceW / 2, 0, -FLANGE / 2);
-      leaf.name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} door`;
-      hinge.add(leaf);
+      const name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} ${spec.fixed ? 'cover' : 'door'}`;
       // The pan behind the face, set over to the hinge side.
       const panelW = faceW - 0.006 - PANEL_INSET - LATCH_SIDE;
       const panelX = faceW / 2 + (PANEL_INSET - LATCH_SIDE) / 2;
-      const panel = createDoorLeaf(
-        panelW,
-        h - 0.006 - 2 * PANEL_INSET,
-        PANEL_DEPTH,
-        doorPaint,
-        opening && {
-          ...opening,
-          x: opening.x + faceW / 2 - panelX,
-        },
-      );
-      panel.position.set(panelX, 0, -FLANGE / 2 - PANEL_DEPTH);
-      hinge.add(panel);
-      if (opening) {
-        const pane = createViewingWindow(kit, opening.width, opening.height);
-        pane.position.set(faceW / 2 + opening.x, opening.y, DOOR_FRONT);
-        hinge.add(pane);
+      if (spec.fixed) {
+        // A flat cover plate, screwed on at its corners.
+        const cover = box(
+          hinge,
+          doorPaint,
+          faceW - 0.006,
+          h - 0.006,
+          FLANGE,
+          faceW / 2,
+          0,
+          0,
+        );
+        cover.name = name;
+        for (const sx of [0.018, faceW - 0.018])
+          for (const sy of [h / 2 - 0.018, -h / 2 + 0.018])
+            box(hinge, dark, 0.008, 0.008, 0.003, sx, sy, DOOR_FRONT + 0.0015);
+      } else {
+        const leaf = createDoorLeaf(
+          faceW - 0.006,
+          h - 0.006,
+          FLANGE,
+          doorPaint,
+          opening,
+        );
+        leaf.position.set(faceW / 2, 0, -FLANGE / 2);
+        leaf.name = name;
+        hinge.add(leaf);
+        const panel = createDoorLeaf(
+          panelW,
+          h - 0.006 - 2 * PANEL_INSET,
+          PANEL_DEPTH,
+          doorPaint,
+          opening && {
+            ...opening,
+            x: opening.x + faceW / 2 - panelX,
+          },
+        );
+        panel.position.set(panelX, 0, -FLANGE / 2 - PANEL_DEPTH);
+        hinge.add(panel);
+        if (opening) {
+          const pane = createViewingWindow(kit, opening.width, opening.height);
+          pane.position.set(faceW / 2 + opening.x, opening.y, DOOR_FRONT);
+          hinge.add(pane);
+        }
+        for (const y of [-h / 2 + 0.035, h / 2 - 0.035])
+          box(hinge, dark, 0.012, 0.025, 0.018, 0, y, -0.004);
       }
-      for (const y of [-h / 2 + 0.035, h / 2 - 0.035])
-        box(hinge, dark, 0.012, 0.025, 0.018, 0, y, -0.004);
       const plate = createNameplate(kit, spec.label, {
         width: Math.min(0.205, faceW * 0.57),
         height: h < 0.35 ? 0.035 : 0.046,
@@ -613,55 +723,87 @@ export function createRetroEncabulatorMcc(
         parts,
         doorPaint,
         circuit,
-        startup.lit,
+        incoming ? supply : startup.lit,
+        mains,
+        (ready) => (toneReady = ready),
+        screenReadyBeep,
       );
-      // Quarter-turn wing latches on the flange, by the free edge: the
-      // only part of the door that opens it. Both work the one door.
-      let shared: ReturnType<typeof doorLatch>['door'] | undefined;
-      for (const y of [h / 2 - 0.05, -h / 2 + 0.05]) {
-        const latch = parts.add(
-          doorLatch(kit, {
-            material: dark,
-            large: h >= 0.6,
-            shared,
-            name: `${leaf.name} latch`,
+      if (!spec.fixed) {
+        // Quarter-turn wing latches on the flange, by the free edge: the
+        // only part of the door that opens it. Both work the one door.
+        let shared: ReturnType<typeof doorLatch>['door'] | undefined;
+        for (const y of [h / 2 - 0.05, -h / 2 + 0.05]) {
+          const latch = parts.add(
+            doorLatch(kit, {
+              material: dark,
+              large: h >= 0.6,
+              shared,
+              name: `${name} latch`,
+            }),
+          );
+          shared ??= latch.door;
+          latch.object.position.set(
+            faceW - LATCH_SIDE / 2 - 0.003,
+            y,
+            FLANGE / 2,
+          );
+          hinge.add(latch.object);
+        }
+        const door = shared!;
+        doorOpen = door.state;
+        if (spec.face === 'drive') driveDoorOpen = door.state;
+        const back = parts.add(
+          doorBack(kit, {
+            shared: door,
+            material: doorPaint,
+            name: `${name} back`,
+            layout: {
+              width: faceW - 0.006,
+              height: h - 0.006,
+              panWidth: panelW,
+              panHeight: h - 0.006 - 2 * PANEL_INSET,
+              panX: panelX - faceW / 2,
+              flangeDepth: FLANGE,
+              panDepth: PANEL_DEPTH,
+              opening,
+            },
           }),
         );
-        shared ??= latch.door;
-        latch.object.position.set(
-          faceW - LATCH_SIDE / 2 - 0.003,
-          y,
-          FLANGE / 2,
-        );
-        hinge.add(latch.object);
+        back.object.position.x = faceW / 2;
+        hinge.add(back.object);
+        hinges.push({
+          group: hinge,
+          interior,
+          alwaysRender,
+          open: () => door.state.value,
+          force: (open) => door.set(open),
+        });
       }
-      const door = shared!;
-      const back = parts.add(
-        doorBack(kit, {
-          shared: door,
-          material: doorPaint,
-          name: `${leaf.name} back`,
-          layout: {
-            width: faceW - 0.006,
-            height: h - 0.006,
-            panWidth: panelW,
-            panHeight: h - 0.006 - 2 * PANEL_INSET,
-            panX: panelX - faceW / 2,
-            flangeDepth: FLANGE,
-            panDepth: PANEL_DEPTH,
-            opening,
-          },
-        }),
-      );
-      back.object.position.x = faceW / 2;
-      hinge.add(back.object);
-      hinges.push({
-        group: hinge,
-        interior,
-        alwaysRender,
-        open: () => door.state.value,
-        force: (open) => door.set(open),
-      });
+      if (spec.face === 'drive') driveReady = toneReady;
+      if (spec.face === 'plc')
+        updates.push(() => (plcReady.value = toneReady.value));
+      if (spec.tone) {
+        const { id, rate, level } = spec.tone;
+        const sound = beginPart(
+          kit,
+          `${spec.label.replace('\n', ' ')} ${id} tone`,
+        );
+        sound.object.position.set(faceX, cy, -MCC_DEPTH / 2);
+        sound.holdWhile(
+          computed(
+            () =>
+              toneReady.value &&
+              (options.toneEnabled?.[bucketId]?.value ?? true),
+          ),
+          machineTone(
+            id,
+            signal(rate),
+            computed(() => level * (doorOpen.value ? openGain : closedGain)),
+          ),
+        );
+        parts.add(sound.part());
+        bay.add(sound.object);
+      }
       // Numbered section and bucket tags remain legible at close range.
       const tag = createMicroLabel(
         kit,
@@ -672,6 +814,18 @@ export function createRetroEncabulatorMcc(
       hinge.add(tag);
     }
   });
+  const drive = beginPart(kit, 'Encabulator drive train');
+  drive.object.position.set(-0.0525, 0.7, -MCC_DEPTH / 2);
+  drive.holdWhile(
+    driveReady,
+    machineTone(
+      'motor',
+      signal(1),
+      computed(() => 0.07 * (driveDoorOpen.value ? openGain : closedGain)),
+    ),
+  );
+  parts.add(drive.part());
+  driveBay!.add(drive.object);
   let clock = 0;
   for (const update of updates) update(0, 0);
   parts.update(0);
@@ -704,6 +858,9 @@ export function createRetroEncabulatorMcc(
       const hinge = hinges[index];
       hinge?.force(!hinge.open());
     },
+    isDoorOpen(index) {
+      return hinges[index]?.open() ?? false;
+    },
     get doorCount() {
       return hinges.length;
     },
@@ -727,6 +884,14 @@ function dressDoor(
   doorPaint: Material,
   circuit: BucketCircuit,
   startup: Readable<boolean>,
+  /** Whether the machine is drawing current: the main disconnect closed. */
+  load: Readable<boolean>,
+  onBoot: (ready: Readable<boolean>) => void,
+  onScreenReady: (
+    boot: ReturnType<typeof createScreenBoot>,
+    from: Object3D,
+    chosen?: SoundRecipe,
+  ) => void,
 ) {
   // The raised panel's middle, where the fittings are centred.
   const lit = computed(() => circuit.powered.value && startup.value);
@@ -765,9 +930,10 @@ function dressDoor(
     scale = 0.9,
     x = width - LATCH_SIDE - 0.04,
     y = 0,
+    style: 'flange' | 'heavy-throw' = 'flange',
   ) =>
     place(
-      disconnectHandle(kit, { colour, shared: circuit.breaker?.handle }),
+      disconnectHandle(kit, { colour, style, shared: circuit.breaker?.handle }),
       x,
       y,
       scale,
@@ -834,8 +1000,11 @@ function dressDoor(
     const view = createPanelMeter(kit, unit, { width: 0.075, scaleMax });
     put(view.group, x, y);
     updates.push((delta, clock) => {
+      // Current flows only while the machine draws it.
       view.set(
-        circuit.powered.value ? 0.35 + wander(clock, seed + k) * 0.3 : 0,
+        circuit.powered.value && load.value
+          ? 0.35 + wander(clock, seed + k) * 0.3
+          : 0,
       );
       view.update(delta);
     });
@@ -844,6 +1013,8 @@ function dressDoor(
     const view = createCrtMonitor(kit, { width: w, mode, seed, title });
     put(view.group, cx - 0.005, y);
     const boot = screenBoot(title ?? mode);
+    onScreenReady(boot, view.group);
+    onBoot(boot.ready);
     updates.push((delta) => {
       view.setOn(lit.value);
       view.setBoot(boot.booting ? boot.lines() : null);
@@ -855,9 +1026,23 @@ function dressDoor(
 
   switch (spec.face) {
     case 'meters':
-      meter('A  L1', cx - 0.16, -0.02, 1, 1000);
-      meter('A  L2', cx - 0.07, -0.02, 2, 1000);
-      meter('A  L3', cx + 0.02, -0.02, 3, 1000);
+      // The incoming supply's line voltages, phase to phase: nominal
+      // 480 V whenever the isolator is on, whatever the main disconnect.
+      for (const [k, pair] of ['L1-L2', 'L2-L3', 'L3-L1'].entries()) {
+        const view = createPanelMeter(kit, `V  ${pair}`, {
+          width: 0.075,
+          scaleMax: 600,
+        });
+        put(view.group, cx - 0.16 + k * 0.09, -0.02);
+        updates.push((delta, clock) => {
+          view.set(
+            circuit.powered.value
+              ? (480 + Math.sin(clock * 0.7 + k * 2.1) * 1.5) / 600
+              : 0,
+          );
+          view.update(delta);
+        });
+      }
       selector(3, cx + 0.13, -0.03, 0.9, 1);
       legend('PHASE', cx + 0.13, 0.0);
       break;
@@ -866,11 +1051,15 @@ function dressDoor(
       const monitor = createPowerMonitor(kit);
       put(monitor.group, cx - 0.1, top - 0.08);
       updates.push((_, clock) => {
-        const amps = 412 + wander(clock, seed) * 60;
+        const volts = 479 + Math.sin(clock) * 1.5;
+        const amps =
+          47 +
+          1.4 * Math.sin(clock * 0.29 + seed) +
+          0.6 * Math.sin(clock * 0.93 + seed * 0.47);
         monitor.show(
-          479 + Math.sin(clock) * 1.5,
+          volts,
           amps,
-          (amps * 479 * 1.73 * 0.86) / 1000,
+          (Math.sqrt(3) * volts * amps * 0.86) / 1000,
           lit.value,
         );
       });
@@ -1038,6 +1227,7 @@ function dressDoor(
       });
       put(lcd.group, cx - 0.06, -0.03);
       const boot = screenBoot('AUX DRIVE');
+      onScreenReady(boot, lcd.group);
       updates.push((_, clock) =>
         lcd.show(
           boot.booting
@@ -1125,8 +1315,16 @@ function dressDoor(
       break;
     }
     case 'plc': {
-      const terminal = place(operatorTerminal(kit, {}), cx, height * 0.2).view;
-      const boot = screenBoot('PANELVIEW');
+      const terminalPart = place(operatorTerminal(kit, {}), cx, height * 0.2);
+      const terminal = terminalPart.view;
+      const boot = createScreenBoot(
+        circuit.powered,
+        'AUTOMATION CONTROL',
+        'controller',
+      );
+      updates.push((delta) => boot.step(delta));
+      onScreenReady(boot, terminalPart.object, computerCueSound(PC_POST_CUE));
+      onBoot(boot.ready);
       updates.push((_, clock) => {
         if (!lit.value) {
           terminal.draw(null);
@@ -1179,8 +1377,11 @@ function dressDoor(
     }
     case 'drive': {
       crt('mimic', 0.34, height / 2 - 0.27, 'VFD-601 PROCESS');
-      const keypad = place(driveKeypad(kit, {}), cx - 0.1, 0.02).view;
+      const keypadPart = place(driveKeypad(kit, {}), cx - 0.1, 0.02);
+      const keypad = keypadPart.view;
       const boot = screenBoot('VFD-601 HIM');
+      onScreenReady(boot, keypadPart.object);
+      onBoot(boot.ready);
       updates.push((_, clock) => {
         keypad.show(
           boot.booting
@@ -1314,7 +1515,10 @@ function populateInterior(
   world: ReturnType<typeof createGraph>,
   prefix: string,
   mainBreaker: ReturnType<typeof createCircuitBreaker>,
+  /** What feeds this bucket's breaker. */
+  feed: Readable<boolean>,
   indicatorPower: Readable<boolean>,
+  plcReady: Readable<boolean>,
 ): BucketCircuit {
   const request = world.input(`${prefix}.run`, true, {
     where: 'START / STOP station',
@@ -1364,7 +1568,8 @@ function populateInterior(
         prefix === 'section1.bucket2'
           ? mainBreaker
           : createCircuitBreaker(world, `${prefix}.breaker`),
-      power: prefix === 'section1.bucket2' ? undefined : mainBreaker.closed,
+      handleSoundLevel: prefix === 'section1.bucket2' ? 0.22 : undefined,
+      power: feed,
     },
   );
   const controlFuse = put('fuse', -w * 0.25, h / 2 - 0.075, -0.27, {
@@ -1406,6 +1611,16 @@ function populateInterior(
     // Genuine 2U instrument cases, not fictitious rack-mounted 1771 cards.
     for (let i = 0; i < 2; i++)
       put('rack-unit', 0, -h / 2 + 0.18 + i * 0.18, -0.03, {
+        power: controlFeed,
+        status: computed(() =>
+          !controlFeed.value
+            ? 'off'
+            : assembly.faulted.value
+              ? 'fault'
+              : plcReady.value
+                ? 'running'
+                : 'starting',
+        ),
         rack: {
           label: 'CONTROL INTERFACE',
           style: 'vented',

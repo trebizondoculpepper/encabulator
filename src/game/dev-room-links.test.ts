@@ -28,7 +28,7 @@ describe('the rooms', () => {
       { to: 'dev0', side: 'north', x: bounds.minX + 2.1, z: bounds.minZ },
     ]);
     expect(devPortals('rhombus', bounds, 1)).toEqual([
-      { to: 'dev11', side: 'east', x: bounds.maxX, z: 0 },
+      { to: 'dev13', side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
 
@@ -38,6 +38,10 @@ describe('the rooms', () => {
     for (const id of ROOMS)
       expect(devPortals(id, bounds, 1).map((p) => p.to)).not.toContain('hall');
     expect(DEV_ROOMS).not.toContain('rhombus');
+    expect(DEV_ROOMS).not.toContain('level2');
+    expect(CHAIN).not.toContain('level2');
+    expect(resolveRoomId('level2')).toBe('level2');
+    expect(devPortals('level2', bounds, 1)).toEqual([]);
   });
 
   it('keeps the old Hall and rhombus URLs as aliases', () => {

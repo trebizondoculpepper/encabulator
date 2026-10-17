@@ -150,8 +150,8 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   place(createCabinetBoard(kit), cabinetX, 1.55, cabinetZ, -Math.PI / 2, {
     minX: (cabinetX - 0.1) * m,
     maxX: half.x * m,
-    minZ: (cabinetZ - 1.75) * m,
-    maxZ: (cabinetZ + 1.75) * m,
+    minZ: (cabinetZ - 2.55) * m,
+    maxZ: (cabinetZ + 2.55) * m,
   });
   [...createMachineGallery(kit), ...createEmptyMachinePlinths(kit)].forEach(
     (plinth, i) => {

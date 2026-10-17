@@ -1,0 +1,13 @@
+# Level 2: first game room
+
+The owner confirmed that Module 2 takes place at Neumann Dynamik's Guildford office and asked for a plain test space before architectural dressing. `?room=level2` is a separate game room, outside the development-room portal chain. It reuses the seven-bay MCC and the five removable Pepperdyne cards, with a waste-paper bin and a simple smoke and scorch effect at Automation Control.
+
+The interaction pass follows the scripted main switch, oil pump retry, drive isolator cycle, hydrocoptic pump failure, power isolation, cabinet inspection, and card disposal. A cue manifest transcribes all 108 narrator passages, including the closing poem, and the browser speaks them with a temporary English voice. The owner will replace the narration with their own recordings. Cards use the existing first-person pickup and drop; the suggested automatic flight toward a nearby bin is reserved for a separate development-room test.
+
+This is a playable staging pass. The oil bucket stays dark on the first throw and comes online after the OFF/ON retry; the drive bucket waits for its isolator cycle. The opening and ending use a short procedural jingle, and the final machine failure uses a descending procedural sigh. The room remains a plain test space, and the soundtrack and failure effects are provisional. Typecheck, lint, format check, the full test suite and build passed; a focused MCC test for the scenario power gate also passed. The exact dramatic timing should be reviewed in the browser as the sequence is refined.
+
+## Narrator replacement
+
+Replaced browser speech synthesis with pre-rendered Kokoro-82M `bm_george` narration so the same older-sounding British male voice plays on every browser. Rendered all 108 scripted cues plus 28 finite card-name and remaining-board variants to working WAVs in `resources/sound/narrations/level2/` and game MP3s in `src/audio/assets/narration/level2/`. The voice player now queues these recordings, retains the 850 ms gap, and pauses and resumes with the room. The author, model source, licence and processing are recorded in `CREDITS.md` and `src/audio/assets/README.md`.
+
+The Level 2 line-up already uses dev6's `createRetroEncabulatorMcc`, including its world graph, controls, boot sounds and positional machine-tone components. Connected the scripted smoke event to the actual PLC power card's failure action, so the component model drops processor and I/O power; the failure now has a local electrical pop. Exposed the shared world and live component states through `window.level2` for testing. The staged oil, drive and hydrocoptic sound gates still follow the training-room sequence.

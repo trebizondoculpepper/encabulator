@@ -24,7 +24,8 @@ import {
 } from '../game/world/components';
 import type { Readable } from '../game/world/components';
 import { createMachineDeviceView } from '../scene/machine-components';
-import type { RackUnitOptions } from '../scene/rack-equipment';
+import { createRackStatusIndicator } from '../scene/rack-equipment';
+import type { RackStatus, RackUnitOptions } from '../scene/rack-equipment';
 import type { PanelKit } from '../scene/eighties-controls';
 import {
   beginPart,
@@ -69,12 +70,16 @@ export function machineComponent(
     dropProfile?: DropProfile;
     rack?: Pick<RackUnitOptions, 'u' | 'style' | 'depth' | 'label'>;
     breaker?: ReturnType<typeof createCircuitBreaker>;
+    /** Main disconnect may use a quieter handle than ordinary bucket breakers. */
+    handleSoundLevel?: number;
     power?: Readable<boolean>;
     indicatorPower?: Readable<boolean>;
     running?: Readable<boolean>;
     current?: Readable<number>;
     voltage?: Readable<number>;
     input?: Readable<number>;
+    /** Optional three-colour status lamp on an instrument rack unit. */
+    status?: Readable<RackStatus>;
   } = {},
 ): MachineDevice {
   const label = MACHINE_COMPONENTS.find(([key]) => key === kind)![1];
@@ -193,9 +198,10 @@ export function machineComponent(
       const a = beginPart(kit, name);
       const view = createMachineDeviceView(kit, kind, label);
       a.object.add(view.group);
+      const level = props.handleSoundLevel ?? 0.3;
       a.voice(handle, {
-        on: click({ band: 900, q: 1, decay: 0.06, level: 0.3 }),
-        off: click({ band: 1200, q: 1, decay: 0.04, level: 0.3 }),
+        on: click({ band: 900, q: 1, decay: 0.06, level }),
+        off: click({ band: 1200, q: 1, decay: 0.04, level }),
         trip: click({ band: 1700, q: 2, decay: 0.1, level: 0.4 }),
       });
       a.uses.set(view.service, handle.operate);
@@ -370,7 +376,27 @@ export function machineComponent(
         depth: 0.3302,
         ...props.rack,
       });
-      part = device;
+      if (props.status) {
+        const indicator = createRackStatusIndicator(kit);
+        indicator.group.position.set(0.12, 0, 0.002);
+        device.view.face.add(indicator.group);
+        let seconds = 0;
+        part = {
+          ...device,
+          update(delta) {
+            device.update(delta);
+            seconds += delta;
+            indicator.set(
+              !power.value
+                ? 'off'
+                : device.pulled.value
+                  ? 'fault'
+                  : props.status!.value,
+              seconds,
+            );
+          },
+        };
+      } else part = device;
       active = computed(() => !device.pulled.value);
       faulted = device.pulled;
       const operate = [...device.uses.values()][0];

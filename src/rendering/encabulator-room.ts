@@ -16,9 +16,11 @@ import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { createPanelKit, disposeKit } from '../scene/eighties-controls';
 import { createPortals } from '../scene/portals';
+import { ISOLATOR } from '../scene/incoming-isolator';
 import {
   createRetroEncabulatorMcc,
   MCC_DEPTH,
+  MCC_ISOLATOR_X,
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
 import { createFirstPerson } from './first-person';
@@ -117,6 +119,13 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
       maxZ: -3.72 * m,
     },
     { minX: 2.84 * m, maxX: 3.38 * m, minZ: -4.46 * m, maxZ: -4.03 * m },
+    // The incoming isolator, to the left of the line-up.
+    {
+      minX: (MCC_ISOLATOR_X - ISOLATOR.width / 2 - 0.05) * m,
+      maxX: (MCC_ISOLATOR_X + ISOLATOR.width / 2 + 0.05) * m,
+      minZ: (-3.8 + ISOLATOR.back) * m,
+      maxZ: (-3.8 + ISOLATOR.front) * m,
+    },
   ];
   const raycaster = new Raycaster();
   const pointer = new Vector2();

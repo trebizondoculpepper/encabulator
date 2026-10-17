@@ -52,6 +52,8 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **PLAYER ACTION — BETAFORM AMPLIFIER:** At the MAIN ENCABULATOR DRIVE VFD-601 cabinet, cycle the DRIVE ISOLATOR to OFF, set the SPEED potentiometer to its marked nominal position, then turn the isolator back ON. In this sequence, the drive supplies the betaform amplifier.
 
+**NARRATOR:** [gives instructionss as to which items to change, sarcastically, tell the user again which item to change]
+
 **MACHINE / SOUND:** The response is unmistakable. A bank of indicators changes state, the main machine note shifts pitch, and a new industrial rhythm locks into the existing hum and oil-pump burble. Let the change establish itself before the next action.
 
 **PLAYER ACTION — HYDROCOPTIC PUMP:** Turn the HYDROCOPTIC PUMP operating handle to ON. Its FLOW PULSE display surges into life.
@@ -330,29 +332,67 @@ _If the player already switched off MASTER POWER, omit the interruption and proc
 
 **NARRATOR:** It's done.
 
-**NARRATOR (calm):** We did it… I think.
+**MACHINE:** The smoke subsides. The flickering stops: the remaining indicator lights steady, then one by one grow a little brighter. The machine appears to have pulled through.
 
-**NARRATOR:** It's going to be OK… I think.
+**NARRATOR (calm):** Look at that. The lights are holding.
 
-**NARRATOR:** We're going to be OK.
+**NARRATOR:** That, trainee, was a job well done. A job very well done.
 
-**NARRATOR:** Of course, things are going to be different now. You don't recover from something like this quickly.
+**NARRATOR:** I'm no doctor… well, I'm an Encabulation engineer, which is very nearly the same thing… and in my professional opinion…
 
-**MACHINE:** The smoke subsides. The remaining indicator lighting steadies. The machine appears to have settled; the player is left looking at it in the quiet room.
+**NARRATOR:** It's going to live.
 
-**NARRATOR:** Would you stay here?
+**NARRATOR (overcome with relief):** Oh, thank goodness. Thank goodness. I don't mind telling you, there was a moment back there when I thought we'd lost it.
 
-**NARRATOR:** With me, and the machine.
-
-**BEAT:** A long, exposed pause. No prompt for the player to answer.
+**BEAT:** A shaky exhalation. He pulls himself together.
 
 **NARRATOR:** Ahem.
 
-**DELIVERY:** Abruptly recover the bright, assured training-film voice, as though the preceding episode never happened.
+**DELIVERY:** Abruptly recover the bright, assured training-film voice, picking up exactly where the module left off, as though nothing has happened.
 
-**NARRATOR:** As I was saying, the Neumann Dynamik Turbo Encabulator represents a step change in quality. State of the art, with its twin-spline design. Today you've learned to operate this, bring it to a steady state and successfully complete normal operations. Congratulations, trainee.
+**NARRATOR:** Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—
 
-**MUSIC:** The optimistic opening jingle returns.
+**MACHINE / SOUND:** Cut him off mid-word. The machine gives a long, descending sigh, a last faint echo of its running note winding down to nothing. The indicator lights dim and go out one at a time, irregularly; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room.
+
+**BEAT:** A long silence. Let it be uncomfortable.
+
+**NARRATOR (quietly):** No.
+
+**NARRATOR:** No, no, no. Come on. Come on, old thing.
+
+**BEAT:** Silence. Nothing in the machine responds.
+
+**NARRATOR:** It's gone.
+
+**NARRATOR:** It's really gone this time.
+
+**BEAT:** A pause, as at a graveside. He clears his throat.
+
+**NARRATOR (slowly, with great dignity):** Fade out reciting WH Auden's Funeral Blues
+
+Stop all the clocks, cut off the telephone,\
+Prevent the dog from barking with a juicy bone,\
+Silence the pianos and with muffled drum\
+Bring out the coffin, let the mourners come.
+
+Let aeroplanes circle moaning overhead\
+Scribbling on the sky the message 'It is Dead'.\
+Put crepe bows round the white necks of the public doves,\
+Let the traffic policemen wear black cotton gloves.
+
+It was my North, my South, my East and West,\
+My working week and my Sunday rest,\
+My noon, my midnight, my talk, my song;\
+I thought that love would last forever: I was wrong.
+
+The stars are not wanted now; put out every one,\
+Pack up the moon and dismantle the sun,\
+Pour away the ocean and sweep up the wood;\
+For nothing now can ever come to any good.
+
+**BEAT:** The last line of the recital hangs in the silent room.
+
+**MUSIC:** The optimistic opening jingle returns, exactly as cheerful as at the start, oblivious.
 
 **CAPTION OVERLAY:** “Module 2 complete.”
 

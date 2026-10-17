@@ -38,6 +38,15 @@ describe('the button gallery', () => {
     expect(STAND_CONDITIONS.filter((c) => c.leak > 0)).toEqual([last]);
   });
 
+  it('lights the lamps that work, and shorts from VANDALISED on', () => {
+    const at = (caption: string) =>
+      STAND_CONDITIONS.findIndex((c) => c.caption === caption);
+    for (const c of STAND_CONDITIONS.slice(0, at('VANDALISED')))
+      expect([c.lamp, c.shorts], c.caption).toEqual(['on', false]);
+    for (const c of STAND_CONDITIONS.slice(at('VANDALISED')))
+      expect(c.shorts, c.caption).toBe(true);
+  });
+
   it('numbers and captions every stand once', () => {
     const names = STAND_CONDITIONS.map((c) => c.name);
     expect(new Set(names).size).toBe(names.length);

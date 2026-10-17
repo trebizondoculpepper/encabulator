@@ -7,7 +7,8 @@ import { lensDamageLevel } from './lens-damage';
  * worse, each stand keeping every hurt of the one before it and adding
  * more, to a wreck. Drawn by `src/scene/stand-condition.ts`.
  *
- * Amounts run from 0 (none) to 1 (as bad as it gets).
+ * Amounts run from 0 (none) to 1 (as bad as it gets). The lamps of those
+ * that still work are lit; from VANDALISED on, the wiring shorts.
  */
 export interface StandCondition {
   /** Its number in the gallery and the caption under it. */
@@ -43,6 +44,11 @@ export interface StandCondition {
    * it: brown, glossy, run down the post and pooled on the floor.
    */
   leak: number;
+  /**
+   * Whether its wiring shorts out now and then, a little spark and a
+   * crackle at its button (`src/game/shorting.ts`).
+   */
+  shorts: boolean;
 }
 
 export const STAND_CONDITIONS: readonly StandCondition[] = [
@@ -63,12 +69,13 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: false,
   },
   {
     name: '2',
     caption: 'IN SERVICE',
     finish: 'standard',
-    lamp: 'off',
+    lamp: 'on',
     lens: 'intact',
     scratches: 0,
     grime: 0,
@@ -81,12 +88,13 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: false,
   },
   {
     name: '3',
     caption: 'WORN',
     finish: 'standard',
-    lamp: 'off',
+    lamp: 'on',
     lens: 'scuffed',
     scratches: 0.4,
     grime: 0.35,
@@ -99,12 +107,13 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: false,
   },
   {
     name: '4',
     caption: 'KNOCKED ABOUT',
     finish: 'standard',
-    lamp: 'off',
+    lamp: 'on',
     lens: 'cracked',
     scratches: 0.6,
     grime: 0.5,
@@ -117,6 +126,7 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: false,
   },
   {
     name: '5',
@@ -135,6 +145,7 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: true,
   },
   {
     name: '6',
@@ -153,6 +164,7 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: false,
     castorsMissing: 0,
     leak: 0,
+    shorts: true,
   },
   {
     name: '7',
@@ -171,6 +183,7 @@ export const STAND_CONDITIONS: readonly StandCondition[] = [
     severed: true,
     castorsMissing: 1,
     leak: 0.85,
+    shorts: true,
   },
 ];
 
@@ -189,5 +202,6 @@ export function damageOf(condition: StandCondition) {
     severed: condition.severed ? 1 : 0,
     castorsMissing: condition.castorsMissing,
     leak: condition.leak,
+    shorts: condition.shorts ? 1 : 0,
   };
 }

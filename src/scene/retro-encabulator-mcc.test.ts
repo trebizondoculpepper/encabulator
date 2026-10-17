@@ -1,4 +1,6 @@
 import { assertDropProfile } from '../game/drop-profile';
+import { signal } from '@preact/signals-core';
+import { partAudio } from '../audio/part-audio';
 import type { PortableObject } from '../rendering/object-handling';
 import {
   afterEach,
@@ -62,6 +64,16 @@ function fixture() {
   };
 }
 
+/** Throw the incoming isolator's handle, as a click on it does. */
+function isolate(mcc: ReturnType<typeof createRetroEncabulatorMcc>) {
+  const isolator = mcc.group.getObjectByName('INCOMING ISOLATOR handle')!;
+  let lever: Object3D | undefined;
+  isolator.traverse((o) => {
+    if (!lever && mcc.parts.uses.has(o)) lever = o;
+  });
+  return work(mcc, lever!);
+}
+
 function work(
   mcc: ReturnType<typeof createRetroEncabulatorMcc>,
   object: Object3D,
@@ -75,6 +87,105 @@ function work(
   }
   return false;
 }
+
+it('keeps a scenario-gated pump dark until its retry feed is enabled', () => {
+  const kit = createPanelKit();
+  const oilFeed = signal(false);
+  const mcc = createRetroEncabulatorMcc(kit, {
+    incomingOn: true,
+    bucketFeed: { 'section3.bucket1': oilFeed },
+  });
+  const main = mcc.components.find(
+    (device) => device.object.name === 'section1.bucket2: breaker',
+  )!;
+  const oil = mcc.components.find(
+    (device) => device.object.name === 'section3.bucket1: breaker',
+  )!;
+  expect(main.breaker!.closed.value).toBe(false);
+  main.breaker!.operate();
+  expect(oil.active.value).toBe(false);
+  oilFeed.value = true;
+  expect(oil.active.value).toBe(true);
+  mcc.parts.dispose();
+  disposeKit(kit, mcc.group);
+});
+
+it('shows two rack status lamps through Automation Control startup and fault', () => {
+  const { mcc, dispose } = fixture();
+  const lamps: Object3D[] = [];
+  mcc.group.traverse((object) => {
+    if (object.name === 'Rack status lens') lamps.push(object);
+  });
+  expect(lamps).toHaveLength(2);
+  expect(lamps.map((lamp) => lamp.userData.status)).toEqual(['off', 'off']);
+
+  isolate(mcc);
+  mcc.components
+    .find((device) => device.object.name === 'section1.bucket2: breaker')!
+    .breaker!.operate();
+  mcc.update(0.1);
+  expect(lamps.map((lamp) => lamp.userData.status)).toEqual([
+    'starting',
+    'starting',
+  ]);
+  mcc.update(3.5);
+  expect(lamps.map((lamp) => lamp.userData.status)).toEqual([
+    'running',
+    'running',
+  ]);
+  expect(lamps.every((lamp) => lamp.userData.lit)).toBe(true);
+
+  mcc.components.find((device) => device.kind === 'backplane')!.test();
+  mcc.update(0.1);
+  expect(lamps.map((lamp) => lamp.userData.status)).toEqual(['fault', 'fault']);
+  dispose();
+});
+
+it('beeps at a distinct pitch as each screen reaches steady state, once per boot', () => {
+  const play = vi.spyOn(partAudio, 'play').mockImplementation(() => () => {});
+  const { mcc, dispose } = fixture();
+  isolate(mcc);
+  mcc.components
+    .find((d) => d.object.name === 'section1.bucket2: breaker')!
+    .breaker!.operate();
+  play.mockClear();
+  const beeps = () =>
+    play.mock.calls
+      .map(([recipe]) => recipe)
+      .filter(
+        (recipe) =>
+          ('tone' in recipe && recipe.tone.seconds === 0.16) ||
+          ('tones' in recipe && recipe.tones[0]?.hz === 880),
+      );
+  mcc.update(3);
+  expect(beeps()).toHaveLength(0);
+  mcc.update(0.5);
+  expect(beeps()).toHaveLength(1); // Automation Control PLC self-test.
+  expect(beeps()[0]).toEqual({
+    tones: [{ at: 0, hz: 880, seconds: 0.11, type: 'square', level: 0.018 }],
+  });
+  mcc.update(20);
+  const first = beeps();
+  expect(first.length).toBeGreaterThanOrEqual(7);
+  expect(
+    new Set(
+      first.map((recipe) => {
+        if ('tone' in recipe) return recipe.tone.hz;
+        if ('tones' in recipe) return recipe.tones[0].hz;
+        return NaN;
+      }),
+    ).size,
+  ).toBe(first.length);
+  mcc.update(5);
+  expect(beeps()).toHaveLength(first.length);
+  isolate(mcc);
+  mcc.update(0);
+  isolate(mcc);
+  mcc.update(25);
+  expect(beeps()).toHaveLength(first.length * 2);
+  dispose();
+  play.mockRestore();
+});
 
 describe('MCC bucket doors', () => {
   it('renders only the opened bucket contents, including through the closing animation', () => {
@@ -358,9 +469,40 @@ describe('shared machine inventory', () => {
     disposeKit(kit, mcc.group);
   });
 
+  it('keeps MAIN INCOMING live from the isolator, before the main disconnect', () => {
+    const { mcc, dispose } = fixture();
+    mcc.update(0.05);
+    const named = (name: string) =>
+      mcc.components.find((d) => d.object.name === name)!;
+    const incoming = named('section1.bucket1: breaker');
+    const main = named('section1.bucket2: breaker');
+    const contact = mcc.components.find((d) => d.kind === 'contactor')!;
+    // Everything starts off, the isolator too: nothing is live.
+    expect(incoming.active.value).toBe(false);
+    expect(main.active.value).toBe(false);
+    // The isolator on, the main disconnect off: the supply is in, no further.
+    expect(isolate(mcc)).toBe(true);
+    expect(incoming.active.value).toBe(true);
+    expect(main.active.value).toBe(false);
+    expect(contact.active.value).toBe(false);
+    main.breaker!.operate();
+    expect(main.active.value).toBe(true);
+    expect(contact.active.value).toBe(true);
+    // Opening the isolator kills everything, MAIN INCOMING too.
+    expect(isolate(mcc)).toBe(true);
+    expect(incoming.active.value).toBe(false);
+    expect(main.active.value).toBe(false);
+    expect(contact.active.value).toBe(false);
+    expect(isolate(mcc)).toBe(true);
+    expect(incoming.active.value).toBe(true);
+    expect(contact.active.value).toBe(true);
+    dispose();
+  });
+
   it('drops an installed starter when its breaker trips or control fuse blows', () => {
     const { mcc, dispose } = fixture();
     mcc.update(0.05);
+    isolate(mcc);
     mcc.components
       .find((d) => d.object.name === 'section1.bucket2: breaker')!
       .breaker!.operate();
@@ -471,7 +613,7 @@ it('cannot electrically reseat a Pepperdyne card after it has been picked up', (
   disposeKit(kit, assembly.object);
 });
 
-it('starts off and the main disconnect supplies every bucket, including the PLC', () => {
+it('starts off, and the isolator and main disconnect supply every bucket, including the PLC', () => {
   const { mcc, dispose } = fixture();
   const main = mcc.components.find(
     (d) => d.object.name === 'section1.bucket2: breaker',
@@ -481,7 +623,11 @@ it('starts off and the main disconnect supplies every bucket, including the PLC'
   );
   expect(consumers.length).toBeGreaterThan(5);
   expect(consumers.every((d) => !d.active.value)).toBe(true);
+  // The main disconnect alone does nothing while the isolator is off.
   main.breaker!.operate();
+  mcc.update(3);
+  expect(consumers.every((d) => !d.active.value)).toBe(true);
+  isolate(mcc);
   mcc.update(3);
   expect(consumers.every((d) => d.active.value)).toBe(true);
   main.breaker!.operate();
@@ -494,7 +640,7 @@ it('keeps windowed PLC contents visible and supports a per-bucket override', () 
   const kit = createPanelKit();
   const mcc = createRetroEncabulatorMcc(kit, {
     interiorVisibility: {
-      'section1.bucket1': 'always',
+      'section1.bucket3': 'always',
       'section5.bucket1': 'when-open',
     },
   });

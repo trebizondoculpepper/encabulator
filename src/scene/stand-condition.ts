@@ -761,8 +761,26 @@ export function createStandInCondition(
     }
   }
   if (c.scorch > 0) {
-    // The lead melted and drooping, its sheath blistered.
-    stand.cable.scale.set(1.2, 1.15, 1.25);
+    // The lead melted and drooping, its sheath swollen and blistered: its
+    // loop sags lower and further out, but its ends stay in the gland on
+    // the box and the grommet in the post.
+    const lead = stand.cable.geometry as TubeGeometry;
+    const path = lead.parameters.path as CatmullRomCurve3;
+    const points = path.points.map((p, i, all) =>
+      i === 0 || i === all.length - 1
+        ? p.clone()
+        : p
+            .clone()
+            .add(new Vector3(0.008, -0.012, 0.006).multiplyScalar(c.scorch)),
+    );
+    stand.cable.geometry = new TubeGeometry(
+      new CatmullRomCurve3(points),
+      32,
+      0.003 * (1 + 0.25 * c.scorch),
+      8,
+      false,
+    );
+    lead.dispose();
     (stand.cable.material as MeshStandardMaterial).roughness = 1;
   }
   for (let i = 0; i < c.castorsMissing; i++) {

@@ -42,12 +42,18 @@ const openRoom = async () => {
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
   if (room === 'rhombus')
     start = (await import('./rendering/plinth-room')).startPlinthRoom;
+  else if (room === 'level2')
+    start = (await import('./rendering/level2-room')).startLevel2Room;
   else if (room === 'training')
     start = (await import('./rendering/training-room')).startTrainingRoom;
   else if (room === 'hall')
     start = (await import('./rendering/hall-room')).startHallRoom;
   else if (room === 'dev6')
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
+  else if (room === 'dev12')
+    start = (await import('./rendering/tones-room')).startTonesRoom;
+  else if (room === 'dev13')
+    start = (await import('./rendering/beeps-room')).startBeepsRoom;
   else if (room === 'dev11')
     start = (await import('./rendering/button-gallery-room'))
       .startButtonGalleryRoom;

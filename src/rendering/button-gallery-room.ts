@@ -14,13 +14,19 @@ import {
   Vector3,
 } from 'three';
 import type { Object3D } from 'three';
-import { partAudio } from '../audio/part-audio';
+import { click, partAudio } from '../audio/part-audio';
 import { devPortals, devWalls } from '../game/dev-room-links';
+import { createShorting } from '../game/shorting';
 import { STAND_CONDITIONS } from '../game/stand-conditions';
 import { STAND_RADIUS } from '../game/mobile-pedestal';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import { createSectionBoard } from '../scene/building-fittings';
+import {
+  createLampGlow,
+  createPowerMotes,
+  createShortSpark,
+} from '../scene/button-effects';
 import {
   createPanelKit,
   disposeKit,
@@ -49,8 +55,12 @@ const SPACING = 2;
  * wrecked, each keeping every hurt of the one before
  * (`src/game/stand-conditions.ts`, drawn by `src/scene/stand-condition.ts`).
  * Their buttons press, their lenses damaged to match
- * (`src/game/lens-damage.ts`); the wreck's lamp flickers, white through
- * the hole in its lens, grey plastic when it goes out.
+ * (`src/game/lens-damage.ts`); those that still work are lit and gleam,
+ * the new one giving off tiny motes of power; from the vandalised one on,
+ * each shorts out now and then with a little spark and a crackle
+ * (`src/game/shorting.ts`, `src/scene/button-effects.ts`), and the wreck's
+ * lamp flickers, white through the hole in its lens, grey plastic when it
+ * goes out.
  */
 export function startButtonGalleryRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -108,7 +118,19 @@ export function startButtonGalleryRoom(canvas: HTMLCanvasElement) {
 
   // ---- The stands ---------------------------------------------------------
   const flickering = signal(false);
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  // A short's crackle: a few sharp ticks of high noise, close together.
+  const crackle = click({
+    band: 4800,
+    q: 1.1,
+    decay: 0.022,
+    level: 0.22,
+    repeat: [3, 0.028],
+  });
   const auras: ((time: number) => void)[] = [];
+  /** What each button gives off, run each frame. */
+  const effects: ((time: number, delta: number) => void)[] = [];
+  const shorts = new Map<string, () => void>();
   const frees: (() => void)[] = [];
   const stands = STAND_CONDITIONS.map((condition, i) => {
     const x = (i - (STAND_CONDITIONS.length - 1) / 2) * SPACING;
@@ -117,19 +139,42 @@ export function startButtonGalleryRoom(canvas: HTMLCanvasElement) {
     room.add(stand.group);
     auras.push(stand.update);
     frees.push(stand.dispose);
+    const lamp = signal(condition.lamp === 'on');
     const button = pushButton(kit, {
       colour: 'red',
       head: 'illuminated',
       name: `button ${condition.name}, ${condition.caption.toLowerCase()}`,
-      lamp:
-        condition.lamp === 'flickering'
-          ? flickering
-          : signal(condition.lamp === 'on'),
+      lamp,
       damage: signal(condition.lens),
       damageSeed: i + 1,
     });
     stand.mount.add(button.object);
     parts.add(button);
+    // A lit lens gleams; a new one gives off motes of power; a damaged one
+    // shorts now and then, its lamp jumping on with the spark.
+    const glow = createLampGlow(kit, m);
+    button.object.add(glow.group);
+    const motes = condition.finish === 'chrome' ? createPowerMotes(kit) : null;
+    if (motes) button.object.add(motes.group);
+    const spark = condition.shorts ? createShortSpark(kit) : null;
+    if (spark) button.object.add(spark.group);
+    const shorting = condition.shorts ? createShorting() : null;
+    const short = () => {
+      if (!spark) return;
+      spark.fire();
+      partAudio.play(crackle, button.object);
+    };
+    shorts.set(condition.name, short);
+    effects.push((time, delta) => {
+      if (shorting?.update(delta)) short();
+      spark?.update(delta, reducedMotion.matches);
+      motes?.update(time, delta, reducedMotion.matches);
+      lamp.value =
+        (condition.lamp === 'flickering'
+          ? flickering.value
+          : condition.lamp === 'on') || Boolean(spark?.flashing());
+      glow.set(lamp.value ? 1 : 0);
+    });
     // Its own spotlight, from above and in front.
     const spot = new SpotLight('#fff3e2', 14 * m * m, 0, 0.36, 0.6, 2);
     spot.position.set(x * m, (CEILING - 0.1) * m, (ROW_Z + 1.4) * m);
@@ -262,6 +307,8 @@ export function startButtonGalleryRoom(canvas: HTMLCanvasElement) {
     place(x: number, z: number, yaw = 0, pitch = 0) {
       walk.place(x * m, z * m, yaw, pitch);
     },
+    /** Short stand `n`'s button out now, if it shorts. */
+    short: (n: number | string) => shorts.get(String(n))?.(),
   };
 
   // ---- Each frame ----------------------------------------------------------
@@ -279,6 +326,7 @@ export function startButtonGalleryRoom(canvas: HTMLCanvasElement) {
     flickering.value =
       Math.sin(t * 13.1) + Math.sin(t * 7.3 + 1) + Math.sin(t * 1.7 + 2) > 1.1;
     for (const aura of auras) aura(t);
+    for (const effect of effects) effect(t, delta);
     walk.update(delta);
     parts.update(delta);
     portals.update(delta, walk.walker.x, walk.walker.z);

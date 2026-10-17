@@ -1,3 +1,5 @@
+import { signal } from '@preact/signals-core';
+import { machineTone } from './machine-tones';
 import { recordedLoop } from './recorded-loop';
 import { renderFireAlarm } from './fire-alarm';
 import type { LoopRecipe } from './part-audio';
@@ -8,12 +10,13 @@ import type { LoopRecipe } from './part-audio';
  * makes it imports and holds; nothing chooses them by name. They are
  * quiet, synthesised except for the recorded castors:
  *
- * - `MAINS_HUM`: a transformer or breaker carrying load, 60 Hz (the
- *   American mains) and its harmonics;
+ * - `MAINS_HUM`: a transformer or breaker carrying load: the low, coarse
+ *   transformer tone of `machine-tones.ts`, faded in and out;
  * - `NEON_BUZZ`: a mains neon or lamp ballast, a thin 120 Hz rasp;
- * - `RELAY_HOLD`: a relay or contactor coil holding in, a 120 Hz buzz;
- * - `MOTOR_HUM`: an induction motor running, its 120 Hz magnetic hum
- *   and the hiss of its cooling fan;
+ * - `RELAY_HOLD`: a relay or contactor coil holding in: the same, much
+ *   quieter and a little higher;
+ * - `MOTOR_HUM`: an induction motor running: the motor tone, running up
+ *   and coasting down;
  * - `FIRE_SOUNDER`: the fire alarm, the VX3 Simulator's synthesised
  *   sounders (`fire-alarm.ts`): a pulsing piezo, a two-note buzzer and a
  *   far sweep;
@@ -46,13 +49,22 @@ const tones =
     });
   };
 
-export const MAINS_HUM: LoopRecipe = tones(0.05, [
-  ['sine', 60, 0.7],
-  ['sine', 120, 0.35],
-  ['sine', 180, 0.08],
-]);
+/** Switched in, a transformer or contactor only fades in and out. */
+const SWITCHED = { up: 0.3, down: 0.4, floor: 1 };
 
-export const RELAY_HOLD: LoopRecipe = tones(0.014, [['triangle', 120, 1]]);
+export const MAINS_HUM: LoopRecipe = machineTone(
+  'transformer',
+  signal(1),
+  0.04,
+  SWITCHED,
+);
+
+export const RELAY_HOLD: LoopRecipe = machineTone(
+  'transformer',
+  signal(1.5),
+  0.012,
+  SWITCHED,
+);
 
 export const NEON_BUZZ: LoopRecipe = (context, out) => {
   const osc = context.createOscillator();
@@ -69,29 +81,7 @@ export const NEON_BUZZ: LoopRecipe = (context, out) => {
   return [osc];
 };
 
-export const MOTOR_HUM: LoopRecipe = (context, out) => {
-  const hum = tones(0.05, [
-    ['sine', 120, 0.8],
-    ['sine', 240, 0.25],
-    ['sawtooth', 360, 0.04],
-  ])(context, out);
-  // The fan: noise through a soft band.
-  const noise = context.createBuffer(1, context.sampleRate, context.sampleRate);
-  const data = noise.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const fan = context.createBufferSource();
-  fan.buffer = noise;
-  fan.loop = true;
-  const band = context.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = 900;
-  band.Q.value = 0.7;
-  const level = context.createGain();
-  level.gain.value = 0.025;
-  fan.connect(band).connect(level).connect(out);
-  fan.start();
-  return [...hum, fan];
-};
+export const MOTOR_HUM: LoopRecipe = machineTone('motor', signal(1), 0.06);
 
 /** A shared second of white noise, for hisses. */
 const noiseSource = (context: AudioContext) => {
