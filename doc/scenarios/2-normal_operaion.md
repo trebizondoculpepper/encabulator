@@ -16,7 +16,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **ORDER:** Names belong to the physical cards, not the order of pickup. If the player chooses a different order, identify the card they actually pulled; first/second/third-card reactions still follow the number removed. The timed and emotional reactions do not require a particular card identity.
 
-## Interior — daytime — Training Room 2 - Neumann Dymamik, a German Electronic Firm, Offices on the Guldford Trading Estate, England.
+## Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England
 
 **SETTING:** THE ENCABULATOR stands in the middle of the room, installed and plugged into a 450 W industrial power supply. A waste-paper bin stands nearby, empty. The machine is switched off. Its cabinet doors are closed.
 
