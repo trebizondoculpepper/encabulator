@@ -154,7 +154,7 @@ it('beeps at a distinct pitch as each screen reaches steady state, once per boot
       .map(([recipe]) => recipe)
       .filter(
         (recipe) =>
-          ('tone' in recipe && recipe.tone.seconds === 0.16) ||
+          ('tone' in recipe && recipe.tone.seconds === 0.11) ||
           ('tones' in recipe && recipe.tones[0]?.hz === 880),
       );
   mcc.update(3);
@@ -162,7 +162,7 @@ it('beeps at a distinct pitch as each screen reaches steady state, once per boot
   mcc.update(0.5);
   expect(beeps()).toHaveLength(1); // Automation Control PLC self-test.
   expect(beeps()[0]).toEqual({
-    tones: [{ at: 0, hz: 880, seconds: 0.11, type: 'square', level: 0.018 }],
+    tones: [{ at: 0, hz: 880, seconds: 0.11, type: 'square', level: 0.06 }],
   });
   mcc.update(20);
   const first = beeps();
@@ -176,6 +176,16 @@ it('beeps at a distinct pitch as each screen reaches steady state, once per boot
       }),
     ).size,
   ).toBe(first.length);
+  // Every one heard over the machine's hum.
+  for (const recipe of first) {
+    const level =
+      'tone' in recipe
+        ? recipe.tone.level
+        : 'tones' in recipe
+          ? recipe.tones[0].level
+          : 0;
+    expect(level).toBeGreaterThanOrEqual(0.06);
+  }
   mcc.update(5);
   expect(beeps()).toHaveLength(first.length);
   isolate(mcc);
@@ -709,5 +719,124 @@ it('fails like an engine giving up, stalls, restarts from RESET and dies for goo
   expect(main.active.value).toBe(false);
   mcc.recover();
   expect(main.active.value).toBe(true);
+  dispose();
+});
+
+it('in the kaput, smokes from two low units, soots those above and lights almost every fault', () => {
+  const { mcc, dispose } = fixture();
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  isolate(mcc);
+  main.breaker!.operate();
+  mcc.update(3);
+  const plumes: Object3D[] = [];
+  const soot: Mesh[] = [];
+  const windows: Mesh[] = [];
+  mcc.group.traverse((o) => {
+    if (o.name === 'Burning unit smoke') plumes.push(o);
+    if (o.name === 'Soot') soot.push(o as Mesh);
+    if (o.name.startsWith('Annunciator ')) windows.push(o as Mesh);
+  });
+  expect(plumes).toHaveLength(2);
+  expect(windows).toHaveLength(12);
+  // Each sooted face hangs on a door at or above a burning unit.
+  const doors = soot.map((s) => {
+    let door = '';
+    s.parent!.traverse((o) => {
+      if (!door && / (door|cover)$/.test(o.name)) door = o.name;
+    });
+    return door;
+  });
+  expect(doors).toEqual(
+    expect.arrayContaining([
+      'Section 2 MAIN DRIVE MOTOR M-101 door',
+      'Section 2 FEED MOTOR M-102 door',
+      'Section 2 AUXILIARY MOTOR M-103 door',
+      'Section 6 MAIN ENCABULATOR DRIVE VFD-601 door',
+      'Section 6 DRIVE ISOLATOR 480 VAC door',
+    ]),
+  );
+  expect(doors).toHaveLength(5);
+  // The soot never takes a click.
+  const ray = new Raycaster(new Vector3(0, 1, 5), new Vector3(0, 0, -1));
+  for (const s of soot) expect(ray.intersectObject(s)).toEqual([]);
+  expect(plumes.some((p) => p.visible)).toBe(false);
+  expect(soot.some((s) => s.visible)).toBe(false);
+
+  mcc.fail('kaput');
+  for (let t = 0; t < 4; t += 0.1) mcc.update(0.1);
+  expect(plumes.every((p) => p.visible)).toBe(true);
+  // Cleared within about eight seconds of the first bang; dead, sooted.
+  for (let t = 4; t < 20; t += 0.1) mcc.update(0.1);
+  expect(plumes.some((p) => p.visible)).toBe(false);
+  for (const s of soot) {
+    expect(s.visible).toBe(true);
+    expect((s.material as Material).opacity).toBeGreaterThan(0.6);
+  }
+  expect(main.active.value).toBe(false);
+  // On its battery, the annunciator still shows the faults: all but two
+  // windows, the red trips flashing and the amber ones steady.
+  const lit = (w: Mesh) =>
+    (
+      w.material as Material & { color: { getHexString(): string } }
+    ).color.getHexString() !== '8e8a80';
+  const samples = Array.from({ length: 10 }, () => {
+    mcc.update(0.05);
+    return windows.map(lit);
+  });
+  const ever = windows.map((_, i) => samples.some((s) => s[i]));
+  const always = windows.map((_, i) => samples.every((s) => s[i]));
+  expect(ever.filter(Boolean)).toHaveLength(10);
+  const flashing = windows.filter((_, i) => ever[i] && !always[i]);
+  expect(flashing.map((w) => w.name).sort()).toEqual([
+    'Annunciator BREAKER TRIP',
+    'Annunciator BUS OVERVOLT',
+    'Annunciator GROUND FAULT',
+    'Annunciator PHASE LOSS',
+  ]);
+  for (const w of flashing) expect(w.userData.alarmColour).toBe('#ff4a30');
+  // Put back as it was: clean, and the faults cleared.
+  mcc.recover();
+  mcc.update(0.1);
+  expect(soot.some((s) => s.visible)).toBe(false);
+  dispose();
+});
+
+it('brings up fewer faults in the lighter failures', () => {
+  const { mcc, dispose } = fixture();
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  isolate(mcc);
+  main.breaker!.operate();
+  mcc.update(3);
+  const windows: Mesh[] = [];
+  mcc.group.traverse((o) => {
+    if (o.name.startsWith('Annunciator ')) windows.push(o as Mesh);
+  });
+  const lit = () =>
+    windows.filter(
+      (w) =>
+        (
+          w.material as Material & { color: { getHexString(): string } }
+        ).color.getHexString() !== '8e8a80',
+    ).length;
+  const most = (seconds: number) => {
+    let n = 0;
+    for (let t = 0; t < seconds; t += 0.05) {
+      mcc.update(0.05);
+      n = Math.max(n, lit());
+    }
+    return n;
+  };
+  mcc.fail('hiccup');
+  const hiccup = most(1.5);
+  mcc.recover();
+  mcc.update(0.1);
+  mcc.fail('sputter');
+  const sputter = most(7);
+  expect(hiccup).toBe(1);
+  expect(sputter).toBe(3);
   dispose();
 });

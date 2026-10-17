@@ -3,8 +3,7 @@ import { BoxGeometry, Group, Mesh } from 'three';
 import type { Object3D } from 'three';
 import { partAudio } from '../audio/part-audio';
 import type { SoundRecipe } from '../audio/part-audio';
-import { bootBeep } from '../audio/boot-beep';
-import { PC_POST_CUE, computerCueSound } from '../audio/computer-cues';
+import { bootBeep, postBeep } from '../audio/boot-beep';
 import { createAnnunciator } from '../game/annunciator';
 import { createScreenBoot } from '../game/screen-boot';
 import {
@@ -314,7 +313,7 @@ export function createDisplaysBoard(kit: PanelKit): TestFitting {
       messagePower.value,
     );
   });
-  readyBeep(updates, messageBoot, message.group, 280);
+  readyBeep(updates, messageBoot, message.group, 932);
 
   // The stack light on its bracket, and its mode.
   const stack = createStackLight(kit);
@@ -484,7 +483,7 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
     crt.setMode(CRT_MODES[mode.position.value]);
     crt.update(delta);
   });
-  readyBeep(updates, crtBoot, crt.group, 314);
+  readyBeep(updates, crtBoot, crt.group, 988);
 
   // The terminal and drive HIM are cabinet fittings, each with its own
   // supply. Their controls cannot work while their screens are off.
@@ -542,14 +541,8 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
             },
     );
   });
-  readyBeep(
-    updates,
-    terminalBoot,
-    terminalPart.object,
-    374,
-    computerCueSound(PC_POST_CUE),
-  );
-  readyBeep(updates, himBoot, keypadPart.object, 420);
+  readyBeep(updates, terminalBoot, terminalPart.object, 374, postBeep);
+  readyBeep(updates, himBoot, keypadPart.object, 1047);
 
   // The disconnect, the soft starter and its pushbutton station.
   const disconnect = board.place(

@@ -107,6 +107,7 @@ export const COMPUTER_CUES: readonly ComputerCue[] = [
   },
 ];
 
-export const computerCueSound = (cue: ComputerCue): SoundRecipe => ({
-  tones: cue.notes,
+/** A cue as a part's sound, its notes `gain` times as loud as auditioned. */
+export const computerCueSound = (cue: ComputerCue, gain = 1): SoundRecipe => ({
+  tones: cue.notes.map((n) => ({ ...n, level: n.level * gain })),
 });

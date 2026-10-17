@@ -48,7 +48,7 @@ it('powers the cabinet screens independently and boots each when switched on', (
   };
   const beeps = () =>
     play.mock.calls.flatMap(([recipe]) => {
-      if ('tone' in recipe && recipe.tone.seconds === 0.16)
+      if ('tone' in recipe && recipe.tone.seconds === 0.11)
         return [recipe.tone.hz];
       if ('tones' in recipe && recipe.tones[0]?.hz === 880) return [880];
       return [];
@@ -60,21 +60,21 @@ it('powers the cabinet screens independently and boots each when switched on', (
   expect(beeps()).toEqual([880]);
   press('CRT POWER');
   cabinet.update(0, 20, false);
-  expect(beeps()).toEqual([880, 314]);
+  expect(beeps()).toEqual([880, 988]);
   press('HIM POWER');
   cabinet.update(0, 20, false);
-  expect(beeps()).toEqual([880, 314, 420]);
+  expect(beeps()).toEqual([880, 988, 1047]);
   expect(
     play.mock.calls
       .map(([recipe]) => ('tone' in recipe ? recipe.tone : null))
-      .filter((spec) => spec?.seconds === 0.16)
-      .every((spec) => spec?.type === 'sawtooth'),
+      .filter((spec) => spec?.seconds === 0.11)
+      .every((spec) => spec?.type === 'square'),
   ).toBe(true);
   press('TERMINAL POWER');
   cabinet.update(0, 0, false);
   press('TERMINAL POWER');
   cabinet.update(0, 3.5, false);
-  expect(beeps()).toEqual([880, 314, 420, 880]);
+  expect(beeps()).toEqual([880, 988, 1047, 880]);
   cabinet.dispose();
   displays.dispose();
   disposeKit(kit, cabinet.group);

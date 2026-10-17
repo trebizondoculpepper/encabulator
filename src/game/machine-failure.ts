@@ -32,6 +32,19 @@ export interface Failure {
   sparks: readonly number[];
   /** When its sections' own sounds trip out, if they do. */
   dropout?: readonly [number, number];
+  /**
+   * Whether it smokes: from which buckets (`section<n>.bucket<n>`, counted
+   * from the left and from the top), starting when, seconds from the start.
+   * See `smokeAt`.
+   */
+  smoke?: { from: readonly string[]; start: number };
+  /**
+   * The faults it brings up on the annunciator (`DISTRIBUTION`, section 1):
+   * each window, by its legend on one line, comes in `at` seconds from the
+   * start and, if somebody gets to it, is acknowledged at `ack`. A worse
+   * failure brings up more; see `faultsAt`.
+   */
+  faults: readonly { window: string; at: number; ack?: number }[];
 }
 
 export const FAILURES: readonly Failure[] = [
@@ -43,6 +56,8 @@ export const FAILURES: readonly Failure[] = [
     coughs: [0.12],
     sparks: [],
     dropout: [0.1, 1.05],
+    // One window, and gone again before anybody acknowledges it.
+    faults: [{ window: 'MODIAL HI', at: 0.15 }],
   },
   {
     id: 'sputter',
@@ -51,6 +66,12 @@ export const FAILURES: readonly Failure[] = [
     ends: 'stalled',
     coughs: [0.1, 0.35, 2.4, 2.7, 4.3, 5.1],
     sparks: [],
+    // A few, one still flashing when it stops.
+    faults: [
+      { window: 'MODIAL HI', at: 0.2, ack: 1.6 },
+      { window: 'LUBE LOW', at: 2.5, ack: 3.8 },
+      { window: 'FAN FAIL', at: 4.4 },
+    ],
   },
   {
     id: 'restart',
@@ -59,6 +80,12 @@ export const FAILURES: readonly Failure[] = [
     ends: 'running',
     coughs: [0.2, 0.55, 0.95, 1.7],
     sparks: [],
+    // The stall's faults, acknowledged, until it is running again.
+    faults: [
+      { window: 'MODIAL HI', at: 0, ack: 0 },
+      { window: 'LUBE LOW', at: 0, ack: 0 },
+      { window: 'FAN FAIL', at: 0, ack: 0.6 },
+    ],
   },
   {
     id: 'kaput',
@@ -67,6 +94,23 @@ export const FAILURES: readonly Failure[] = [
     ends: 'dead',
     coughs: [1.32, 1.8, 2.5, 3.45, 4.1, 4.9, 5.6],
     sparks: [1.3, 1.42, 1.6, 3.4, 3.55, 4.85, 6.9],
+    // The AUXILIARY MOTOR starter and the DRIVE ISOLATOR, low down, burn
+    // from the first bang, and their smoke stains the units above them.
+    smoke: { from: ['section2.bucket3', 'section6.bucket2'], start: 1.3 },
+    // Almost every window: the amber ones as it struggles, acknowledged
+    // as they come; the red trips with the bangs, flashing, unanswered.
+    faults: [
+      { window: 'MODIAL HI', at: 0.4, ack: 1.0 },
+      { window: 'BEARING TEMP', at: 0.9, ack: 2.0 },
+      { window: 'BUS OVERVOLT', at: 1.3 },
+      { window: 'DINGLE ARM', at: 1.6, ack: 3.0 },
+      { window: 'LUBE LOW', at: 2.6, ack: 4.0 },
+      { window: 'GROUND FAULT', at: 3.4 },
+      { window: 'FAN FAIL', at: 3.6, ack: 5.0 },
+      { window: 'GRAM-METER', at: 4.6, ack: 6.0 },
+      { window: 'PHASE LOSS', at: 4.85 },
+      { window: 'BREAKER TRIP', at: 7.95 },
+    ],
   },
 ];
 
@@ -159,4 +203,52 @@ export function failureAt(id: FailureId, t: number) {
       };
     }
   }
+}
+
+/** Seconds a failure's smoke takes to thicken, pours, and clears. */
+const SMOKE_RISE = 1.2;
+const SMOKE_CLEARS = 6;
+const SMOKE_GONE = 8;
+
+/**
+ * How hard a failure is smoking at `t` seconds, 0 to 1: nothing until its
+ * smoke starts, thickening quickly, pouring out, and clearing away about
+ * eight seconds after it began, leaving only its soot.
+ */
+export function smokeAt(id: FailureId, t: number) {
+  const smoke = FAILURES.find((f) => f.id === id)!.smoke;
+  if (!smoke) return 0;
+  const since = t - smoke.start;
+  if (since <= 0 || since >= SMOKE_GONE) return 0;
+  if (since < SMOKE_RISE) return ease(since, 0, SMOKE_RISE, 0, 1);
+  return ease(since, SMOKE_CLEARS, SMOKE_GONE, 1, 0);
+}
+
+/** Seconds of thick smoke that blacken a surface about two-thirds of the way. */
+const SOOTING = 5;
+
+/**
+ * Soot on a surface over a smoking unit, 0 (clean) to 1 (black), after
+ * `delta` more seconds of smoke at `strength`: it only builds up, ever
+ * more slowly as it darkens.
+ */
+export const sootAfter = (soot: number, strength: number, delta: number) =>
+  soot + (1 - soot) * (1 - Math.exp((-strength * delta) / SOOTING));
+
+/**
+ * The annunciator windows a failure has in alarm at `t` seconds, and which
+ * of them have been acknowledged. A failure the machine shakes off clears
+ * its faults when it is over; one that stalls or kills it keeps them.
+ */
+export function faultsAt(id: FailureId, t: number) {
+  const failure = FAILURES.find((f) => f.id === id)!;
+  if (failure.ends === 'running' && t >= failure.seconds)
+    return { alarms: [], acknowledged: [] };
+  const alarms = failure.faults.filter((f) => f.at <= t);
+  return {
+    alarms: alarms.map((f) => f.window),
+    acknowledged: alarms
+      .filter((f) => f.ack !== undefined && f.ack <= t)
+      .map((f) => f.window),
+  };
 }

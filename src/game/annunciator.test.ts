@@ -41,4 +41,11 @@ describe('the annunciator', () => {
     a.test = false;
     expect(a.lit(0.25)).toEqual([false, false, false]);
   });
+
+  it('can acknowledge some windows and leave the rest flashing', () => {
+    const a = createAnnunciator(3);
+    a.sense([true, true, true]);
+    a.acknowledge([0, 2]);
+    expect(a.states).toEqual(['steady', 'flashing', 'steady']);
+  });
 });

@@ -13,8 +13,11 @@ export interface Annunciator {
   readonly states: readonly WindowState[];
   /** Feed each window's alarm condition; call every step. */
   sense(alarms: readonly boolean[]): void;
-  /** Acknowledge: flashing windows go steady, or dark if clear. */
-  acknowledge(): void;
+  /**
+   * Acknowledge: flashing windows go steady, or dark if clear; only those
+   * in `windows`, if given.
+   */
+  acknowledge(windows?: readonly number[]): void;
   /** Whether TEST is held. */
   test: boolean;
   /** What each window shows now: lit, and whether it is in its flash. */
@@ -38,9 +41,10 @@ export function createAnnunciator(windows: number): Annunciator {
         alarmed[i] = on;
       }
     },
-    acknowledge() {
+    acknowledge(which) {
       for (let i = 0; i < windows; i++)
-        if (states[i] === 'flashing') states[i] = alarmed[i] ? 'steady' : 'off';
+        if (states[i] === 'flashing' && (!which || which.includes(i)))
+          states[i] = alarmed[i] ? 'steady' : 'off';
     },
     lit(seconds) {
       const blink = Math.floor(seconds * FLASH_HZ * 2) % 2 === 0;

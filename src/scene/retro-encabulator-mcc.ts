@@ -4,13 +4,20 @@ import { machineTone } from '../audio/machine-tones';
 import type { MachineToneId } from '../audio/machine-tones';
 import { partAudio } from '../audio/part-audio';
 import type { SoundRecipe } from '../audio/part-audio';
-import { bootBeep } from '../audio/boot-beep';
-import { PC_POST_CUE, computerCueSound } from '../audio/computer-cues';
+import { bootBeep, postBeep } from '../audio/boot-beep';
 import { createMachinePower } from '../game/machine-power';
-import { FAILURES, failureAt } from '../game/machine-failure';
+import {
+  FAILURES,
+  failureAt,
+  faultsAt,
+  smokeAt,
+  sootAfter,
+} from '../game/machine-failure';
 import type { Failure, FailureId } from '../game/machine-failure';
 import { ISOLATOR, createIncomingIsolator } from './incoming-isolator';
 import { createShortSpark } from './button-effects';
+import { createUnitSmoke } from './mcc-smoke';
+import type { SootedFace } from './mcc-smoke';
 import { createPcbBackplane } from './pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
@@ -433,6 +440,13 @@ export function createRetroEncabulatorMcc(
   const lampsOk = signal(true);
   // A hiccup trips the sections' own sounds out for a moment.
   const dropped = signal(false);
+  // What a failure brings up on the annunciator (see `Faults`).
+  const faults: Faults = {
+    active: signal(false),
+    alarms: signal<readonly string[]>([]),
+    acknowledged: signal<readonly string[]>([]),
+    battery: supply,
+  };
   // A stopped machine is a silent one: its sounds fade as it slows.
   const audible = computed(() => Math.min(1, strain.value * 3));
   const lamps = computed(() => startup.lit.value && lampsOk.value);
@@ -459,7 +473,8 @@ export function createRetroEncabulatorMcc(
     from: Object3D,
     chosen?: SoundRecipe,
   ) => {
-    const hz = 280 * 2 ** (bootNote++ / 12);
+    // Rising a semitone at a time from just above the terminal's 880 Hz POST.
+    const hz = 880 * 2 ** (++bootNote / 12);
     let wasReady = false;
     updates.push(() => {
       const ready = boot.ready.value;
@@ -495,6 +510,11 @@ export function createRetroEncabulatorMcc(
   }
   box(lineup, copper, total - 0.05, 0.012, 0.015, 0, 0.09, -0.44);
 
+  /** Every unit's face, by its bucket id, for the smoke to stain. */
+  const unitFaces = new Map<
+    string,
+    { section: Group; bay: number; face: SootedFace; centre: number }
+  >();
   let left = -total / 2;
   BAY_WIDTHS.forEach((width, bayIndex) => {
     const bay = new Group();
@@ -708,6 +728,19 @@ export function createRetroEncabulatorMcc(
       const hinge = new Group();
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
       bay.add(hinge);
+      unitFaces.set(bucketId, {
+        section: bay,
+        bay: bayIndex,
+        centre: faceX,
+        face: {
+          hinge,
+          x: 0.003,
+          width: faceW - 0.006,
+          bottom: cy - h / 2 + 0.003,
+          top: cy + h / 2 - 0.003,
+          z: DOOR_FRONT + 0.0006,
+        },
+      });
       const doorPaint = worn(faceW, h, { x: 0.86, y: 0.5 });
       const opening =
         spec.face === 'plc'
@@ -786,6 +819,7 @@ export function createRetroEncabulatorMcc(
         (ready) => (toneReady = ready),
         screenReadyBeep,
         (name, part) => controls.set(name, part),
+        faults,
       );
       if (!spec.fixed) {
         // Quarter-turn wing latches on the flange, by the free edge: the
@@ -962,6 +996,42 @@ export function createRetroEncabulatorMcc(
       },
     ],
   };
+  // Smoke from the units a failure burns, and the soot it leaves on the
+  // units above them in the same section.
+  const smokes = FAILURES.flatMap((f) =>
+    (f.smoke?.from ?? []).map((id, i) => {
+      const source = unitFaces.get(id)!;
+      const faces = [...unitFaces.values()]
+        .filter(
+          (u) => u.bay === source.bay && u.face.bottom >= source.face.bottom,
+        )
+        .map((u) => u.face);
+      return {
+        failure: f.id,
+        soot: 0,
+        view: createUnitSmoke(source.section, {
+          x: source.centre,
+          width: source.face.width,
+          seam: source.face.top + 0.003,
+          z: DOOR_FRONT,
+          seed: 4100 + i,
+          faces,
+        }),
+      };
+    }),
+  );
+  let smokeClock = 0;
+  const stepSmoke = (delta: number) => {
+    smokeClock += delta;
+    for (const smoke of smokes) {
+      const strength =
+        failing?.failure.id === smoke.failure
+          ? smokeAt(smoke.failure, failing.t)
+          : 0;
+      smoke.soot = sootAfter(smoke.soot, strength, delta);
+      smoke.view.update(smokeClock, strength, smoke.soot);
+    }
+  };
   const stepFailure = (delta: number) => {
     if (!failing) return;
     failing.t += delta;
@@ -969,6 +1039,10 @@ export function createRetroEncabulatorMcc(
     const now = failureAt(failure.id, t);
     strain.value = now.speed;
     lampsOk.value = now.lit;
+    const raised = faultsAt(failure.id, t);
+    faults.active.value = true;
+    faults.alarms.value = raised.alarms;
+    faults.acknowledged.value = raised.acknowledged;
     dropped.value = Boolean(
       failure.dropout && t >= failure.dropout[0] && t < failure.dropout[1],
     );
@@ -1001,6 +1075,7 @@ export function createRetroEncabulatorMcc(
     if (failure.ends === 'running') {
       failing = null;
       dropped.value = false;
+      faults.active.value = false;
     }
   };
   /** Start a failure, or a restart, from the beginning. */
@@ -1032,6 +1107,7 @@ export function createRetroEncabulatorMcc(
           begin('restart');
       }
       stepFailure(delta);
+      stepSmoke(delta);
       for (const update of updates) update(delta, clock);
       parts.update(delta);
       for (const hinge of hinges) {
@@ -1075,9 +1151,14 @@ export function createRetroEncabulatorMcc(
     },
     recover() {
       failing = null;
+      // Cleaned up, as if it had never burnt.
+      for (const smoke of smokes) smoke.soot = 0;
       strain.value = 1;
       lampsOk.value = true;
       dropped.value = false;
+      faults.active.value = false;
+      faults.alarms.value = [];
+      faults.acknowledged.value = [];
       whining.value = false;
       if (killed && mainBreaker.position.value === 'tripped') {
         mainBreaker.position.set('on');
@@ -1088,6 +1169,21 @@ export function createRetroEncabulatorMcc(
       return hinges.length;
     },
   };
+}
+
+/** A failure's faults, as the annunciator shows them. */
+interface Faults {
+  /** Whether a failure is playing out or has left the machine down. */
+  active: Signal<boolean>;
+  /** Its windows in alarm, and those acknowledged, by one-line legend. */
+  alarms: Signal<readonly string[]>;
+  acknowledged: Signal<readonly string[]>;
+  /**
+   * The annunciator's own supply: the station battery, kept charged from
+   * the incoming side, so it still tells what went wrong when the main
+   * breaker has tripped.
+   */
+  battery: Readable<boolean>;
 }
 
 /**
@@ -1117,6 +1213,7 @@ function dressDoor(
   ) => void,
   /** Name a control a scenario may watch (see `MccView.controls`). */
   register: (name: string, part: { position: Readable<number> }) => void,
+  faults: Faults,
 ) {
   // The raised panel's middle, where the fittings are centred.
   const lit = computed(() => circuit.powered.value && startup.value);
@@ -1329,22 +1426,46 @@ function dressDoor(
       });
       put(panel.group, cx - 0.02, top - 0.1);
       const alarms = createAnnunciator(labels.length);
+      const legends = labels.map((label) =>
+        label.replace('-\n', '-').replace('\n', ' '),
+      );
+      const windows = (names: readonly string[]) =>
+        names.map((name) => legends.indexOf(name)).filter((i) => i >= 0);
+      // On the station battery: it shows what went wrong even once the
+      // main breaker has tripped.
+      const shows = computed(() =>
+        faults.active.value ? faults.battery.value : lit.value,
+      );
       let acked = 0;
       let testUntil = 0;
       updates.push((_, clock) => {
-        alarms.sense(
-          labels.map(
-            (_, k) =>
-              k < 11 && Math.sin(clock * (0.09 + k * 0.017) + k * 2.1) > 0.9,
-          ),
-        );
-        // Somebody walks by and acknowledges, now and then.
-        if (clock - acked > 7) {
+        if (faults.active.value) {
+          // A failure's own faults, and nobody passing to acknowledge
+          // them but its own story.
+          const raised = windows(faults.alarms.value);
+          alarms.sense(labels.map((_, k) => raised.includes(k)));
+          // Its story's acknowledgements, and anything stale from before
+          // put out, so the panel tells only what this failure did.
+          alarms.acknowledge([
+            ...windows(faults.acknowledged.value),
+            ...labels.map((_, k) => k).filter((k) => !raised.includes(k)),
+          ]);
           acked = clock;
-          alarms.acknowledge();
+        } else {
+          alarms.sense(
+            labels.map(
+              (_, k) =>
+                k < 11 && Math.sin(clock * (0.09 + k * 0.017) + k * 2.1) > 0.9,
+            ),
+          );
+          // Somebody walks by and acknowledges, now and then.
+          if (clock - acked > 7) {
+            acked = clock;
+            alarms.acknowledge();
+          }
         }
         alarms.test = clock < testUntil;
-        panel.set(alarms.lit(clock).map((on) => lit.value && on));
+        panel.set(alarms.lit(clock).map((on) => shows.value && on));
       });
       const tests = signal(0);
       register('annunciator.tests', { position: tests });
@@ -1559,7 +1680,7 @@ function dressDoor(
         'controller',
       );
       updates.push((delta) => boot.step(delta));
-      onScreenReady(boot, terminalPart.object, computerCueSound(PC_POST_CUE));
+      onScreenReady(boot, terminalPart.object, postBeep);
       onBoot(boot.ready);
       updates.push((_, clock) => {
         if (!lit.value) {

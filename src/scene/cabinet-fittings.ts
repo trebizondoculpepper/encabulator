@@ -651,9 +651,17 @@ export function createAnnunciatorPanel(
     looks.push({ off, on });
     const x = -width / 2 + 0.006 + cw * (col + 0.5);
     const y = height / 2 - 0.006 - ch * (row + 0.5);
-    windows.push(
-      add(group, new PlaneGeometry(cw - 0.005, ch - 0.005), off, x, y, 0.0305),
+    const window = add(
+      group,
+      new PlaneGeometry(cw - 0.005, ch - 0.005),
+      off,
+      x,
+      y,
+      0.0305,
     );
+    window.name = `Annunciator ${label.replace('-\n', '-').replace('\n', ' ')}`;
+    window.userData.alarmColour = colour;
+    windows.push(window);
   });
   return {
     group,
