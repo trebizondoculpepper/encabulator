@@ -39,8 +39,9 @@ import {
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
 import { knobDirection } from '../scene/rotary-knob';
-import { createSkip } from '../scene/skip';
+import { addSkipLamps, createSkip } from '../scene/skip';
 import { hiddenSpot, offSight } from '../game/hidden-spot';
+import { dressSkip } from '../game/skip-dressing';
 import { createBinTossing } from './bin-tossing';
 import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
@@ -220,6 +221,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const skipModel = createSkip(kit);
   skipModel.group.scale.setScalar(m);
   let skip: TossBin | null = null;
+  let skipLamps: ReturnType<typeof addSkipLamps> | null = null;
   const eye = new Vector3();
   const look = new Vector3();
   const conjureSkip = () => {
@@ -261,6 +263,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       )[0];
     skipModel.group.position.set(spot.x * m, 0, spot.z * m);
     scene.add(skipModel.group);
+    skipLamps = addSkipLamps(kit, skipModel.group, dressSkip().lamps);
     skip = tossing.add({ name: 'skip', ...skipModel, ...spot });
   };
   // On the first card dropped, the player's eyes go down to it, as the
@@ -588,6 +591,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     walk.update(delta);
     glancing(delta);
     tossing.update(delta);
+    skipLamps?.update(time / 1000);
     mcc.update(delta);
     partAudio.listen(camera, m);
     phaseTime += delta;
@@ -796,6 +800,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     mcc.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.remove(skipModel.group);
+    skipLamps?.dispose();
     for (const root of [scene, skipModel.group])
       root.traverse((object) => {
         if (object instanceof Mesh) object.geometry.dispose();

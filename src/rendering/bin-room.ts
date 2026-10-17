@@ -20,6 +20,7 @@ import {
   EXPANSION_CARD_KINDS,
 } from '../game/machine-components';
 import type { MachineComponentKind } from '../game/machine-components';
+import { dressSkip } from '../game/skip-dressing';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import { createSectionBoard } from '../scene/building-fittings';
@@ -29,7 +30,7 @@ import {
   disposeKit,
   kitPaint,
 } from '../scene/eighties-controls';
-import { createSkip } from '../scene/skip';
+import { addSkipLamps, createSkip } from '../scene/skip';
 import { createPortals } from '../scene/portals';
 import { knobDirection } from '../scene/rotary-knob';
 import { createBinTossing } from './bin-tossing';
@@ -146,6 +147,8 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   const tossing = createBinTossing({ camera, metre: m, random });
   const skip = tossing.add({ name: 'skip', ...createSkip(kit), x: 0, z: 0 });
   room.add(skip.group);
+  // Perhaps amber lamps clamped to its rails, flashing.
+  const lamps = addSkipLamps(kit, skip.group, dressSkip().lamps);
   const light = new SpotLight('#fff3e2', 16 * m * m, 0, 0.42, 0.6, 2);
   light.position.set(0, (CEILING - 0.1) * m, 0.8 * m);
   light.target.position.set(0, 0.4 * m, 0);
@@ -346,6 +349,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     tossing.update(delta);
+    lamps.update(time / 1000);
     // A plinth whose board has gone has a fresh one a little later.
     for (const p of plinths) {
       const portable = p.board && portableOf(p.board);
@@ -364,6 +368,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     parts.dispose();
+    lamps.dispose();
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
     renderer.dispose();

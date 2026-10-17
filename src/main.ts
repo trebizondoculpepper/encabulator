@@ -52,6 +52,8 @@ const openRoom = async () => {
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
   else if (room === 'dev12')
     start = (await import('./rendering/tones-room')).startTonesRoom;
+  else if (room === 'dev16')
+    start = (await import('./rendering/graffiti-room')).startGraffitiRoom;
   else if (room === 'dev15')
     start = (await import('./rendering/appearing-skip-room'))
       .startAppearingSkipRoom;

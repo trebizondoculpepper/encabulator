@@ -336,6 +336,26 @@ canvas {
   }
 }
 
+/* Dev15's SPAWN SKIP button: an on-screen test button, the owner's one
+   exception to the rule against on-screen controls (AGENTS.md). */
+.skip-spawn {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  padding: 10px 16px;
+  border-radius: 4px;
+  border: 2px solid #e2a514;
+  background: #292d29e6;
+  color: #f2c21b;
+  font: bold 13px monospace;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.skip-spawn:active {
+  background: #e2a514;
+  color: #1a1a18;
+}
+
 /* The touch crouch button, above the walk stick. */
 .touch-crouch {
   display: none;

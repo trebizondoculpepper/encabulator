@@ -9,11 +9,16 @@ import {
   Shape,
   ShapeGeometry,
 } from 'three';
-import type { Material } from 'three';
+import type { Material, Object3D } from 'three';
 import type { BinShape } from '../game/bin-toss';
+import { lampLit } from '../game/skip-dressing';
+import type { SkipLamp } from '../game/skip-dressing';
+import { anySkipHirer } from '../game/skip-hirers';
+import type { SkipHirer } from '../game/skip-hirers';
 import type { PanelKit } from './eighties-controls';
 import { kitPaint } from './eighties-controls';
 import { createCanvasTexture } from './screens';
+import { createSkipLamp } from './skip-lamp';
 
 /**
  * A mini skip, the smallest a builder hires for rubble: a British 2-cubic-
@@ -23,7 +28,8 @@ import { createCanvasTexture } from './screens';
  * stiffeners down its sides, four lifting lugs for the lorry's chains and
  * red-and-yellow marker boards on its ends. Chipped yellow paint over
  * rust, its inside scraped back to bare, rusty steel by years of rubble,
- * under a hire firm's name of our own. Its origin is the middle of the
+ * under the name of one of our own hire firms, chosen at random
+ * (`src/game/skip-hirers.ts`) unless given. Its origin is the middle of the
  * floor under it; it is in metres, its length along x.
  */
 const LONG = 1.83;
@@ -34,6 +40,10 @@ const HIGH = 0.91;
 const LIFT = 0.07;
 const PLATE = 0.005;
 const RAIL = 0.06;
+/** The lifting lugs: how far along, how high, and how thick. */
+const LUG_X = 0.62;
+const LUG_Y = HIGH - 0.2;
+const LUG_RADIUS = 0.035;
 
 /** Where the stiffeners stand along each side, and how wide they are. */
 const STIFFENERS = [-0.3, 0.3];
@@ -131,10 +141,10 @@ function markerBoard() {
 }
 
 /**
- * The firm's name and number, black stencil on clear, stacked to fit the
- * middle panel between the stiffeners: 0.48 × 0.4 m.
+ * A hire firm's name and number, black stencil on clear, stacked to fit
+ * the middle panel between the stiffeners: 0.48 × 0.4 m.
  */
-function stencil() {
+function stencil(hirer: SkipHirer) {
   const { context, texture } = createCanvasTexture(480, 400);
   context.fillStyle = '#1a1a18';
   context.textAlign = 'center';
@@ -143,10 +153,13 @@ function stencil() {
     context.font = `bold ${size}px Impact, "Arial Narrow", sans-serif`;
     context.fillText(text, 240, y, 460);
   };
-  line('KESTREL', 118, 75);
-  line('SKIP HIRE', 92, 185);
+  const [first, second] = hirer.name;
+  if (second) {
+    line(first, 112, 75);
+    line(second, 88, 185);
+  } else line(first, 112, 130);
   context.fillRect(40, 248, 400, 8);
-  line('01632 960471', 64, 320);
+  line(hirer.phone, 64, 320);
   return new MeshStandardMaterial({
     map: texture,
     transparent: true,
@@ -156,7 +169,32 @@ function stencil() {
   });
 }
 
-export function createSkip(kit: PanelKit) {
+/** Each kit's lettering, one material for each firm, made when needed. */
+const letterings = new WeakMap<PanelKit, Map<SkipHirer, Material>>();
+const letteringFor = (kit: PanelKit, hirer: SkipHirer) => {
+  let made = letterings.get(kit);
+  if (!made) letterings.set(kit, (made = new Map()));
+  let material = made.get(hirer);
+  if (!material) {
+    material = stencil(hirer);
+    kit.materials.push(material);
+    made.set(hirer, material);
+  }
+  return material;
+};
+
+/**
+ * Put `hirer`'s name on a skip (one from `createSkip`, or a clone of
+ * one): every skip of a kit shares one lettering per firm.
+ */
+export function letterSkip(kit: PanelKit, skip: Object3D, hirer: SkipHirer) {
+  const lettering = letteringFor(kit, hirer);
+  skip.traverse((object) => {
+    if (object.userData.skipLettering) (object as Mesh).material = lettering;
+  });
+}
+
+export function createSkip(kit: PanelKit, hirer = anySkipHirer()) {
   const group = new Group();
   group.name = 'Mini skip';
   const material = (colour: string, seed: number, bare = false) => {
@@ -271,20 +309,22 @@ export function createSkip(kit: PanelKit) {
       );
     // A rail along the bottom of each side.
     box(FLOOR_LONG + 0.04, 0.05, 0.04, 0, LIFT + 0.025, s * (WIDE / 2 + 0.02));
-    for (const x of [-0.62, 0.62]) {
-      const lug = add(new CylinderGeometry(0.035, 0.035, 0.09, 16), steel);
+    for (const x of [-LUG_X, LUG_X]) {
+      const lug = add(
+        new CylinderGeometry(LUG_RADIUS, LUG_RADIUS, 0.09, 16),
+        steel,
+      );
       lug.rotation.x = Math.PI / 2;
-      lug.position.set(x, HIGH - 0.2, s * (WIDE / 2 + 0.045));
+      lug.position.set(x, LUG_Y, s * (WIDE / 2 + 0.045));
       const collar = add(new CylinderGeometry(0.055, 0.055, 0.015, 16), steel);
       collar.rotation.x = Math.PI / 2;
-      collar.position.set(x, HIGH - 0.2, s * (WIDE / 2 + 0.09));
+      collar.position.set(x, LUG_Y, s * (WIDE / 2 + 0.09));
     }
   }
 
   // The hire firm's name and number on both sides, stencilled in black
   // on the middle panel, between the stiffeners.
-  const lettering = stencil();
-  kit.materials.push(lettering);
+  const lettering = letteringFor(kit, hirer);
   const clear = STIFFENERS[1] - STIFFENER / 2;
   for (const s of [-1, 1]) {
     const panel = new Mesh(
@@ -293,7 +333,39 @@ export function createSkip(kit: PanelKit) {
     );
     panel.position.set(0, 0.5, s * (WIDE / 2 + 0.003));
     if (s < 0) panel.rotation.y = Math.PI;
+    panel.userData.skipLettering = true;
     group.add(panel);
   }
   return { group, shape: SKIP_SHAPE, footprint: { x: LONG, z: WIDE } };
+}
+
+/**
+ * Hang skip lamps (`createSkipLamp`) by their straps from a skip's
+ * lifting lugs at `lamps`' corners; `update` flashes them, each from its own phase.
+ */
+export function addSkipLamps(
+  kit: PanelKit,
+  skip: Object3D,
+  lamps: readonly SkipLamp[],
+) {
+  const fitted = lamps.map((lamp) => {
+    const made = createSkipLamp(kit);
+    // Hung by its strap from the lifting lug at that corner, the lamp
+    // against the side below it.
+    made.group.position.set(
+      lamp.end * LUG_X,
+      LUG_Y + LUG_RADIUS + 0.004,
+      lamp.side * (WIDE / 2 + 0.065),
+    );
+    skip.add(made.group);
+    return { lamp, made };
+  });
+  return {
+    update(seconds: number) {
+      for (const { lamp, made } of fitted) made.setLit(lampLit(lamp, seconds));
+    },
+    dispose() {
+      for (const { made } of fitted) made.dispose();
+    },
+  };
 }

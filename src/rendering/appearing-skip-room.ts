@@ -26,6 +26,8 @@ import {
   EXPANSION_CARD_KINDS,
 } from '../game/machine-components';
 import type { MachineComponentKind } from '../game/machine-components';
+import { dressSkip } from '../game/skip-dressing';
+import { anySkipHirer } from '../game/skip-hirers';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
 import { createSectionBoard } from '../scene/building-fittings';
@@ -37,7 +39,7 @@ import {
 } from '../scene/eighties-controls';
 import { createPortals } from '../scene/portals';
 import { turningKnob } from '../scene/rotary-knob';
-import { createSkip } from '../scene/skip';
+import { addSkipLamps, createSkip, letterSkip } from '../scene/skip';
 import { createBinTossing } from './bin-tossing';
 import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
@@ -218,6 +220,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     box: Box3;
     plan: Footprint;
     bin: TossBin;
+    lamps: ReturnType<typeof addSkipLamps>;
   })[] = [];
   const plinthPlan = {
     minX: PLINTH.x - PLINTH.w / 2,
@@ -245,6 +248,8 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     camera.getWorldPosition(eye).divideScalar(m);
     const yaw = walk.walker.yaw;
     const group = model.group.clone();
+    // Each skip from a hire firm of its own, chosen at random.
+    letterSkip(kit, group, anySkipHirer());
     // Long side square to the player, so it faces them when they turn.
     group.rotation.y = -yaw;
     const c = Math.abs(Math.cos(yaw));
@@ -294,7 +299,9 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
           z,
         });
         contents.set(bin, []);
-        skips.push({ id, born: born++, group, box, plan, bin });
+        // Some have amber lamps clamped to their rails, flashing.
+        const lamps = addSkipLamps(kit, group, dressSkip().lamps);
+        skips.push({ id, born: born++, group, box, plan, bin, lamps });
         return true;
       }
     return false;
@@ -357,6 +364,17 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     },
     aimed: () => true,
   });
+  // An on-screen SPAWN SKIP button, by the owner's leave the one exception
+  // to the rule against on-screen controls: it conjures a skip behind the
+  // player as a use on nothing does (Esc frees the cursor to reach it).
+  const spawnButton = document.createElement('button');
+  spawnButton.type = 'button';
+  spawnButton.className = 'skip-spawn';
+  spawnButton.textContent = 'SPAWN SKIP';
+  spawnButton.addEventListener('click', () => {
+    conjure();
+  });
+  canvas.parentElement?.append(spawnButton);
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;
@@ -402,6 +420,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
         x: Number(skip.group.position.x.toFixed(2)),
         z: Number(skip.group.position.z.toFixed(2)),
         seen: seen.has(skip.id),
+        lamps: skip.group.children.filter((c) => c.name === 'Skip lamp').length,
       })),
   };
 
@@ -419,6 +438,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     walk.update(delta);
     tossing.update(delta);
     parts.update(delta);
+    for (const skip of skips) skip.lamps.update(time / 1000);
     // Whatever is out of view may go: the oldest, when one is looked away
     // from and there is more than one.
     updateFrustum();
@@ -438,6 +458,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
       room.remove(skip.group);
       skips.splice(at, 1);
       tossing.remove(skip.bin);
+      skip.lamps.dispose();
       // What was thrown in it goes with it.
       for (const object of contents.get(skip.bin) ?? []) {
         object.removeFromParent();
@@ -458,7 +479,11 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     parts.dispose();
-    for (const skip of skips) room.remove(skip.group);
+    spawnButton.remove();
+    for (const skip of skips) {
+      skip.lamps.dispose();
+      room.remove(skip.group);
+    }
     room.add(model.group);
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
