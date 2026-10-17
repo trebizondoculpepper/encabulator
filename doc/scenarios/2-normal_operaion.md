@@ -18,7 +18,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 ## Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England
 
-**SETTING:** THE ENCABULATOR stands in the middle of the room, installed and plugged into a 450 W industrial power supply. A waste-paper bin stands nearby, empty. The machine is switched off. Its cabinet doors are closed.
+**SETTING:** THE ENCABULATOR stands in the middle of the room, installed and plugged into a 450 W industrial power supply. There is no bin anywhere in the room, which is long and bare: the far end is about ten seconds' walk from the machine. The machine is switched off. Its cabinet doors are closed.
 
 **VIEW:** The player sees through their own eyes throughout. Actions happen in the room, using the machine's physical controls.
 
@@ -180,17 +180,29 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** Get rid of it. I can't stand to even look at it. Horrible, insidious, evil thing. Pernicious. Stop the rot now.
 
-**PLAYER ACTION:** Carry the card to the nearby waste-paper bin and drop it inside.
+**PLAYER ACTION:** With nowhere to put it, the player drops the card on the floor. Players will: it is the natural thing to do.
 
-**SOUND:** The card clatters into the empty bin.
+## The skip that was always there
 
-## First board in the bin
+**TRIGGER:** The first removed Pepperdyne board is dropped on the floor. Play once; from now on a dropped board plays the floor interruption below instead.
 
-**TRIGGER:** The first removed Pepperdyne board lands in the waste-paper bin. Play this reaction once.
+**ACTION:** The player's eyes go down to the card on the floor for a moment (the game turns the view to it, holding the player for under two seconds). Unseen, behind them, a builder's mini skip appears at the far end of the room, about ten seconds' walk away: KESTREL SKIP HIRE, yellow, rusty, and plainly never there before. It takes the first of three places at the far end where the player is neither standing nor looking.
+
+**NARRATOR:** Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.
+
+**DIRECTION:** The joke is that there never was a skip until the narrator says so. He is messing with the player, claiming it was there all along. Nobody remarks on it, ever.
+
+**PLAYER ACTION:** Pick the card up, carry it the length of the room and throw it in the skip (let go within a metre and a half of it, facing it, and it flies in).
+
+**SOUND:** The card clangs into the empty skip.
+
+## First board in the skip
+
+**TRIGGER:** The first removed Pepperdyne board lands in the skip. Play this reaction once.
 
 **NARRATOR:** Good riddance to bad rubbish. Now get rid of the others. Tear them all out! One at a time. Let's show Pepperdyne what we think of their modial-interaction boards!
 
-**PLAYER ACTION:** Return to the cabinet and remove the remaining Pepperdyne boards, carrying each one separately to the waste-paper bin.
+**PLAYER ACTION:** Return to the cabinet and remove the remaining Pepperdyne boards, carrying each one separately to the skip.
 
 ## Second board removed
 
@@ -200,9 +212,9 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR (panicked):** Quickly… get rid of it.
 
-## Conditional follow-up — second board not yet in the bin
+## Conditional follow-up — second board not yet in the skip
 
-**TRIGGER:** After the second-board removal reaction finishes, the second board has not yet been put in the waste-paper bin. Play once; cancel if the board reaches the bin before the line starts.
+**TRIGGER:** After the second-board removal reaction finishes, the second board has not yet been put in the skip. Play once; cancel if the board reaches the skip before the line starts.
 
 **NARRATOR:** It's pure evil. It's like a dark stain on the soul of the universe. Can't you see? It's sucking the energy out of our lives.
 
@@ -228,9 +240,9 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** But, see, that's what I mean. That's why it's important you get rid of these disgusting, dirty Pepperdyne modial-interaction boards.
 
-## Second board in the bin — faith and trust
+## Second board in the skip — faith and trust
 
-**TRIGGER:** The second Pepperdyne board reaches the bin. Play once, after any immediate action reaction.
+**TRIGGER:** The second Pepperdyne board reaches the skip. Play once, after any immediate action reaction.
 
 **NARRATOR:** Two down, [BOARDS REMAINING: THREE] to go… you can do it. I have faith in you.
 
@@ -262,7 +274,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** If only they could talk…
 
-**NARRATOR:** It would probably say, put this shard of villainy in the bin.
+**NARRATOR:** It would probably say, put this shard of villainy in the skip.
 
 **NARRATOR:** Please, if not for me, then for it.
 
@@ -274,9 +286,9 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **DELIVERY:** These lines accompany the player holding or disposing of the third card. Allow pauses and give immediate action reactions priority; do not hold up the player's progress to finish the speech.
 
-## Third card in the bin
+## Third card in the skip
 
-**TRIGGER:** The third removed Pepperdyne card lands in the waste-paper bin. Play once; cancel any remaining pleas to dispose of that card.
+**TRIGGER:** The third removed Pepperdyne card lands in the skip. Play once; cancel any remaining pleas to dispose of that card.
 
 **NARRATOR:** Thank you. On behalf of me, this beautiful machine, and all of Neumann Dynamik, thank you.
 
@@ -326,7 +338,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **CARD NAME:** If that card was removed earlier, substitute the name of a Pepperdyne card still fitted.
 
-**PLAYER ACTION:** Remove the Hydrocoptic Phase Regulator and put it in the bin. If the player chose a different order, identify the actual fourth card removed.
+**PLAYER ACTION:** Remove the Hydrocoptic Phase Regulator and put it in the skip. If the player chose a different order, identify the actual fourth card removed.
 
 ## Fourth card removed
 
@@ -364,7 +376,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** Please save it. I know you have what it takes.
 
-**PLAYER ACTION:** Put the fourth card in the bin, if it has not already been discarded, and return to the cabinet.
+**PLAYER ACTION:** Put the fourth card in the skip, if it has not already been discarded, and return to the cabinet.
 
 ## Fifth card — Baltovsky Flux Compensator
 
@@ -400,17 +412,17 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** It can't end like this. You're still under warranty.
 
-**NARRATOR:** Quickly, the last card, the Baltovsky flux compensator, in the bin.
+**NARRATOR:** Quickly, the last card, the Baltovsky flux compensator, in the skip.
 
 **CARD NAME:** If a different card was left until last, substitute its actual name.
 
-**PLAYER ACTION:** Put the final card in the waste-paper bin.
+**PLAYER ACTION:** Put the final card in the skip.
 
-**DELIVERY:** These pleas apply while the last card remains outside the bin. Cancel unplayed pleas as soon as it is discarded.
+**DELIVERY:** These pleas apply while the last card remains outside the skip. Cancel unplayed pleas as soon as it is discarded.
 
-## All five cards in the bin
+## All five cards in the skip
 
-**TRIGGER:** All five Pepperdyne expansion cards are now in the waste-paper bin. Play once and cancel any pending removal, disposal or idle prompts. A card held or lying on the floor still needs to be discarded before this ending begins.
+**TRIGGER:** All five Pepperdyne expansion cards are now in the skip. Play once and cancel any pending removal, disposal or idle prompts. A card held or lying on the floor still needs to be discarded before this ending begins.
 
 **NARRATOR:** It's done.
 
@@ -492,7 +504,7 @@ For nothing now can ever come to any good.
 
 **TRIGGER:** After the Pepperdyne reveal, while the disposal task is unfinished, the player is idle or holding a removed board. These lines are a pool of optional reactions, not a continuous speech or a fixed sequence.
 
-**DELIVERY:** Play one line or passage at a time, with space between them. Each entry can be used once during the sequence. Story narration and specific action reactions take priority; do not queue a backlog of idle lines. Stop scheduling these prompts once all the Pepperdyne boards are in the bin.
+**DELIVERY:** Play one line or passage at a time, with space between them. Each entry can be used once during the sequence. Story narration and specific action reactions take priority; do not queue a backlog of idle lines. Stop scheduling these prompts once all the Pepperdyne boards are in the skip.
 
 **NARRATOR:** You think all this is a bit unhinged? Think I'm overreacting? I've seen good men go to their death. I've seen legions mown down. I've seen the killing fields of applied industrial engineering. So before you go telling me that I'm overreacting, tell that to the wives and widows of the men who lost everything… who gave everything.
 
@@ -516,33 +528,33 @@ For nothing now can ever come to any good.
 
 **NARRATOR:** What are you thinking? Sullying our beautiful Encabulator with this filth! Our pristine, perfect, innocent Encabulator, soiled and besmirched with this foreign muck… No, don't you dare. Keep it away from my Encabulator.
 
-**PLAYER ACTION:** Keep the board out of the machine and take it to the waste-paper bin instead.
+**PLAYER ACTION:** Keep the board out of the machine and take it to the skip instead.
 
-## Conditional interruption — dropping a board on the floor
+## Conditional interruption — littering, once the skip is there
 
-**TRIGGER:** The player drops a removed Pepperdyne board on the floor instead of into the waste-paper bin.
+**TRIGGER:** Once the skip is there, the player drops a removed Pepperdyne board on the floor instead of into the skip. (The first board dropped, before there is a skip, plays "The skip that was always there" instead.)
 
 **SOUND / ACTION:** The board clatters, skitters and settles, with a couple of small puffs of dust.
 
-**NARRATOR:** Were you born in a barn? There's a proper receptacle for this. Would you do that in your mother's house? Scatter Pepperdyne circuitry on her shag-pile?
+**NARRATOR:** Litterbug! Honestly. If there's one thing I can't stand, it's littering. Littering! In a place this special.
 
-**BEAT:** A short, appraising silence.
+**BEAT:** A short, wounded silence.
 
-**NARRATOR:** Hmm… perhaps you would.
+**NARRATOR:** The skip. Over there. Big, yellow, you can't miss it.
 
-**PLAYER ACTION:** Pick the board up again and put it in the waste-paper bin.
+**PLAYER ACTION:** Pick the board up again and put it in the skip.
 
 ## Timed prompts — board left on the floor
 
 **TRIGGER — 30 SECONDS:** Thirty seconds after the board lands on the floor, it is still there.
 
-**NARRATOR:** Pick it up, you slob, and put it in the bin.
+**NARRATOR:** Pick it up, you slob, and put it in the skip.
 
 **TRIGGER — 10 SECONDS LATER:** Ten seconds after the preceding prompt, the board is still on the floor.
 
-**NARRATOR:** Yes, the bin, you dolt. Pick it up and put it in there.
+**NARRATOR:** Yes, the skip, you dolt. Pick it up and put it in there.
 
-**TIMING:** Cancel pending floor prompts when the player picks up the board. Neither line plays once the board has been put in the bin.
+**TIMING:** Cancel pending floor prompts when the player picks up the board. Neither line plays once the board has been put in the skip.
 
 ## Conditional prompt — waiting for another board to be removed
 

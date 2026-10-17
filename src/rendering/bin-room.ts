@@ -4,21 +4,16 @@ import {
   BoxGeometry,
   Group,
   HemisphereLight,
-  Matrix4,
   Mesh,
   PerspectiveCamera,
   PlaneGeometry,
-  Quaternion,
   Raycaster,
   Scene,
   SpotLight,
   Vector2,
-  Vector3,
 } from 'three';
 import type { Object3D } from 'three';
-import { click, partAudio } from '../audio/part-audio';
-import { aimsAtBin, arcSeconds, binArc, binRest } from '../game/bin-toss';
-import type { Point3 } from '../game/bin-toss';
+import { partAudio } from '../audio/part-audio';
 import { devPortals, devWalls } from '../game/dev-room-links';
 import {
   CARD_DESIGNATIONS,
@@ -34,9 +29,10 @@ import {
   disposeKit,
   kitPaint,
 } from '../scene/eighties-controls';
-import { createOfficeBin } from '../scene/office-bin';
+import { createSkip } from '../scene/skip';
 import { createPortals } from '../scene/portals';
 import { knobDirection } from '../scene/rotary-knob';
+import { createBinTossing } from './bin-tossing';
 import { createFirstPerson } from './first-person';
 import { machineComponent } from './machine-components';
 import type { MachineDevice } from './machine-components';
@@ -82,9 +78,10 @@ function seeded(seed: number) {
 
 /**
  * Dev14, Putting Things in the Bin: the boards we have built stand on
- * plinths round a single large office waste-paper bin. Let go of one
- * facing the bin within a metre and a half (`src/game/bin-toss.ts`) and it
- * flies in a parabola into the bin and lands on whatever is already there;
+ * plinths round a builder's mini skip. Let go of one facing the skip
+ * within a metre and a half of its nearer end (`src/game/bin-toss.ts`)
+ * and it flies in a parabola into the skip and lands with a clang on
+ * whatever is already there;
  * let go anywhere else and it clatters to the floor as dropped things do.
  * Each plinth has a fresh board a few seconds after its board is taken, so
  * the bin can be filled, and over-filled, with expensive circuit boards.
@@ -143,13 +140,16 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   sign.position.set(-2.2, 2.5, FLOOR.minZ + 0.154);
   room.add(sign);
 
-  // ---- The bin --------------------------------------------------------------
-  const bin = createOfficeBin(kit);
-  room.add(bin.group);
-  const binLight = new SpotLight('#fff3e2', 16 * m * m, 0, 0.42, 0.6, 2);
-  binLight.position.set(0, (CEILING - 0.1) * m, 0.8 * m);
-  binLight.target.position.set(0, 0.4 * m, 0);
-  scene.add(binLight, binLight.target);
+  // ---- The skip -------------------------------------------------------------
+  // A mini skip in the middle of the ring; boards are thrown into it by the
+  // shared bin tossing (`bin-tossing.ts`).
+  const tossing = createBinTossing({ camera, metre: m, random });
+  const skip = tossing.add({ name: 'skip', ...createSkip(kit), x: 0, z: 0 });
+  room.add(skip.group);
+  const light = new SpotLight('#fff3e2', 16 * m * m, 0, 0.42, 0.6, 2);
+  light.position.set(0, (CEILING - 0.1) * m, 0.8 * m);
+  light.target.position.set(0, 0.4 * m, 0);
+  scene.add(light, light.target);
 
   // ---- The plinths and their boards ---------------------------------------
   const plinthPaint = kitPaint(kit, '#d9d6cc');
@@ -223,115 +223,6 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   const portableOf = (device: MachineDevice) =>
     device.object.userData.portable as PortableObject | undefined;
 
-  // ---- Tossing into the bin -------------------------------------------------
-  const tosses: {
-    object: Object3D;
-    portable: PortableObject;
-    from: Point3;
-    to: Point3;
-    fromQ: Quaternion;
-    toQ: Quaternion;
-    centre: Vector3;
-    age: number;
-    seconds: number;
-  }[] = [];
-  let filled = 0;
-  const eye = new Vector3();
-  const look = new Vector3();
-  const binThud = click({
-    band: 420,
-    q: 1.1,
-    decay: 0.09,
-    level: 0.22,
-    thump: [105, 0.09],
-  });
-  /** Where an object's middle is, in its own frame, scaled. */
-  const middleOf = (object: Object3D) => {
-    object.updateMatrixWorld(true);
-    const box = new Box3().setFromObject(object);
-    const centre = box.getCenter(new Vector3());
-    return object.worldToLocal(centre).multiply(object.scale);
-  };
-  /** Send `object` into the bin from where it is now. */
-  const toss = (object: Object3D, portable: PortableObject) => {
-    const centre = middleOf(object);
-    const start = object.position
-      .clone()
-      .add(centre.clone().applyQuaternion(object.quaternion))
-      .divideScalar(m);
-    const rest = binRest(filled++, bin.shape, random);
-    const to = { x: rest.x, y: rest.y + 0.02, z: rest.z };
-    // Lying flat (its thinnest side up) with its length along the bin,
-    // then tipped up at the end as the bin fills, and turned a little.
-    const turned = object.quaternion.clone();
-    object.quaternion.identity();
-    object.updateMatrixWorld(true);
-    const own = new Box3().setFromObject(object).getSize(new Vector3());
-    object.quaternion.copy(turned);
-    object.updateMatrixWorld(true);
-    const axes = [
-      new Vector3(1, 0, 0),
-      new Vector3(0, 1, 0),
-      new Vector3(0, 0, 1),
-    ].sort((p, q) => own.dot(p) - own.dot(q));
-    const thin = axes[0];
-    const long = axes[2];
-    const across = long.clone().cross(thin);
-    const lay = new Quaternion().setFromRotationMatrix(
-      new Matrix4().makeBasis(long, thin, across).transpose(),
-    );
-    const toQ = new Quaternion()
-      .setFromAxisAngle(new Vector3(0, 1, 0), rest.yaw)
-      .multiply(
-        new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), rest.tilt),
-      )
-      .multiply(lay);
-    tosses.push({
-      object,
-      portable,
-      from: { x: start.x, y: start.y, z: start.z },
-      to,
-      fromQ: object.quaternion.clone(),
-      toQ,
-      centre,
-      age: 0,
-      seconds: arcSeconds(Math.hypot(start.x - to.x, start.z - to.z)),
-    });
-  };
-  const divert = (object: Object3D, portable: PortableObject) => {
-    camera.getWorldPosition(eye).divideScalar(m);
-    camera.getWorldDirection(look);
-    if (
-      !aimsAtBin(
-        { x: eye.x, z: eye.z },
-        { x: look.x, z: look.z },
-        { x: 0, z: 0 },
-      )
-    )
-      return false;
-    toss(object, portable);
-    return true;
-  };
-  const flight = (delta: number) => {
-    for (let i = tosses.length - 1; i >= 0; i--) {
-      const t = tosses[i];
-      t.age += delta;
-      const k = Math.min(1, t.age / t.seconds);
-      const at = binArc(t.from, t.to, k);
-      t.object.quaternion.copy(t.fromQ).slerp(t.toQ, k);
-      t.object.position
-        .set(at.x * m, at.y * m, at.z * m)
-        .sub(t.centre.clone().applyQuaternion(t.object.quaternion));
-      if (k < 1) continue;
-      // Landed: on the bin's bottom, or on the boards already in it.
-      tosses.splice(i, 1);
-      t.portable.component.impact(1.4, 0);
-      t.portable.component.settle();
-      t.portable.component.setLocked(true);
-      partAudio.play(binThud, t.object);
-    }
-  };
-
   // ---- Walking and working ------------------------------------------------
   const portals = createPortals('dev14', devPortals('dev14', bounds, m), 0, m);
   scene.add(portals.group);
@@ -357,8 +248,8 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     { x: number; z: number; yaw: number; pitch: number }
   > = {
     room: { x: 0, z: 4 * m, yaw: 0, pitch: -0.15 },
-    // A metre south of the bin, looking down into it.
-    bin: { x: 0, z: 1 * m, yaw: 0, pitch: -0.7 },
+    // Just south of the skip, looking down into it.
+    bin: { x: 0, z: 1.3 * m, yaw: 0, pitch: -0.6 },
   };
   for (const [i, p] of plinths.entries()) {
     // Standing in front of the plinth, between it and the bin.
@@ -377,19 +268,19 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     metre: m,
     floorY: 0,
     objects: scene,
-    divert,
+    divert: tossing.divert,
     start:
       views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ??
       views.room,
     solids: () => [
       ...outer,
-      {
-        minX: -(bin.footprint.x / 2 + 0.05) * m,
-        maxX: (bin.footprint.x / 2 + 0.05) * m,
-        minZ: -(bin.footprint.z / 2 + 0.05) * m,
-        maxZ: (bin.footprint.z / 2 + 0.05) * m,
-      },
+      ...tossing.bins.map((bin) => ({
+        minX: (bin.x - bin.footprint.x / 2 - 0.05) * m,
+        maxX: (bin.x + bin.footprint.x / 2 + 0.05) * m,
+        minZ: (bin.z - bin.footprint.z / 2 - 0.05) * m,
+        maxZ: (bin.z + bin.footprint.z / 2 + 0.05) * m,
+      })),
       ...plinths.map((p) => ({
         minX: (p.x - 0.32) * m,
         maxX: (p.x + 0.32) * m,
@@ -419,11 +310,11 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     place(x: number, z: number, yaw = 0, pitch = 0) {
       walk.place(x * m, z * m, yaw, pitch);
     },
-    /** How many things have gone in the bin. */
-    fill: () => filled,
-    /** Throw plinth boards straight into the bin, `n` of them. */
+    /** How many things have gone in each bin. */
+    fill: () => skip.filled,
+    /** Throw plinth boards straight into the skip, `n` of them. */
     throw(n = 1) {
-      const first = filled;
+      const first = skip.filled;
       for (let k = 0; k < n; k++) {
         const p = plinths[(first + k) % plinths.length];
         const board = p.board;
@@ -438,7 +329,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
         portable.detach();
         scene.attach(board.object);
         portable.component.drop();
-        toss(board.object, portable);
+        tossing.toss(board.object, portable, 'skip');
       }
     },
   };
@@ -454,7 +345,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
-    flight(delta);
+    tossing.update(delta);
     // A plinth whose board has gone has a fresh one a little later.
     for (const p of plinths) {
       const portable = p.board && portableOf(p.board);

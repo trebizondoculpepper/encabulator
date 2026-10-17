@@ -55,7 +55,7 @@ export const LEVEL2_CUES = [
     text: "Get rid of it. I can't stand to even look at it. Horrible, insidious, evil thing. Pernicious. Stop the rot now.",
   },
   {
-    section: 'First board in the bin',
+    section: 'First board in the skip',
     text: "Good riddance to bad rubbish. Now get rid of the others. Tear them all out! One at a time. Let's show Pepperdyne what we think of their modial-interaction boards!",
   },
   {
@@ -63,7 +63,7 @@ export const LEVEL2_CUES = [
     text: 'Quickly… get rid of it.',
   },
   {
-    section: 'Conditional follow-up — second board not yet in the bin',
+    section: 'Conditional follow-up — second board not yet in the skip',
     text: "It's pure evil. It's like a dark stain on the soul of the universe. Can't you see? It's sucking the energy out of our lives.",
   },
   {
@@ -99,27 +99,27 @@ export const LEVEL2_CUES = [
     text: "But, see, that's what I mean. That's why it's important you get rid of these disgusting, dirty Pepperdyne modial-interaction boards.",
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: 'Two down, [BOARDS REMAINING: THREE] to go… you can do it. I have faith in you.',
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: "Yes, faith. That's really what this was ever about. Trust.",
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: 'Who do you trust to encabulate? Turbo or Retro… it was always Neumann that I wanted to work for. First time I laid eyes on the powder-blue cabinets.',
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: 'Some say baby blue… like a newborn baby.',
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: 'This Encabulator is like a child to me.',
   },
   {
-    section: 'Second board in the bin — faith and trust',
+    section: 'Second board in the skip — faith and trust',
     text: "Like a sick, wounded child. Please, you're the doctor. We have to operate. There are [BOARDS REMAINING: THREE] more Pepperdyne modial-interaction boards in my baby's heart.",
   },
   {
@@ -140,7 +140,7 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'Third board removed — signs of recovery',
-    text: 'It would probably say, put this shard of villainy in the bin.',
+    text: 'It would probably say, put this shard of villainy in the skip.',
   },
   {
     section: 'Third board removed — signs of recovery',
@@ -159,7 +159,7 @@ export const LEVEL2_CUES = [
     text: 'Please, for all of us.',
   },
   {
-    section: 'Third card in the bin',
+    section: 'Third card in the skip',
     text: 'Thank you. On behalf of me, this beautiful machine, and all of Neumann Dynamik, thank you.',
   },
   {
@@ -336,58 +336,58 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'Fifth card removed — fading fast',
-    text: 'Quickly, the last card, the Baltovsky flux compensator, in the bin.',
+    text: 'Quickly, the last card, the Baltovsky flux compensator, in the skip.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "It's done.",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: 'Look at that. The lights are holding.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: 'That, trainee, was a job well done. A job very well done.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "I'm no doctor… well, I'm an Encabulation engineer, which is very nearly the same thing… and in my professional opinion…",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "It's going to live.",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "Oh, thank goodness. Thank goodness. I don't mind telling you, there was a moment back there when I thought we'd lost it.",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: 'Ahem.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: 'No.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: 'No, no, no. Come on. Come on, old thing.',
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "It's gone.",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "It's really gone this time.",
   },
   {
-    section: 'All five cards in the bin',
+    section: 'All five cards in the skip',
     text: "Stop all the clocks, cut off the telephone, Prevent the dog from barking with a juicy bone, Silence the pianos and with muffled drum Bring out the coffin, let the mourners come. Let aeroplanes circle moaning overhead Scribbling on the sky the message 'It is Dead'. Put crepe bows round the white necks of the public doves, Let the traffic policemen wear black cotton gloves. It was my North, my South, my East and West, My working week and my Sunday rest, My noon, my midnight, my talk, my song; I thought that love would last forever: I was wrong. The stars are not wanted now; put out every one, Pack up the moon and dismantle the sun, Pour away the ocean and sweep up the wood; For nothing now can ever come to any good.",
   },
   {
@@ -419,20 +419,20 @@ export const LEVEL2_CUES = [
     text: "What are you thinking? Sullying our beautiful Encabulator with this filth! Our pristine, perfect, innocent Encabulator, soiled and besmirched with this foreign muck… No, don't you dare. Keep it away from my Encabulator.",
   },
   {
-    section: 'Conditional interruption — dropping a board on the floor',
-    text: "Were you born in a barn? There's a proper receptacle for this. Would you do that in your mother's house? Scatter Pepperdyne circuitry on her shag-pile?",
+    section: 'Conditional interruption — littering, once the skip is there',
+    text: "Litterbug! Honestly. If there's one thing I can't stand, it's littering. Littering! In a place this special.",
   },
   {
-    section: 'Conditional interruption — dropping a board on the floor',
-    text: 'Hmm… perhaps you would.',
-  },
-  {
-    section: 'Timed prompts — board left on the floor',
-    text: 'Pick it up, you slob, and put it in the bin.',
+    section: 'Conditional interruption — littering, once the skip is there',
+    text: "The skip. Over there. Big, yellow, you can't miss it.",
   },
   {
     section: 'Timed prompts — board left on the floor',
-    text: 'Yes, the bin, you dolt. Pick it up and put it in there.',
+    text: 'Pick it up, you slob, and put it in the skip.',
+  },
+  {
+    section: 'Timed prompts — board left on the floor',
+    text: 'Yes, the skip, you dolt. Pick it up and put it in there.',
   },
   {
     section: 'Conditional prompt — waiting for another board to be removed',
@@ -529,4 +529,14 @@ export const LEVEL2_RESET = {
   prompt:
     "Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.",
   remind: 'The blue button. Automation control. Reset. Please. For all of us.',
+} as const;
+
+/**
+ * The first card dropped on the floor: there is no bin, so the narrator
+ * scolds the player and points out a skip that "was there all along",
+ * which appears behind them, out of sight, as he says it.
+ */
+export const LEVEL2_SKIP = {
+  appears:
+    "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.",
 } as const;

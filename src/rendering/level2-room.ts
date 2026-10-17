@@ -22,6 +22,7 @@ import {
   LEVEL2_BETAFORM,
   LEVEL2_CUES,
   LEVEL2_RESET,
+  LEVEL2_SKIP,
 } from '../game/level2-cues';
 import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../game/units';
@@ -37,11 +38,24 @@ import {
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
 import { knobDirection } from '../scene/rotary-knob';
+import { createSkip } from '../scene/skip';
+import { hiddenSpot, offSight } from '../game/hidden-spot';
+import { createBinTossing } from './bin-tossing';
+import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
 import { createPs1Material, ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
 /** Module 2's interactive test space; its architectural dressing comes later. */
+/** Where the skip may appear, metres: the far end of the room. */
+const SKIP_SPOTS = [
+  { x: -3.6, z: 16.6 },
+  { x: 0, z: 17.4 },
+  { x: 3.6, z: 16.6 },
+];
+/** The glance down at the first dropped card: seconds turning, holding. */
+const GLANCE = { turn: 0.7, hold: 1.1 };
+
 export function startLevel2Room(canvas: HTMLCanvasElement) {
   const m = METRE;
   const scene = new Scene();
@@ -58,11 +72,15 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const ceiling = createPs1Material({ color: '#d4d5cf' });
   const steel = createPs1Material({ color: '#969a99', metalness: 0.4 });
   const dark = createPs1Material({ color: '#25292b' });
+  // A long room: the skip, when there is one, stands at the far end,
+  // about ten seconds' walk (20 m) from the machine, time for the narrator
+  // to talk while the player carries each card to it.
+  const ROOM = { minZ: -5, maxZ: 19 };
   const bounds: Footprint = {
     minX: -6 * m,
     maxX: 6 * m,
-    minZ: -5 * m,
-    maxZ: 5 * m,
+    minZ: ROOM.minZ * m,
+    maxZ: ROOM.maxZ * m,
   };
   const slab = (
     w: number,
@@ -78,8 +96,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     scene.add(mesh);
     return mesh;
   };
-  slab(12, 0.1, 10, 0, -0.05, 0, floor);
-  slab(12, 0.08, 10, 0, 3.34, 0, ceiling);
+  const roomDepth = ROOM.maxZ - ROOM.minZ;
+  const roomMiddle = (ROOM.minZ + ROOM.maxZ) / 2;
+  slab(12, 0.1, roomDepth, 0, -0.05, roomMiddle, floor);
+  slab(12, 0.08, roomDepth, 0, 3.34, roomMiddle, ceiling);
   const walls = devWalls(bounds, m, 3.3 * m);
   for (const piece of walls) {
     const mesh = new Mesh(
@@ -97,12 +117,13 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     );
     scene.add(mesh);
   }
-  for (const x of [-3, 0, 3]) {
-    slab(1.1, 0.035, 0.25, x, 3.2, -0.5, dark);
-    const lamp = new PointLight('#f0efe3', 8, 6 * m);
-    lamp.position.set(x * m, 3.15 * m, -0.5 * m);
-    scene.add(lamp);
-  }
+  for (const z of [-0.5, 5.5, 11.5, 17])
+    for (const x of [-3, 0, 3]) {
+      slab(1.1, 0.035, 0.25, x, 3.2, z, dark);
+      const lamp = new PointLight('#f0efe3', 8, 6 * m);
+      lamp.position.set(x * m, 3.15 * m, z * m);
+      scene.add(lamp);
+    }
   const kit = createPanelKit();
   const oilFeed = signal(false);
   const driveFeed = signal(false);
@@ -141,32 +162,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   oil.position.set('off');
   hydro.position.set('off');
 
-  // Open-topped waste-paper bin: a physical drop target beside the line-up.
-  const bin = new Group();
-  bin.name = 'Waste-paper bin';
-  bin.position.set(2.45 * m, 0, -2.0 * m);
-  scene.add(bin);
-  const binPaint = createPs1Material({ color: '#555b5c', metalness: 0.3 });
-  for (const side of [-1, 1]) {
-    const front = new Mesh(
-      new BoxGeometry(0.52 * m, 0.48 * m, 0.025 * m),
-      binPaint,
-    );
-    front.position.set(0, 0.24 * m, side * 0.26 * m);
-    bin.add(front);
-    const end = new Mesh(
-      new BoxGeometry(0.025 * m, 0.48 * m, 0.52 * m),
-      binPaint,
-    );
-    end.position.set(side * 0.26 * m, 0.24 * m, 0);
-    bin.add(end);
-  }
-  const base = new Mesh(
-    new BoxGeometry(0.52 * m, 0.025 * m, 0.52 * m),
-    binPaint,
-  );
-  base.position.y = 0.02 * m;
-  bin.add(base);
   // A small stain and a few drifting smoke wisps mark the failed cabinet.
   const plcX =
     -MCC_WIDTH / 2 +
@@ -209,6 +204,104 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const binned = new Set<number>();
   const removed = new Set<number>();
   const floorTime = new Map<number, number>();
+  // There is no bin. The first card the player drops on the floor has the
+  // narrator scold them and point out the skip "over there", which only
+  // then appears, behind them, where they were not looking: it was never
+  // there before he said so (`LEVEL2_SKIP`).
+  const tossing = createBinTossing({
+    camera,
+    metre: m,
+    onLanded: (object) => {
+      const index = cards.findIndex((card) => card.object === object);
+      if (index >= 0 && !binned.has(index)) onBinned(index);
+    },
+  });
+  const skipModel = createSkip(kit);
+  skipModel.group.scale.setScalar(m);
+  let skip: TossBin | null = null;
+  const eye = new Vector3();
+  const look = new Vector3();
+  const conjureSkip = () => {
+    camera.getWorldPosition(eye).divideScalar(m);
+    camera.getWorldDirection(look);
+    // One of three places at the far end, where the player is neither
+    // standing nor looking (nor has dropped a card).
+    const loose = cards
+      .filter(
+        (card, index) =>
+          !binned.has(index) &&
+          (card.object.userData.portable as PortableObject).component.phase
+            .value !== 'installed',
+      )
+      .map((card) =>
+        card.object.getWorldPosition(new Vector3()).divideScalar(m),
+      );
+    const clear = SKIP_SPOTS.filter((spot) =>
+      loose.every((at) => Math.hypot(at.x - spot.x, at.z - spot.z) > 1.4),
+    );
+    const halfView = Math.atan(
+      Math.tan((camera.fov * Math.PI) / 360) * camera.aspect,
+    );
+    const facing = { x: look.x, z: look.z };
+    const at = { x: eye.x, z: eye.z };
+    const spot =
+      hiddenSpot({
+        eye: at,
+        facing,
+        halfView,
+        size: skipModel.footprint,
+        candidates: clear.length ? clear : SKIP_SPOTS,
+        near: 2.5,
+        ideal: 20,
+      }) ??
+      // Should they be looking that way, the one furthest from their view.
+      [...SKIP_SPOTS].sort(
+        (a, b) => offSight(at, facing, b) - offSight(at, facing, a),
+      )[0];
+    skipModel.group.position.set(spot.x * m, 0, spot.z * m);
+    scene.add(skipModel.group);
+    skip = tossing.add({ name: 'skip', ...skipModel, ...spot });
+  };
+  // On the first card dropped, the player's eyes go down to it, as the
+  // narrator draws breath: a glance the room makes, holding the player
+  // for a moment (`hold`), so the skip appears unseen.
+  let glance: {
+    t: number;
+    from: { yaw: number; pitch: number };
+    to: { yaw: number; pitch: number };
+  } | null = null;
+  const glanceAt = (object: Object3D) => {
+    const target = object.getWorldPosition(new Vector3());
+    camera.getWorldPosition(eye);
+    const yaw = Math.atan2(target.x - eye.x, -(target.z - eye.z));
+    const pitch = Math.atan2(
+      target.y - eye.y,
+      Math.hypot(target.x - eye.x, target.z - eye.z),
+    );
+    const from = { yaw: walk.walker.yaw, pitch: walk.walker.pitch };
+    // Turning the short way round.
+    const turn =
+      ((((yaw - from.yaw) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) -
+      Math.PI;
+    glance = { t: 0, from, to: { yaw: from.yaw + turn, pitch } };
+    walk.hold(true);
+  };
+  const glancing = (delta: number) => {
+    if (!glance) return;
+    glance.t += delta;
+    const k = Math.min(1, glance.t / GLANCE.turn);
+    const ease = k * k * (3 - 2 * k);
+    walk.place(
+      walk.walker.x,
+      walk.walker.z,
+      glance.from.yaw + (glance.to.yaw - glance.from.yaw) * ease,
+      glance.from.pitch + (glance.to.pitch - glance.from.pitch) * ease,
+    );
+    if (glance.t >= GLANCE.turn + GLANCE.hold) {
+      glance = null;
+      walk.hold(false);
+    }
+  };
   for (const card of cards)
     (card.object.userData.portable as PortableObject).component.setLocked(true);
   const voice = createLevel2Voice();
@@ -344,7 +437,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   };
   const onBinned = (index: number) => {
     binned.add(index);
-    cards[index].object.visible = false;
     idle = 0;
     if (binned.size === 5) {
       smokeOn = false;
@@ -433,7 +525,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       minZ: (-3.8 + ISOLATOR.back) * m,
       maxZ: (-3.8 + ISOLATOR.front) * m,
     },
-    { minX: 2.14 * m, maxX: 2.76 * m, minZ: -2.31 * m, maxZ: -1.69 * m },
   ];
   const walk = createFirstPerson({
     canvas,
@@ -442,7 +533,21 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     floorY: 0,
     objects: scene,
     start: { x: 0, z: 1.0 * m, yaw: 0, pitch: 0.05 },
-    solids: () => [...walls, ...footprints],
+    solids: () => [
+      ...walls,
+      ...footprints,
+      ...(skip
+        ? [
+            {
+              minX: (skip.x - skip.footprint.x / 2 - 0.05) * m,
+              maxX: (skip.x + skip.footprint.x / 2 + 0.05) * m,
+              minZ: (skip.z - skip.footprint.z / 2 - 0.05) * m,
+              maxZ: (skip.z + skip.footprint.z / 2 + 0.05) * m,
+            },
+          ]
+        : []),
+    ],
+    divert: (object, portable) => tossing.divert(object, portable),
     use: (x, y) => {
       if (liveCardAt(x, y)) {
         // Once, and again only if they keep trying.
@@ -477,6 +582,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     clock += delta;
     walk.update(delta);
+    glancing(delta);
+    tossing.update(delta);
     mcc.update(delta);
     partAudio.listen(camera, m);
     phaseTime += delta;
@@ -603,9 +710,11 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       for (const card of cards) {
         const portable = (card.object.userData.portable as PortableObject)
           .component;
-        portable.setLocked(
-          portable.phase.value === 'installed' && automation.closed.value,
-        );
+        // A card in the skip stays there.
+        if (!binned.has(cards.indexOf(card)))
+          portable.setLocked(
+            portable.phase.value === 'installed' && automation.closed.value,
+          );
       }
     if (phase === 10) {
       for (const [index, card] of cards.entries()) {
@@ -616,18 +725,17 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
           floorTime.delete(index);
           continue;
         }
-        const at = card.object.getWorldPosition(new Vector3());
-        if (
-          Math.abs(at.x - bin.position.x) < 0.23 * m &&
-          Math.abs(at.z - bin.position.z) < 0.23 * m &&
-          at.y < 0.5 * m
-        )
-          onBinned(index);
-        else if (state === 'settled') {
+        if (state === 'settled') {
           const previous = floorTime.get(index);
           const age = (previous ?? 0) + delta;
           floorTime.set(index, age);
-          if (previous === undefined) voice.interrupt(104, 105);
+          if (previous === undefined && !skip) {
+            // The first card on the floor: there never was a bin.
+            glanceAt(card.object);
+            conjureSkip();
+            voice.interrupt();
+            voice.say(LEVEL2_SKIP.appears);
+          } else if (previous === undefined) voice.interrupt(104, 105);
           else if (age >= 30 && age - delta < 30) voice.interrupt(106);
           else if (age >= 40 && age - delta < 40) voice.interrupt(107);
         }
@@ -683,10 +791,12 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     voice.dispose();
     mcc.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
-    scene.traverse((object) => {
-      if (object instanceof Mesh) object.geometry.dispose();
-    });
-    for (const material of [floor, wall, ceiling, steel, dark, binPaint])
+    scene.remove(skipModel.group);
+    for (const root of [scene, skipModel.group])
+      root.traverse((object) => {
+        if (object instanceof Mesh) object.geometry.dispose();
+      });
+    for (const material of [floor, wall, ceiling, steel, dark])
       material.dispose();
     (stain.material as MeshBasicMaterial).dispose();
     for (const puff of smoke) (puff.material as MeshBasicMaterial).dispose();
@@ -710,10 +820,18 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       phase,
       removed: removed.size,
       binned: binned.size,
+      skip: skip && { x: skip.x, z: skip.z },
       smokeOn,
       failedSupplyCard: failedSupplyCard.faulted.value,
     }),
     view: (x: number, z: number, yaw = 0) => walk.place(x * m, z * m, yaw, 0),
+    /** Glance at the first card and conjure the skip, as a first drop does. */
+    conjureSkip: () => {
+      if (skip) return skip;
+      glanceAt(cards[0].object);
+      conjureSkip();
+      return { x: skip!.x, z: skip!.z };
+    },
   };
   return Object.assign(dispose, {
     suspend() {
