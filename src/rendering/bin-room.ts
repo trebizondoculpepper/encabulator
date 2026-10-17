@@ -206,6 +206,8 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
         attachment: 'detachable',
       }),
     );
+    // A card stands as it does in its slot: turned to show its face.
+    if (p.kind.startsWith('plc-')) device.object.rotation.y = Math.PI / 2;
     device.object.updateMatrixWorld(true);
     const envelope = new Box3().setFromObject(device.object);
     device.object.position.set(
@@ -360,12 +362,12 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   };
   for (const [i, p] of plinths.entries()) {
     // Standing in front of the plinth, between it and the bin.
-    const along = (RING - 0.75) / RING;
+    const along = (RING - 1) / RING;
     views[String(i + 1)] = {
       x: p.x * along * m,
       z: p.z * along * m,
       yaw: Math.atan2(p.x, -p.z),
-      pitch: -0.45,
+      pitch: -0.55,
     };
   }
   const params = new URLSearchParams(location.search);
@@ -421,8 +423,9 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     fill: () => filled,
     /** Throw plinth boards straight into the bin, `n` of them. */
     throw(n = 1) {
+      const first = filled;
       for (let k = 0; k < n; k++) {
-        const p = plinths[(filled + k) % plinths.length];
+        const p = plinths[(first + k) % plinths.length];
         const board = p.board;
         const portable = board && portableOf(board);
         if (

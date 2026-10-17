@@ -16,7 +16,9 @@ import type { Footprint } from '../game/walk-collision';
 import { METRE } from '../game/units';
 import { createPanelKit, disposeKit } from '../scene/eighties-controls';
 import { createPortals } from '../scene/portals';
+import type { FailureId } from '../game/machine-failure';
 import { ISOLATOR } from '../scene/incoming-isolator';
+import { FAILURE_CONSOLE_HALF, createFailureConsole } from './failure-console';
 import {
   createRetroEncabulatorMcc,
   MCC_DEPTH,
@@ -106,6 +108,13 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(0, 0, -3.8 * m);
   scene.add(mcc.group);
+  // The failure simulator, in front of the line-up and to one side.
+  const CONSOLE = { x: 1.3, z: -2.3 };
+  const failures = createFailureConsole(kit, mcc);
+  failures.group.scale.setScalar(m);
+  failures.group.position.set(CONSOLE.x * m, 0, CONSOLE.z * m);
+  failures.group.rotation.y = -0.35;
+  scene.add(failures.group);
   // A small utility enclosure beside the MCC and surface conduit to it.
   slab(0.46, 1.45, 0.3, 3.1, 0.83, -4.25, steel);
   slab(0.02, 1.43, 0.28, 3.34, 0.83, -4.25, black);
@@ -119,6 +128,12 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
       maxZ: -3.72 * m,
     },
     { minX: 2.84 * m, maxX: 3.38 * m, minZ: -4.46 * m, maxZ: -4.03 * m },
+    {
+      minX: (CONSOLE.x - FAILURE_CONSOLE_HALF.x) * m,
+      maxX: (CONSOLE.x + FAILURE_CONSOLE_HALF.x) * m,
+      minZ: (CONSOLE.z - FAILURE_CONSOLE_HALF.z) * m,
+      maxZ: (CONSOLE.z + FAILURE_CONSOLE_HALF.z) * m,
+    },
     // The incoming isolator, to the left of the line-up.
     {
       minX: (MCC_ISOLATOR_X - ISOLATOR.width / 2 - 0.05) * m,
@@ -132,7 +147,10 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   /** What a click at (x, y) on the screen would work, if anything in reach. */
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects([portals.group, mcc.group], true)[0];
+    const hit = raycaster.intersectObjects(
+      [portals.group, mcc.group, failures.group],
+      true,
+    )[0];
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -145,7 +163,8 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
       }
       // Each part says what a click on it does: a latch opens its door,
       // a button presses, and a rear cover closes an open door.
-      const work = mcc.parts.uses.get(object);
+      const work =
+        mcc.parts.uses.get(object) ?? failures.parts.uses.get(object);
       if (work) {
         const at = object;
         return () => work(knobDirection(at, hit.point, camera));
@@ -193,6 +212,11 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   resize();
   (window as unknown as { devEncabulator: unknown }).devEncabulator = {
     openAll: mcc.openAll,
+    /** Make the machine fail, as the failure simulator's buttons do. */
+    fail: (id: FailureId) => mcc.fail(id),
+    restart: () => mcc.restart(),
+    recover: () => mcc.recover(),
+    failure: () => mcc.failure,
     world: mcc.world,
     components: () =>
       mcc.components.map((device) => ({
@@ -231,6 +255,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     mcc.update(delta);
+    failures.parts.update(delta);
     partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
     renderer.render(scene, camera);
@@ -241,6 +266,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     mcc.parts.dispose();
+    failures.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.traverse((object) => {
       if (object instanceof Mesh) object.geometry.dispose();

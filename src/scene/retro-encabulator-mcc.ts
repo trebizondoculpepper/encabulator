@@ -382,6 +382,12 @@ const MESSAGES: readonly (readonly string[])[] = [
  */
 export interface MccOptions {
   incomingOn?: boolean;
+  /**
+   * Whether the drive train's deep hum starts with the main power, rather
+   * than waiting for the drive to boot (Level 2's script has it begin the
+   * moment the master power goes on).
+   */
+  driveTrainWithMains?: boolean;
   toneEnabled?: Partial<Record<string, Readable<boolean>>>;
   /** Scripted training sequences can hold a bucket's feed until its cue. */
   bucketFeed?: Partial<Record<string, Readable<boolean>>>;
@@ -875,7 +881,7 @@ export function createRetroEncabulatorMcc(
   const drive = beginPart(kit, 'Encabulator drive train');
   drive.object.position.set(-0.0525, 0.7, -MCC_DEPTH / 2);
   drive.holdWhile(
-    driveReady,
+    options.driveTrainWithMains ? mains : driveReady,
     machineTone(
       'motor',
       running,

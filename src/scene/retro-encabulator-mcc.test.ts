@@ -672,3 +672,42 @@ it('fixes the motherboard and leaves five sockets when the expansion cards are r
   expect(sockets.every((o) => o.parent !== null)).toBe(true);
   dispose();
 });
+
+it('fails like an engine giving up, stalls, restarts from RESET and dies for good', () => {
+  const { mcc, dispose } = fixture();
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  // Nothing fails while the machine is off.
+  mcc.fail('sputter');
+  expect(mcc.failure).toBeNull();
+  isolate(mcc);
+  main.breaker!.operate();
+  mcc.update(3);
+  // A hiccup passes, and leaves it running.
+  mcc.fail('hiccup');
+  expect(mcc.failure).toBe('hiccup');
+  mcc.update(2);
+  expect(mcc.failure).toBeNull();
+  // A sputter leaves it stalled, powered but stopped, until RESET.
+  mcc.fail('sputter');
+  for (let t = 0; t < 7; t += 0.1) mcc.update(0.1);
+  expect(mcc.stalled).toBe(true);
+  expect(main.active.value).toBe(true);
+  const reset = mcc.controls.get('automation.reset')!.position as {
+    value: number;
+  };
+  reset.value++;
+  mcc.update(0.05);
+  expect(mcc.failure).toBe('restart');
+  for (let t = 0; t < 5; t += 0.1) mcc.update(0.1);
+  expect(mcc.failure).toBeNull();
+  // The kaput trips the main breaker: dead.
+  mcc.fail('kaput');
+  for (let t = 0; t < 9; t += 0.1) mcc.update(0.1);
+  expect(main.breaker!.position.value).toBe('tripped');
+  expect(main.active.value).toBe(false);
+  mcc.recover();
+  expect(main.active.value).toBe(true);
+  dispose();
+});

@@ -520,3 +520,13 @@ export const LEVEL2_BETAFORM = {
 } as const;
 
 export type BetaformId = keyof typeof LEVEL2_BETAFORM.operations;
+
+/**
+ * After the last card is binned: the machine has stalled, and the RESET
+ * on the front of Automation Control will bring it back. Placeholder lines.
+ */
+export const LEVEL2_RESET = {
+  prompt:
+    "Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.",
+  remind: 'The blue button. Automation control. Reset. Please. For all of us.',
+} as const;

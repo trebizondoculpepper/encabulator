@@ -160,5 +160,7 @@
   "betaform_test_say": "Test the annunciator.",
   "betaform_test_remind": "The annunciator. The panel of little windows, under the main disconnect. Press test. They all light up. Everyone loves that bit. You loved that bit yesterday.",
   "betaform_stop_say": "Press the emergency stop on the auxiliary motor, then pull it out again.",
-  "betaform_stop_remind": "The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency."
+  "betaform_stop_remind": "The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.",
+  "reset_prompt": "Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.",
+  "reset_remind": "The blue button. Automation control. Reset. Please. For all of us."
 }

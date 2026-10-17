@@ -38,7 +38,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **PLAYER ACTION:** Turn the LUBE OIL PUMP M-201 operating handle to ON.
 
-**MACHINE:** Nothing happens. No new lights. No pump noise. Allow a short, conspicuous silence over the machine's existing hum.
+**MACHINE:** Nothing happens. No new lights. No pump noise. Instead the whole machine hiccups: it sags for a moment, some of its sounds trip out, the lamps blink, and then it carries on as if nothing had happened. Mildly alarming, nothing more: foreshadowing of what is to come (the HICCUP failure). Allow a short, conspicuous silence over the machine's hum.
 
 **NARRATOR:** Hmm. That's the right switch. Give it another go?
 
@@ -142,7 +142,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 **PLAYER ACTION — HYDROCOPTIC PUMP:** Turn the HYDROCOPTIC PUMP operating handle to ON. Its FLOW PULSE display surges into life.
 
-**MACHINE / SOUND:** A brief, dramatic surge suggests that the next stage has caught. Then the machine sputters. Some of its new noises die immediately. The main mechanism struggles on, catches, accelerates hopefully, then fails again. One final attempt winds down into an uneven, exhausted hum. Leave an uncomfortable pause.
+**MACHINE / SOUND:** A brief, dramatic surge suggests that the next stage has caught. Then the machine sputters. Some of its new noises die immediately. The main mechanism struggles on, catches, accelerates hopefully, then fails again. One final, feeble attempt, and it sputters to a standstill: still powered, its lamps still lit, but stopped and silent (the SPUTTER failure). Leave an uncomfortable pause.
 
 **NARRATOR:** Oh. That's not good, is it?
 
@@ -152,7 +152,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 ## Open the smoking cabinet
 
-**PLAYER ACTION:** Open the cabinet from which smoke is still emerging. Nothing stops them: the machine is still running, and it must stay running, because the whole point is to save its life by pulling the rival boards out in a hurry. Its hum and its struggling noises carry on behind everything that follows.
+**PLAYER ACTION:** Open the cabinet from which smoke is still emerging. Nothing stops them: the machine is still powered, stalled but alive, and it must stay powered, because the whole point is to save its life by pulling the rival boards out in a hurry.
 
 **MACHINE:** A puff of trapped smoke rolls out as the door opens, revealing the main board and its removable cards. Residual smoke continues to rise from inside.
 
@@ -166,7 +166,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 **NARRATOR:** Are you suicidal? Those boards are live. We covered this yesterday. Switch off the isolator in that cabinet first.
 
-**PLAYER ACTION:** Switch off the isolator inside the cabinet. Only that cabinet goes dead: the rest of the machine stays on, humming and struggling, so its sounds still make sense while the player works. The cards can now be pulled.
+**PLAYER ACTION:** Switch off the isolator inside the cabinet. Only that cabinet goes dead: the rest of the machine stays powered. The cards can now be pulled.
 
 _If the player switched off the cabinet's isolator before reaching for a card, omit the interruption._
 
@@ -414,7 +414,17 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** It's done.
 
-**MACHINE:** The smoke subsides. The flickering stops: the remaining indicator lights steady, then one by one grow a little brighter. The machine appears to have pulled through.
+**MACHINE:** The smoke subsides. The machine is still stalled.
+
+**NARRATOR:** Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.
+
+**PLAYER ACTION:** Press the blue RESET button on the front of the AUTOMATION CONTROL cabinet.
+
+**TRIGGER:** Every fourteen seconds the RESET has not been pressed:
+
+**NARRATOR:** The blue button. Automation control. Reset. Please. For all of us.
+
+**MACHINE / SOUND:** The machine coughs, turns over, catches, stumbles, and sputters back into life (the RESTART). The lamps come back, steady, then one by one grow a little brighter. The machine appears to have pulled through.
 
 **NARRATOR (calm):** Look at that. The lights are holding.
 
@@ -434,7 +444,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—
 
-**MACHINE / SOUND:** Cut him off mid-word. The machine's main breaker trips with a clunk, and the machine gives a long, descending sigh, a last faint echo of its running note winding down to nothing. The indicator lights dim and go out one at a time, irregularly; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room.
+**MACHINE / SOUND:** Cut him off mid-word. The final failure, the most dramatic of all (the KAPUT): the machine winds itself up, hopefully, for one more go; gives way with a bang and a shower of sparks from the drive and the automation cabinet, its note collapsing in a wobbling, sad wah; tries again, desperately; sparks again; manages one last feeble turn; and slides away to nothing. Its main breaker trips with a clunk. The indicator lights flicker and go out; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room. It is clearly, finally kaput.
 
 **BEAT:** A long silence. Let it be uncomfortable.
 

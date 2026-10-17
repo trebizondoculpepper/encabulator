@@ -18,7 +18,11 @@ import { signal } from '@preact/signals-core';
 import { createLevel2Voice } from '../audio/level2-voice';
 import { partAudio } from '../audio/part-audio';
 import { devWalls } from '../game/dev-room-links';
-import { LEVEL2_BETAFORM, LEVEL2_CUES } from '../game/level2-cues';
+import {
+  LEVEL2_BETAFORM,
+  LEVEL2_CUES,
+  LEVEL2_RESET,
+} from '../game/level2-cues';
 import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../game/units';
 import type { Footprint } from '../game/walk-collision';
@@ -108,6 +112,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const driveTone = signal(false);
   const mcc = createRetroEncabulatorMcc(kit, {
     incomingOn: true,
+    driveTrainWithMains: true,
     bucketFeed: {
       'section3.bucket1': oilFeed,
       'section6.bucket1': driveFeed,
@@ -248,6 +253,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let phaseTime = 0;
   let titleTime = 0;
   let endingCountdown = -1;
+  let griefCountdown = -1;
+  let restarting = false;
+  let revived = false;
+  let resetNag = 0;
   let smokeOn = false;
   let priorOil = false;
   // Rebooting the betaform amplifier: three operations drawn at random
@@ -339,7 +348,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     idle = 0;
     if (binned.size === 5) {
       smokeOn = false;
-      advance(11, 84, 85, 86, 87, 88, 89, 90, 91);
+      // The machine is stalled; its RESET will bring it back.
+      advance(11, 84);
+      voice.say(LEVEL2_RESET.prompt);
     } else if (binned.size === 1) voice.interrupt(13);
     else if (binned.size === 2) {
       const remaining = cards.length - removed.size;
@@ -470,32 +481,36 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     partAudio.listen(camera, m);
     phaseTime += delta;
     if (started) titleTime += delta;
-    if (phase === 8 && !smokeOn) {
-      const attempt =
-        phaseTime < 0.8 ||
-        (phaseTime > 1.35 && phaseTime < 2.1) ||
-        (phaseTime > 2.75 && phaseTime < 3.15);
-      hydroTone.value = attempt;
-      driveTone.value = attempt;
-    }
     if (phase < 13 && titleTime > 5) caption.hidden = true;
     if (endingCountdown >= 0) {
       endingCountdown -= delta;
       if (endingCountdown < 0) {
-        advance(12, 92, 93, 94, 95, 96);
+        // Cut him off mid-word: the machine dies, finally, with sparks,
+        // and its main breaker trips.
+        voice.interrupt();
         smokeOn = false;
-        // The machine was running all along; now it truly dies. Its main
-        // breaker trips, so everything runs down and every light goes out.
-        main.trip();
-        partAudio.play({
-          tones: [220, 185, 151, 121, 94, 70].map((hz, i) => ({
-            at: i * 0.32,
-            hz,
-            seconds: 0.37,
-            type: 'sawtooth' as const,
-            level: 0.012 * (1 - i / 7),
-          })),
-        });
+        mcc.fail('kaput');
+        griefCountdown = 8.5;
+      }
+    }
+    if (griefCountdown >= 0) {
+      griefCountdown -= delta;
+      if (griefCountdown < 0) advance(12, 92, 93, 94, 95, 96);
+    }
+    if (phase === 11) {
+      // Waiting for RESET; then the machine sputters back into life, and
+      // the narrator, relieved, resumes the lesson.
+      if (mcc.failure === 'restart') restarting = true;
+      else if (restarting && mcc.failure === null) {
+        restarting = false;
+        revived = true;
+        voice.interrupt(85, 86, 87, 88, 89, 90, 91);
+      } else if (!revived && !restarting && !voice.busy) {
+        resetNag += delta;
+        if (resetNag > 14) {
+          resetNag = 0;
+          voice.say(LEVEL2_RESET.remind);
+        }
       }
     }
     if (phase === 12 && !voice.busy) {
@@ -509,6 +524,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     if (phase === 0 && main.closed.value) advance(1, 2);
     else if (phase === 1 && oil.closed.value) {
       priorOil = true;
+      // The sticky switch: a hiccup, as a warning of what is to come.
+      mcc.fail('hiccup');
       advance(2);
     } else if (phase === 2 && phaseTime > 2.5) {
       advance(3, 3);
@@ -525,6 +542,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
           if (betaform.size === drawn.length) {
             driveFeed.value = true;
             driveTone.value = true;
+            // The main machine note shifts up as the amplifier comes in.
+            mcc.pitch.value = 1.08;
             advance(7);
             voice.interrupt();
             voice.say(LEVEL2_BETAFORM.done);
@@ -552,6 +571,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     } else if (phase === 7 && hydro.closed.value && !priorHydro) {
       priorHydro = true;
       hydroTone.value = true;
+      // A surge, then the machine sputters to a standstill.
+      mcc.fail('sputter');
       advance(8);
     } else if (phase === 8 && phaseTime > 4 && !smokeOn) {
       smokeOn = true;
