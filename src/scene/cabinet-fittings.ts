@@ -1,3 +1,4 @@
+import { drawBootScreen } from './boot-screen';
 import {
   BoxGeometry,
   CylinderGeometry,
@@ -99,6 +100,8 @@ export interface CrtMonitorView {
   group: Group;
   setMode(mode: CrtMode): void;
   setOn(on: boolean): void;
+  /** null restores the normal instrument picture. */
+  setBoot(lines: readonly string[] | null): void;
   /** Advance its picture; `seconds` is the clock it draws from. */
   update(delta: number): void;
 }
@@ -180,6 +183,7 @@ export function createCrtMonitor(
 
   let mode = initial;
   let on = true;
+  let bootLines: readonly string[] | null = null;
   let clock = seed * 37;
   let since = 1;
   const trend: number[][] = [[], [], []];
@@ -387,7 +391,8 @@ export function createCrtMonitor(
       art.texture.needsUpdate = true;
       return;
     }
-    if (mode === 'trend') drawTrend();
+    if (bootLines) drawBootScreen(c, W, H, bootLines);
+    else if (mode === 'trend') drawTrend();
     else if (mode === 'mimic') drawMimic();
     else if (mode === 'log') drawLog();
     else drawVector();
@@ -405,7 +410,13 @@ export function createCrtMonitor(
       }
       since = 1;
     },
+    setBoot(lines) {
+      if (lines?.join('\n') === bootLines?.join('\n')) return;
+      bootLines = lines;
+      since = 1;
+    },
     setOn(next) {
+      if (next === on) return;
       on = next;
       lamp.material = on ? lampOn : lampOff;
       since = 1;
@@ -887,7 +898,7 @@ export function createSoftStarter(
 
 export interface PowerMonitorView {
   group: Group;
-  show(volts: number, amps: number, kilowatts: number): void;
+  show(volts: number, amps: number, kilowatts: number, powered?: boolean): void;
 }
 
 /**
@@ -934,10 +945,10 @@ export function createPowerMonitor(kit: PanelKit): PowerMonitorView {
   group.add(brand);
   return {
     group,
-    show(volts, amps, kilowatts) {
-      rows[0].show(volts.toFixed(0));
-      rows[1].show(amps.toFixed(1));
-      rows[2].show(kilowatts.toFixed(1));
+    show(volts, amps, kilowatts, powered = true) {
+      rows[0].show(powered ? volts.toFixed(0) : '');
+      rows[1].show(powered ? amps.toFixed(1) : '');
+      rows[2].show(powered ? kilowatts.toFixed(1) : '');
     },
   };
 }

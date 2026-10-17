@@ -41,7 +41,8 @@ export interface Tone {
 export type SoundRecipe =
   | { recording: URL; level: number }
   | { click: Click }
-  | { tone: Tone };
+  | { tone: Tone }
+  | { sequence: { at: number; click: Click }[] };
 
 /** A recorded sound, at `level`. */
 export const recording = (url: URL, level: number): SoundRecipe => ({
@@ -190,6 +191,12 @@ export const partAudio = {
         osc.start(at);
         osc.stop(at + spec.seconds + 0.02);
       }
+      return none;
+    }
+    if ('sequence' in recipe) {
+      const at = context.currentTime + 0.005;
+      for (const contact of recipe.sequence)
+        burst(contact.click, at + contact.at, out);
       return none;
     }
     if ('click' in recipe) {

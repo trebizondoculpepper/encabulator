@@ -27,6 +27,9 @@ import {
 import type { TestFitting } from './test-boards';
 import {
   createMachineGallery,
+  createEmptyMachinePlinths,
+  ALL_GALLERY_LAYOUT,
+  EMPTY_GALLERY_LAYOUT,
   MACHINE_GALLERY_LAYOUT,
   MACHINE_PLINTH_WIDTH,
 } from './machine-gallery';
@@ -37,7 +40,7 @@ import {
  * centre in Rockwell's Retro Encabulator film (an Allen-Bradley CENTERLINE
  * line-up). On the north wall, the CONTROLS board of 30 mm pilot devices
  * and the DISPLAYS board of indicators and displays, each driven by test
- * controls. Eighteen plinths exhibit the shared machine inventory, each with a test panel to put it through what it does,
+ * controls. The plinths exhibit the shared machine inventory, each with a top panel to put it through what it does,
  * failures included. Every control is a component.
  */
 export function startControlsRoom(canvas: HTMLCanvasElement) {
@@ -47,7 +50,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     minX: -half.x * m,
     maxX: half.x * m,
     minZ: -half.z * m,
-    maxZ: half.z * m,
+    maxZ: 10.5 * m,
   };
   const height = 3.4;
   const scene = new Scene();
@@ -78,14 +81,16 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     mesh.position.set(x, y, z);
     scene.add(mesh);
   };
-  slab(2 * half.x * m, 0.1 * m, 2 * half.z * m, 0, -0.05 * m, 0);
+  const roomDepth = bounds.maxZ - bounds.minZ;
+  const roomCentreZ = (bounds.minZ + bounds.maxZ) / 2;
+  slab(2 * half.x * m, 0.1 * m, roomDepth, 0, -0.05 * m, roomCentreZ);
   slab(
     2 * half.x * m,
     0.1 * m,
-    2 * half.z * m,
+    roomDepth,
     0,
     (height + 0.05) * m,
-    0,
+    roomCentreZ,
     true,
   );
   const doors = devPortals('dev0', bounds, m);
@@ -148,16 +153,18 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     minZ: (cabinetZ - 1.75) * m,
     maxZ: (cabinetZ + 1.75) * m,
   });
-  createMachineGallery(kit).forEach((plinth, i) => {
-    const { x, z } = MACHINE_GALLERY_LAYOUT[i];
-    const reach = MACHINE_PLINTH_WIDTH / 2 + 0.15;
-    place(plinth, x, 0, z, 0, {
-      minX: (x - reach) * m,
-      maxX: (x + reach) * m,
-      minZ: (z - reach) * m,
-      maxZ: (z + reach) * m,
-    });
-  });
+  [...createMachineGallery(kit), ...createEmptyMachinePlinths(kit)].forEach(
+    (plinth, i) => {
+      const { x, z } = ALL_GALLERY_LAYOUT[i];
+      const reach = MACHINE_PLINTH_WIDTH / 2 + 0.15;
+      place(plinth, x, 0, z, 0, {
+        minX: (x - reach) * m,
+        maxX: (x + reach) * m,
+        minZ: (z - reach) * m,
+        maxZ: (z + reach) * m,
+      });
+    },
+  );
 
   // What was worked, and what it did.
   const log = document.createElement('ol');
@@ -249,6 +256,8 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
       yaw: Math.PI / 2,
       pitch: -0.1,
     },
+    empty: { x: 1 * m, z: 8 * m, yaw: 0, pitch: -0.5 },
+    capacitor: { x: -5 * m, z: 7 * m, yaw: 0, pitch: -0.9 },
     backplane: { x: 5 * m, z: 4.85 * m, yaw: 0, pitch: -0.3 },
     components: { x: -6.8 * m, z: 6.2 * m, yaw: 0.35, pitch: -0.17 },
     pedestals: {
@@ -273,7 +282,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     floorY: 0,
     objects: scene,
     supports: () =>
-      MACHINE_GALLERY_LAYOUT.map(({ x, z }) => ({
+      ALL_GALLERY_LAYOUT.map(({ x, z }) => ({
         minX: x - 0.47,
         maxX: x + 0.47,
         minZ: z - 0.47,
@@ -290,8 +299,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     use,
   });
   const notes = document.createElement('div');
-  notes.textContent =
-    'DEV0 · Controls and Displays: controls and displays on the north wall, machine components on eighteen plinths · Portals: the training room west, dev1 east';
+  notes.textContent = `DEV0 · Controls and Displays: controls and displays on the north wall, machine components on ${MACHINE_GALLERY_LAYOUT.length} plinths, plus ${EMPTY_GALLERY_LAYOUT.length} temporarily empty exhibits · Portals: the training room west, dev1 east`;
   Object.assign(notes.style, {
     position: 'absolute',
     top: '12px',

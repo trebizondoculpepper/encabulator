@@ -1,3 +1,4 @@
+import type { Attachment } from '../drop-profile';
 import { computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 
@@ -771,6 +772,9 @@ export function createFuse(options: FuseInputs) {
 export type CapacitorHealth = 'good' | 'bulging' | 'vented';
 
 export interface CapacitorInputs {
+  /** Mounted board parts remain fixed; a loose exhibit is detachable. */
+  attachment?: Attachment;
+  random?: () => number;
   /** The voltage across it, volts. */
   voltage: Readable<number>;
   /** Its rated voltage. */
@@ -789,12 +793,14 @@ export interface CapacitorInputs {
  * and at the end it vents through the scored top with a bang and a
  * plume of acrid smoke, and is open circuit from then on. A replacement
  * is new. `smoke` is how much it is smoking, 1 as it vents and dying
- * away over half a minute. Advance with `step`.
+ * away over three seconds. Advance with `step`.
  */
 export function createCapacitor(options: CapacitorInputs) {
   const wear = source(options.bound, 0);
   const stress = wear.value;
   const smoke = signal(0);
+  const failureAge = signal(Infinity);
+  const emberCount = signal(0);
   const health = computed<CapacitorHealth>(() =>
     stress.value >= 1 ? 'vented' : stress.value >= 0.5 ? 'bulging' : 'good',
   );
@@ -807,12 +813,24 @@ export function createCapacitor(options: CapacitorInputs) {
   e.watch(health, (next) => {
     if (next === 'bulging') e.emit('bulge');
     if (next === 'vented') {
-      e.emit('vent');
+      failureAge.value = 0;
+      emberCount.value =
+        3 + Math.min(2, Math.floor((options.random ?? Math.random)() * 3));
       smoke.value = 1;
+      e.emit('vent');
     }
   });
   return {
     kind: 'capacitor' as const,
+    attachment: options.attachment ?? 'fixed',
+    failureAge: failureAge as ReadonlySignal<number>,
+    flash: computed(() => failureAge.value < 0.065),
+    embers: computed(() => (failureAge.value < 0.8 ? emberCount.value : 0)),
+    fail() {
+      if (stress.peek() >= 1) return false;
+      wear.write(1);
+      return true;
+    },
     held: e.held as ReadonlySignal<string | null>,
     rated: options.rated,
     health: health as ReadonlySignal<CapacitorHealth>,
@@ -825,11 +843,15 @@ export function createCapacitor(options: CapacitorInputs) {
       e.emit('press');
       wear.write(0);
       smoke.value = 0;
+      failureAge.value = Infinity;
+      emberCount.value = 0;
       return true;
     },
     step(seconds: number) {
-      if (smoke.peek() > 0)
-        smoke.value = Math.max(0, smoke.peek() - seconds / 30);
+      if (Number.isFinite(failureAge.peek())) {
+        failureAge.value += seconds;
+        smoke.value = Math.max(0, 1 - failureAge.peek() / 3);
+      }
       if (stress.peek() >= 1) return;
       // A tenth over its rating vents it in a minute; half over, in seconds.
       const over = options.voltage.value / options.rated - 1;

@@ -80,6 +80,8 @@ export function createMicroLabel(
     bold = true,
     align = 'center' as 'center' | 'left' | 'right',
     font = PANEL_FONT,
+    width = 0,
+    maxWidth = Infinity,
   } = {},
 ) {
   const px = 16;
@@ -88,7 +90,11 @@ export function createMicroLabel(
   probe.font = `${bold ? 'bold ' : ''}${px}px ${font}`;
   const textWidth = Math.max(...lines.map((l) => probe.measureText(l).width));
   const pad = 4;
-  const w = Math.ceil(textWidth) + pad * 2;
+  const metresPerPixel = height / (px * 0.72);
+  const w = Math.max(
+    Math.ceil(textWidth) + pad * 2,
+    Math.ceil(width / metresPerPixel),
+  );
   const lineHeight = Math.round(px * 1.15);
   const h = lineHeight * lines.length + pad;
   const { context, texture } = createCanvasTexture(w, h);
@@ -107,14 +113,14 @@ export function createMicroLabel(
   texture.needsUpdate = true;
   kit.textures.push(texture);
   // Cap height is about 0.72 of the font size.
-  const metresPerPixel = height / (px * 0.72);
   const material = createPs1Material(
     { map: texture, transparent: !plate, alphaTest: plate ? 0 : 0.35 },
     true,
   );
   kit.materials.push(material);
+  const fit = Math.min(1, maxWidth / (w * metresPerPixel));
   const mesh = new Mesh(
-    new PlaneGeometry(w * metresPerPixel, h * metresPerPixel),
+    new PlaneGeometry(w * metresPerPixel * fit, h * metresPerPixel * fit),
     material,
   );
   mesh.name = `Label ${text}`;

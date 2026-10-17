@@ -87,3 +87,21 @@ it('does not pick up an occluded board', () => {
   expect(f.handling.use(0, 0)).toBe(false);
   expect(f.component.phase.value).toBe('installed');
 });
+
+it('restores an exhibit to its original parent, position, orientation and scale when dev0 requests reset', () => {
+  const f = fixture();
+  const position = f.object.position.clone();
+  const rotation = f.object.quaternion.clone();
+  const scale = f.object.scale.clone();
+  f.handling.use(0, 0);
+  f.handling.use(0, 0);
+  f.handling.update(0.1);
+  f.component.reset();
+  f.handling.update(0.01);
+  expect(f.object.parent).toBe(f.parent);
+  expect(f.object.position.toArray()).toEqual(position.toArray());
+  expect(f.object.quaternion.toArray()).toEqual(rotation.toArray());
+  expect(f.object.scale.toArray()).toEqual(scale.toArray());
+  expect(f.component.phase.value).toBe('installed');
+  f.handling.dispose();
+});

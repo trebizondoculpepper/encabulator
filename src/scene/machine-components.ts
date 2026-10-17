@@ -1,3 +1,5 @@
+import { pcbMaterials } from './pcb-textures';
+import type { PcbTexture } from './pcb-textures';
 import { BoxGeometry, Group, Mesh, CylinderGeometry } from 'three';
 import type { Material } from 'three';
 import type { MachineComponentKind } from '../game/machine-components';
@@ -49,11 +51,27 @@ export function createMachineDeviceView(
   if (kind.startsWith('plc-')) {
     // The withdrawn module exposes its card, not a solid plastic brick.
     box(width, height, 0.024, 0, 0, depth - 0.012);
-    const pcb = kitPaint(kit, '#226440');
-    box(0.0016, height * 0.88, depth - 0.024, 0, 0, (depth - 0.024) / 2, pcb);
+    const pcb = new Mesh(
+      new BoxGeometry(0.0016, height * 0.88, depth - 0.024),
+      pcbMaterials(kit, kind as PcbTexture, 'x'),
+    );
+    pcb.name = 'Textured green daughterboard';
+    pcb.position.set(0, 0, (depth - 0.024) / 2);
+    body.add(pcb);
     const gold = kitPaint(kit, '#bda85c', 0.6);
-    for (let i = 0; i < 18; i++)
-      box(0.002, 0.003, 0.012, 0.001, -height * 0.36 + i * 0.01, 0.007, gold);
+    for (const side of [-1, 1])
+      for (let i = 0; i < 32; i++) {
+        const finger = box(
+          0.0002,
+          0.0022,
+          0.012,
+          side * 0.0009,
+          (i - 15.5) * 0.00508,
+          0.007,
+          gold,
+        );
+        finger.name = 'Gold card edge contact';
+      }
     for (const y of [-0.06, 0, 0.06])
       for (const z of [0.045, 0.105]) {
         box(0.004, 0.024, 0.016, 0.003, y, z, dark);
@@ -128,20 +146,24 @@ export function createMachineDeviceView(
         ? `${cardDesignation(kind)!.face}\n${BETAFORM_BOARD.family}`
         : label,
       {
-        height: kind.startsWith('plc-') ? 0.0025 : 0.005,
+        height:
+          kind === 'relay' ? 0.0012 : kind.startsWith('plc-') ? 0.0016 : 0.0025,
+        maxWidth: width * 0.8,
         ink: '#e8e5d9',
       },
     );
     mark.position.set(0, height * 0.25, face);
     if (kind.startsWith('plc-')) {
       const maker = createMicroLabel(kit, BETAFORM_BOARD.maker, {
-        height: 0.002,
+        height: 0.0013,
+        maxWidth: width * 0.8,
         ink: '#e1d8ba',
       });
       maker.position.set(0, height * 0.37, face);
       body.add(maker);
       const role = createMicroLabel(kit, kind.slice(4).toUpperCase(), {
-        height: 0.002,
+        height: 0.0013,
+        maxWidth: width * 0.8,
         ink: '#b7bfba',
       });
       role.position.set(0, height * 0.2, face);
@@ -149,7 +171,7 @@ export function createMachineDeviceView(
       const boardMark = createMicroLabel(
         kit,
         `${BETAFORM_BOARD.maker}\n${cardDesignation(kind)!.face}\n${BETAFORM_BOARD.family}`,
-        { height: 0.005, ink: '#e4e8ca' },
+        { height: 0.002, maxWidth: depth * 0.7, ink: '#e4e8ca' },
       );
       boardMark.rotation.y = Math.PI / 2;
       boardMark.position.set(0.0055, height * 0.33, depth * 0.45);

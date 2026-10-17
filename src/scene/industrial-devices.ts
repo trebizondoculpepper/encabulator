@@ -1,18 +1,9 @@
-import {
-  BoxGeometry,
-  CanvasTexture,
-  Color,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  SphereGeometry,
-  SRGBColorSpace,
-} from 'three';
+import { pcbMaterials } from './pcb-textures';
+import { createElectrolyticCapacitorView } from './electrolytic-capacitor';
+import { BoxGeometry, Color, CylinderGeometry, Group, Mesh } from 'three';
 import type { BufferGeometry, Material, Object3D } from 'three';
-import { createPs1Material } from '../rendering/ps1-material';
 import { createMicroLabel, kitGlow, kitPaint } from './eighties-controls';
 import type { PanelKit } from './eighties-controls';
-import { createSmokeEmitter } from './smoke-emitter';
 import { createNameplate } from './industrial-controls';
 
 /**
@@ -306,7 +297,8 @@ export function createContactorView(kit: PanelKit): ContactorView {
       );
     }
   const label = createMicroLabel(kit, 'COIL 120V 60Hz', {
-    height: 0.0022,
+    height: 0.0015,
+    maxWidth: 0.032,
     ink: '#e9e5da',
   });
   label.position.set(0, 0.02, 0.0831);
@@ -454,6 +446,9 @@ export interface FuseHolderView {
   group: Group;
   /** The cartridge, which a hand pulls to replace. */
   cartridge: Object3D;
+  removable: Group;
+  detachCartridge(): void;
+  restoreCartridge(): void;
   set(blown: boolean): void;
   update(delta: number): void;
 }
@@ -488,9 +483,18 @@ export function createFuseHolderView(
   const window = kitGlow(kit, '#c9cdd0');
   box(cartridge, 0.006, 0.003, 0.002, window, 0.015, 0, 0.0055);
   let pulled = 0;
+  let installed = true;
   return {
     group,
     cartridge: barrel,
+    removable: cartridge,
+    detachCartridge() {
+      installed = false;
+    },
+    restoreCartridge() {
+      installed = true;
+      pulled = 0;
+    },
     set(blown) {
       (window as unknown as { color: Color }).color.set(
         blown ? '#0a0a0a' : '#c9cdd0',
@@ -498,6 +502,7 @@ export function createFuseHolderView(
       if (!blown) pulled = 0.4;
     },
     update(delta) {
+      if (!installed) return;
       pulled = Math.max(0, pulled - delta);
       cartridge.position.z = ease(
         cartridge.position.z,
@@ -517,47 +522,11 @@ export interface CapacitorBoardView {
     index: number,
     health: 'good' | 'bulging' | 'vented',
     smoke: number,
+    age?: number,
+    embers?: number,
   ): void;
   update(seconds: number, delta: number, reducedMotion: boolean): void;
   dispose(): void;
-}
-
-/** A drive's power board's copper, drawn once. */
-function boardTexture(kit: PanelKit) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 192;
-  const c = canvas.getContext('2d')!;
-  c.fillStyle = '#1f5a32';
-  c.fillRect(0, 0, 256, 192);
-  c.strokeStyle = '#c9a65a';
-  c.globalAlpha = 0.55;
-  let a = 7;
-  const random = () => (a = (a * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 40; i++) {
-    c.lineWidth = random() > 0.8 ? 6 : 2;
-    c.beginPath();
-    let x = random() * 256;
-    let y = random() * 192;
-    c.moveTo(x, y);
-    for (let s = 0; s < 3; s++) {
-      if (random() > 0.5) x = random() * 256;
-      else y = random() * 192;
-      c.lineTo(x, y);
-    }
-    c.stroke();
-  }
-  c.globalAlpha = 1;
-  c.fillStyle = '#f2f0e4';
-  c.font = 'bold 10px monospace';
-  c.fillText('PEPPERDYNE POWER BD  REV C', 8, 184);
-  c.fillText('C1', 52, 30);
-  c.fillText('C2', 140, 30);
-  c.fillText('!  DC BUS', 200, 16);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  kit.textures.push(texture);
-  return texture;
 }
 
 /**
@@ -568,9 +537,13 @@ function boardTexture(kit: PanelKit) {
  */
 export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
   const group = new Group();
-  const pcb = createPs1Material({ map: boardTexture(kit) });
-  kit.materials.push(pcb);
-  box(group, 0.2, 0.004, 0.15, pcb, 0, 0.002, 0);
+  const pcb = new Mesh(
+    new BoxGeometry(0.2, 0.004, 0.15),
+    pcbMaterials(kit, 'power', 'y'),
+  );
+  pcb.name = 'Textured green power board';
+  pcb.position.y = 0.002;
+  group.add(pcb);
   // Stand-offs.
   for (const x of [-0.092, 0.092])
     for (const z of [-0.067, 0.067])
@@ -611,108 +584,36 @@ export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
       0.045,
     );
   box(group, 0.06, 0.016, 0.014, kitPaint(kit, '#3b6b46'), -0.02, 0.012, 0.062);
-  const sleeve = ['#264f9c', '#264f9c'];
-  const cans = sleeve.map((colour, i) => {
-    const can = new Group();
-    can.position.set(-0.05 + i * 0.07, 0.004, -0.02);
-    group.add(can);
-    const r = 0.0175;
-    const height = 0.05;
-    const body = rod(
-      can,
-      r,
-      height,
-      kitPaint(kit, colour),
-      'y',
-      0,
-      height / 2,
-      0,
-      20,
-    );
-    body.name = `Capacitor C${i + 1}`;
-    const stripe = createMicroLabel(kit, `C${i + 1}\n680µF\n400V`, {
-      height: 0.0035,
-      ink: '#eef0f4',
-    });
-    stripe.position.set(0, height * 0.55, r + 0.0005);
-    can.add(stripe);
-    const top = add(
-      can,
-      new SphereGeometry(r * 0.98, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-      kitPaint(kit, '#c9cbcd', 0.7),
-      0,
-      height,
-      0,
-    );
-    top.scale.y = 0.08;
-    // The score: a cross pressed into the top, which splits when it vents.
-    const scoreA = box(
-      can,
-      r * 1.6,
-      0.0012,
-      0.0016,
-      kitPaint(kit, '#6e7072'),
-      0,
-      height + 0.0018,
-      0,
-    );
-    const scoreB = scoreA.clone();
-    scoreB.rotation.y = Math.PI / 2;
-    can.add(scoreB);
-    const smoke = createSmokeEmitter(12, '120, 116, 108');
-    smoke.group.scale.setScalar(0.2);
-    smoke.group.position.y = height + 0.004;
-    can.add(smoke.group);
+  const cans = [0, 1].map((i) => {
+    const view = createElectrolyticCapacitorView(kit, 0.05);
+    view.group.position.set(-0.05 + i * 0.07, 0.004, -0.02);
+    group.add(view.group);
     return {
-      can,
-      body,
-      top,
-      scores: [scoreA, scoreB],
-      smoke,
-      health: 'good' as string,
-      smokeLevel: 0,
-      swell: 0.08,
+      view,
+      health: 'good' as 'good' | 'bulging' | 'vented',
+      smoke: 0,
+      age: Infinity,
+      embers: 0,
     };
   });
-  const scorch = new Color('#2c241c');
   return {
     group,
-    cans: cans.map((c) => c.body),
-    set(index, health, smoke) {
-      const can = cans[index];
-      can.health = health;
-      can.smokeLevel = smoke;
-      const material = can.body.material as unknown as { color: Color };
-      material.color.set(health === 'vented' ? scorch.getStyle() : '#264f9c');
-      for (const score of can.scores) {
-        score.scale.set(
-          1,
-          health === 'vented' ? 3 : 1,
-          health === 'vented' ? 4 : 1,
-        );
-        (score.material as unknown as { color: Color }).color.set(
-          health === 'vented' ? '#141210' : '#6e7072',
-        );
-      }
+    cans: cans.map((can) => can.view.group),
+    set(index, health, smoke, age = Infinity, embers = 0) {
+      Object.assign(cans[index], { health, smoke, age, embers });
     },
-    update(seconds, delta, reducedMotion) {
-      for (const can of cans) {
-        const target =
-          can.health === 'good' ? 0.08 : can.health === 'bulging' ? 0.35 : 0.5;
-        can.swell = ease(can.swell, target, delta, 2);
-        can.top.scale.y = can.swell;
-        can.smoke.update(seconds, can.smokeLevel, reducedMotion);
-      }
+    update(_seconds, _delta, reducedMotion) {
+      for (const can of cans)
+        can.view.set(can.health, can.smoke, can.age, can.embers, reducedMotion);
     },
     dispose() {
-      for (const can of cans) can.smoke.dispose();
+      for (const can of cans) can.view.dispose();
     },
   };
 }
 
 export interface MotorView {
   group: Group;
-  /** Turn the shaft at this many revolutions per minute. */
   set(rpm: number): void;
   update(delta: number): void;
 }

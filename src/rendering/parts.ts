@@ -1,3 +1,5 @@
+import { createElectrolyticCapacitorView } from '../scene/electrolytic-capacitor';
+import type { Attachment } from '../game/drop-profile';
 import { computed, effect, signal } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
@@ -974,7 +976,12 @@ export function overloadRelay(
 export function fuse(
   kit: PanelKit,
   props: Common & { current: Readable<number>; rating: number },
-): Part & { component: ReturnType<typeof createFuse> } {
+): Part & {
+  component: ReturnType<typeof createFuse>;
+  cartridge: Group;
+  detachCartridge(): void;
+  restoreCartridge(): void;
+} {
   const a = beginPart(kit, props.name ?? 'fuse');
   const view = createFuseHolderView(kit);
   a.object.add(view.group);
@@ -987,7 +994,41 @@ export function fuse(
     view.update(delta);
   });
   a.disposers.push(part.dispose);
-  return { ...a.part(), component: part };
+  return {
+    ...a.part(),
+    component: part,
+    cartridge: view.removable,
+    detachCartridge: view.detachCartridge,
+    restoreCartridge: view.restoreCartridge,
+  };
+}
+
+/** A single capacitor is the same electrical component, mounted or loose. */
+export function electrolyticCapacitor(
+  kit: PanelKit,
+  props: Common & {
+    voltage: Readable<number>;
+    rated: number;
+    attachment?: Attachment;
+  },
+) {
+  const a = beginPart(kit, props.name ?? 'electrolytic capacitor');
+  const view = createElectrolyticCapacitorView(kit);
+  a.object.add(view.group);
+  const component = createCapacitor(props);
+  a.voice(component, { vent: VENT, bulge: BULGE, press: REPLACE });
+  a.uses.set(view.group, () => component.replace());
+  a.updates.push((dt) => {
+    component.step(dt);
+    view.set(
+      component.health.value,
+      component.smoke.value,
+      component.failureAge.value,
+      component.embers.value,
+    );
+  });
+  a.disposers.push(component.dispose, view.dispose);
+  return { ...a.part(), component };
 }
 
 /**
@@ -1018,7 +1059,13 @@ export function capacitorBoard(
     seconds += delta;
     capacitors.forEach((can, i) => {
       can.step(delta);
-      view.set(i, can.health.value, can.smoke.value);
+      view.set(
+        i,
+        can.health.value,
+        can.smoke.value,
+        can.failureAge.value,
+        can.embers.value,
+      );
     });
     view.update(seconds, delta, props.reducedMotion?.() ?? false);
   });

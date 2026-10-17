@@ -5,6 +5,11 @@ export const MACHINE_REFERENCES: Record<
   MachineComponentKind,
   { model: string; source: string }
 > = {
+  capacitor: {
+    model: 'Chemi-Con KMQ, 680 µF / 400 V, 35 × 45 mm',
+    source:
+      'https://www.chemi-con.co.jp/en/products/detail-condenser.php?part_number=EKMQ401VSN681MA45S',
+  },
   backplane: {
     model: 'Custom PCB / Allen-Bradley 1771 card format',
     source:

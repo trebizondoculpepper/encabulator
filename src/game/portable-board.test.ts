@@ -71,3 +71,18 @@ it('reports diminishing collision speeds at increasingly short intervals', () =>
   board.drop();
   expect(board.impacts.value).toBe(0);
 });
+
+it('fixed and locked objects stay attached; releasing an exhibit enables pickup and drop', () => {
+  const fixed = createPortableBoard(undefined, undefined, 'fixed');
+  expect(fixed.pickUp()).toBe(false);
+  expect(fixed.phase.value).toBe('installed');
+  const exhibit = createPortableBoard();
+  exhibit.setLocked(true);
+  expect(exhibit.canPickUp.value).toBe(false);
+  expect(exhibit.pickUp()).toBe(false);
+  exhibit.setLocked(false);
+  expect(exhibit.canPickUp.value).toBe(true);
+  exhibit.pickUp();
+  exhibit.drop();
+  expect(exhibit.phase.value).toBe('falling');
+});

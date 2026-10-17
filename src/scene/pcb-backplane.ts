@@ -1,15 +1,7 @@
-import {
-  BoxGeometry,
-  CanvasTexture,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  SRGBColorSpace,
-} from 'three';
-import { createPs1Material } from '../rendering/ps1-material';
+import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import { createMicroLabel, kitPaint } from './eighties-controls';
 import type { PanelKit } from './eighties-controls';
-import { circuitTraces } from './vendor/circuit-traces';
+import { pcbMaterials } from './pcb-textures';
 
 /** Passive FR4 backplane, front at z=0; mounted equipment remains separate working parts. */
 export function createPcbBackplane(
@@ -22,71 +14,17 @@ export function createPcbBackplane(
   const group = new Group();
   group.name = `${legend} PCB backplane`;
   group.userData.pcbBackplane = { width, height, seed };
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = Math.round((1024 * height) / width);
-  const c = canvas.getContext('2d')!;
-  const { width: w, height: h } = canvas;
-  c.fillStyle = '#145c3d';
-  c.fillRect(0, 0, w, h);
-  const pitch = 0.004;
-  const cols = Math.floor(width / pitch),
-    rows = Math.floor(height / pitch);
-  const sx = w / cols,
-    sy = h / rows;
-  const traces = circuitTraces(cols, rows, seed);
-  c.lineCap = 'round';
-  c.lineJoin = 'round';
-  // Copper is visible as a subdued ridge under the solder mask.
-  for (const [colour, thickness] of [
-    ['#0c422d', 0.38],
-    ['#39865a', 0.21],
-  ] as const) {
-    c.strokeStyle = colour;
-    c.lineWidth = sx * thickness;
-    c.beginPath();
-    for (const wire of traces) {
-      c.moveTo(wire[0] * sx, wire[1] * sy);
-      for (let i = 2; i < wire.length; i += 2)
-        c.lineTo(wire[i] * sx, wire[i + 1] * sy);
-    }
-    c.stroke();
-  }
-  // Plated through-holes and white assembly/silkscreen markings.
-  for (const wire of traces)
-    for (const i of [0, wire.length - 2]) {
-      c.beginPath();
-      c.arc(wire[i] * sx, wire[i + 1] * sy, sx * 0.3, 0, Math.PI * 2);
-      c.fillStyle = '#b9b287';
-      c.fill();
-      c.beginPath();
-      c.arc(wire[i] * sx, wire[i + 1] * sy, sx * 0.12, 0, Math.PI * 2);
-      c.fillStyle = '#092c20';
-      c.fill();
-    }
-  c.strokeStyle = '#c8dac7';
-  c.lineWidth = 1.5;
-  c.strokeRect(sx * 2, sy * 2, w - sx * 4, h - sy * 4);
-  c.fillStyle = '#dce4cb';
-  c.font = '18px monospace';
-  c.fillText(`${legend}  REV C`, sx * 4, sy * 5);
-  c.fillText('PEPPERDYNE   FR4 94V-0   COMPONENT SIDE', sx * 4, h - sy * 4);
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
-  kit.textures.push(texture);
-  const face = createPs1Material({ map: texture, roughness: 0.7 });
-  kit.materials.push(face);
-  const edge = kitPaint(kit, '#a49754');
-  const reverse = kitPaint(kit, '#145c3d');
-  const board = new Mesh(new BoxGeometry(width, height, 0.0024), [
-    edge,
-    edge,
-    edge,
-    edge,
-    face,
-    reverse,
-  ]);
+  const variant =
+    legend.includes('DRIVE') || seed === 650
+      ? 'drive'
+      : width / height > 1.1
+        ? 'backplane'
+        : 'cabinet';
+  const board = new Mesh(
+    new BoxGeometry(width, height, 0.0024),
+    pcbMaterials(kit, variant, 'z'),
+  );
+  board.name = 'Textured green PCB';
   board.position.z = -0.0012;
   group.add(board);
   const brass = kitPaint(kit, '#b2a471', 0.65);
@@ -134,5 +72,85 @@ export function createPcbBackplane(
     mark.position.set(x, height * 0.29, 0.001);
     group.add(mark);
   }
+  // Through-hole logic and support chips populate the motherboard's clear side.
+  const chipMaterial = kitPaint(kit, '#242629');
+  const chipPin = kitPaint(kit, '#b8bdba', 0.7);
+  for (let chip = 0; chip < 5; chip++) {
+    const wide = chip < 2;
+    const w = wide ? 0.025 : 0.016;
+    const h = wide ? 0.034 : 0.018;
+    const x = -width * (chip % 2 === 0 ? 0.32 : 0.22);
+    const y = height * 0.3 - Math.floor(chip / 2) * height * 0.21;
+    const packageBody = new Mesh(new BoxGeometry(w, h, 0.004), chipMaterial);
+    packageBody.name = `Motherboard logic chip U${chip + 1}`;
+    packageBody.position.set(x, y, 0.003);
+    group.add(packageBody);
+    for (const side of [-1, 1])
+      for (let pin = 0; pin < 8; pin++) {
+        const lead = new Mesh(new BoxGeometry(0.003, 0.001, 0.001), chipPin);
+        lead.position.set(
+          x + side * (w / 2 + 0.001),
+          y + ((pin - 3.5) * h) / 9,
+          0.0015,
+        );
+        group.add(lead);
+      }
+    const mark = createMicroLabel(kit, `U${chip + 1}\nPD-${271 + chip}`, {
+      height: 0.0012,
+      maxWidth: w * 0.8,
+      ink: '#9b9d95',
+    });
+    mark.position.set(x, y, 0.0051);
+    group.add(mark);
+  }
+  return group;
+}
+
+/** Fixed female edge connector. The two rails leave a real, dark open card slot. */
+export function createCardEdgeSlot(kit: PanelKit, index: number) {
+  const group = new Group();
+  group.name = `Fixed black card slot ${index + 1}`;
+  group.userData.attachment = 'fixed';
+  group.userData.cardSlot = index;
+  const plastic = kitPaint(kit, '#171a1c');
+  const inside = kitPaint(kit, '#050606');
+  const gold = kitPaint(kit, '#b9a35e', 0.65);
+  const piece = (
+    w: number,
+    h: number,
+    d: number,
+    x: number,
+    y: number,
+    z: number,
+    material = plastic,
+  ) => {
+    const mesh = new Mesh(new BoxGeometry(w, h, d), material);
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+    return mesh;
+  };
+  piece(0.011, 0.204, 0.003, 0, 0, 0.0015);
+  piece(0.003, 0.195, 0.0005, 0, 0, 0.0033, inside);
+  for (const side of [-1, 1]) {
+    piece(0.0035, 0.196, 0.017, side * 0.00325, 0, 0.0115);
+    piece(0.011, 0.004, 0.02, 0, side * 0.1, 0.01);
+    for (let pin = 0; pin < 32; pin++)
+      piece(
+        0.00035,
+        0.0022,
+        0.008,
+        side * 0.00125,
+        (pin - 15.5) * 0.00508,
+        0.0075,
+        gold,
+      );
+  }
+  const legend = createMicroLabel(kit, `SLOT ${index + 1}`, {
+    height: 0.0018,
+    maxWidth: 0.025,
+    ink: '#e4ead6',
+  });
+  legend.position.set(0, -0.116, 0.0002);
+  group.add(legend);
   return group;
 }

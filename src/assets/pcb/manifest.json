@@ -1,0 +1,82 @@
+[
+  {
+    "name": "backplane",
+    "width": 1024,
+    "height": 896,
+    "cols": 120,
+    "rows": 105,
+    "seed": 1771
+  },
+  {
+    "name": "cabinet",
+    "width": 1024,
+    "height": 1024,
+    "cols": 90,
+    "rows": 90,
+    "seed": 613
+  },
+  {
+    "name": "drive",
+    "width": 768,
+    "height": 1024,
+    "cols": 75,
+    "rows": 112,
+    "seed": 650
+  },
+  {
+    "name": "power",
+    "width": 1024,
+    "height": 768,
+    "cols": 50,
+    "rows": 38,
+    "seed": 713
+  },
+  {
+    "name": "plc-power",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3100
+  },
+  {
+    "name": "plc-cpu",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3237
+  },
+  {
+    "name": "plc-input",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3374
+  },
+  {
+    "name": "plc-output",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3511
+  },
+  {
+    "name": "plc-analog",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3648
+  },
+  {
+    "name": "plc-comms",
+    "width": 512,
+    "height": 768,
+    "cols": 35,
+    "rows": 45,
+    "seed": 3785
+  }
+]

@@ -34,3 +34,7 @@ The fire alarm sounder (`src/audio/fire-alarm.ts`), copied from the VX3 Simulato
 ## Procedural circuit boards
 
 The cabinet backplane trace generator (`src/scene/vendor/circuit-traces.ts`) is adapted from [Circuit Board Painter](https://github.com/ArtBIT/circuitboard-painter) by ArtBIT, copyright 2025, under the MIT licence. The full notice is retained in `src/scene/vendor/circuitboard-painter.LICENSE`. Adaptations remove the editor and flow-field dependency, use a local seeded RNG, reserve board-edge clearance and draw static solder-mask, via and silkscreen textures for Three.js. Backplane geometry and assembly markings are original project work.
+
+The pre-rendered green PCB textures in `src/assets/pcb/` are generated from that same MIT-licensed trace algorithm by `scripts/bake-pcb-textures.ts`, using [@napi-rs/canvas](https://github.com/Brooooooklyn/canvas) (MIT) as a development-time renderer. The seeds and dimensions are retained in the texture manifest; no reference photographs are included in the game.
+
+The Encabulator drive-train hum (`src/audio/machine-hum.ts`) is original project synthesis, written with OpenAI Codex: three speed-controlled sine partials, with no third-party recording or sample; distributed under the project's licence. [Source](src/audio/machine-hum.ts).

@@ -191,7 +191,7 @@ describe('an electrolytic capacitor', () => {
   it('bulges and then vents, smoking, held well over its rating', () => {
     const c = createCapacitor({ voltage: signal(480), rated: 400 });
     const events = heard(c);
-    run(c.step, 20);
+    run(c.step, 16);
     expect(c.health.value).toBe('vented');
     expect(c.working.value).toBe(false);
     expect(c.smoke.value).toBeGreaterThan(0.5);
@@ -214,3 +214,43 @@ describe('an hour meter', () => {
     expect(m.hours.value).toBeCloseTo(100.1, 2);
   });
 });
+
+it.each([0, 0.4, 0.999])(
+  'a capacitor fails once with a flash, 3–5 embers and exactly three seconds of smoke (random=%s)',
+  (random) => {
+    const capacitor = createCapacitor({
+      voltage: signal(325),
+      rated: 400,
+      random: () => random,
+    });
+    const events = heard(capacitor);
+    expect(capacitor.attachment).toBe('fixed');
+    expect(capacitor.flash.value).toBe(false);
+    expect(capacitor.fail()).toBe(true);
+    expect(capacitor.health.value).toBe('vented');
+    expect(capacitor.flash.value).toBe(true);
+    expect(capacitor.embers.value).toBe(3 + Math.floor(random * 3));
+    expect(capacitor.fail()).toBe(false);
+    expect(events).toEqual(['vent']);
+    capacitor.step(0.1);
+    expect(capacitor.flash.value).toBe(false);
+    capacitor.step(0.75);
+    expect(capacitor.embers.value).toBe(0);
+    capacitor.step(2.05);
+    expect(capacitor.smoke.value).toBeGreaterThan(0);
+    capacitor.step(0.11);
+    expect(capacitor.smoke.value).toBe(0);
+    expect(capacitor.working.value).toBe(false);
+    capacitor.replace();
+    expect(capacitor.health.value).toBe('good');
+    expect(capacitor.flash.value).toBe(false);
+    expect(capacitor.embers.value).toBe(0);
+    expect(
+      createCapacitor({
+        voltage: signal(0),
+        rated: 400,
+        attachment: 'detachable',
+      }).attachment,
+    ).toBe('detachable');
+  },
+);

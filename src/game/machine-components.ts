@@ -30,6 +30,7 @@ export const MACHINE_COMPONENTS = [
   ['motor-unit', 'MOTOR CONTROL UNIT'],
   ['motor', 'INDUCTION MOTOR'],
   ['backplane', 'PCB BACKPLANE REV C'],
+  ['capacitor', 'ELECTROLYTIC CAPACITOR'],
 ] as const;
 export type MachineComponentKind = (typeof MACHINE_COMPONENTS)[number][0];
 export type ServiceKind = Extract<

@@ -1,3 +1,7 @@
+import { createScreenBoot } from '../game/screen-boot';
+import { drawBootScreen } from './boot-screen';
+import { machineHum } from '../audio/machine-hum';
+import { createMachinePower } from '../game/machine-power';
 import { createPcbBackplane } from './pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
@@ -9,6 +13,7 @@ import { machineComponent } from '../rendering/machine-components';
 import type { MachineDevice } from '../rendering/machine-components';
 import { createAnnunciator } from '../game/annunciator';
 import {
+  beginPart,
   createPartSet,
   disconnectHandle,
   doorLatch,
@@ -291,7 +296,15 @@ const MESSAGES: readonly (readonly string[])[] = [
  * the plinth is kicked and scuffed by years of boots. Front faces +z;
  * dimensions are metres.
  */
-export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
+export interface MccOptions {
+  /** Bucket IDs such as section5.bucket1; windowed PLC buckets default to always. */
+  interiorVisibility?: Partial<Record<string, 'always' | 'when-open'>>;
+}
+
+export function createRetroEncabulatorMcc(
+  kit: PanelKit,
+  options: MccOptions = {},
+): MccView {
   const group = new Group();
   group.name = 'Allen-Bradley CENTERLINE-style Retro Encabulator MCC';
   // Everything above the plinth stands in its own group.
@@ -301,11 +314,23 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
   const parts = createPartSet();
   const components: MachineDevice[] = [];
   const world = createGraph();
+  const mainBreaker = createCircuitBreaker(world, 'section1.bucket2.breaker');
+  mainBreaker.position.set('off');
+  const startup = createMachinePower(mainBreaker.closed);
+  const drive = beginPart(kit, 'Encabulator drive train');
+  drive.object.position.set(0, 0.7, -0.25);
+  drive.holdWhile(
+    computed(() => startup.speed.value > 0),
+    machineHum(startup.speed),
+  );
+  parts.add(drive.part());
+  group.add(drive.object);
   const hinges: {
     group: Group;
     open: () => boolean;
     force(open: boolean): void;
     interior: Group;
+    alwaysRender: boolean;
   }[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
   let seed = 0;
@@ -454,8 +479,15 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
       message.group.scale.setScalar(0.95);
       message.group.position.set(-0.02, MCC_HEIGHT - WIREWAY / 2, 0.006);
       bay.add(message.group);
+      const boot = createScreenBoot(mainBreaker.closed, 'DATALINE');
+      updates.push((delta) => boot.step(delta));
       updates.push((_, clock) =>
-        message.show(MESSAGES[Math.floor(clock / 4) % MESSAGES.length], true),
+        message.show(
+          boot.booting
+            ? boot.lines(2, 20)
+            : MESSAGES[Math.floor(clock / 4) % MESSAGES.length],
+          startup.lit.value,
+        ),
       );
     }
     if (bayIndex === 4) {
@@ -464,7 +496,11 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
       bay.add(stack.group);
       updates.push((_, clock) => {
         const warn = Math.sin(clock * 0.21) > 0.6;
-        stack.set([false, warn && Math.floor(clock * 2) % 2 === 0, !warn]);
+        stack.set([
+          false,
+          startup.lit.value && warn && Math.floor(clock * 2) % 2 === 0,
+          startup.lit.value && !warn,
+        ]);
       });
     }
     let top = MCC_HEIGHT - WIREWAY;
@@ -475,7 +511,14 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
       // Cull the entire bucket contents, including its parts, while shut.
       const interior = new Group();
       interior.name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} contents`;
-      interior.visible = false;
+      const bucketId = `section${bayIndex + 1}.bucket${bucketIndex + 1}`;
+      const alwaysRender =
+        (options.interiorVisibility?.[bucketId] ??
+          (spec.face === 'plc' ? 'always' : 'when-open')) === 'always';
+      interior.userData.interiorVisibility = alwaysRender
+        ? 'always'
+        : 'when-open';
+      interior.visible = alwaysRender;
       // Raycaster does not honour visible=false itself. Stop traversal of
       // hidden interiors so closed buckets cannot expose clickable parts.
       interior.raycast = () => (interior.visible ? undefined : false);
@@ -509,7 +552,9 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
         parts,
         components,
         world,
-        `section${bayIndex + 1}.bucket${bucketIndex + 1}`,
+        bucketId,
+        mainBreaker,
+        startup.lit,
       );
       const hinge = new Group();
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
@@ -555,7 +600,7 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
         width: Math.min(0.205, faceW * 0.57),
         height: h < 0.35 ? 0.035 : 0.046,
       });
-      plate.position.set(faceW * 0.43, h / 2 - 0.052, DOOR_FRONT);
+      plate.position.set(faceW * 0.43, h / 2 - 0.052, DOOR_FRONT + 0.001);
       hinge.add(plate);
       dressDoor(
         kit,
@@ -568,6 +613,7 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
         parts,
         doorPaint,
         circuit,
+        startup.lit,
       );
       // Quarter-turn wing latches on the flange, by the free edge: the
       // only part of the door that opens it. Both work the one door.
@@ -612,6 +658,7 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
       hinges.push({
         group: hinge,
         interior,
+        alwaysRender,
         open: () => door.state.value,
         force: (open) => door.set(open),
       });
@@ -626,6 +673,8 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
     }
   });
   let clock = 0;
+  for (const update of updates) update(0, 0);
+  parts.update(0);
   return {
     group,
     parts,
@@ -633,6 +682,7 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
     world,
     update(delta) {
       clock += delta;
+      startup.step(delta);
       for (const update of updates) update(delta, clock);
       parts.update(delta);
       for (const hinge of hinges) {
@@ -642,7 +692,9 @@ export function createRetroEncabulatorMcc(kit: PanelKit): MccView {
         if (Math.abs(hinge.group.rotation.y - target) < 0.001)
           hinge.group.rotation.y = target;
         hinge.interior.visible =
-          hinge.open() || Math.abs(hinge.group.rotation.y) > 0.001;
+          hinge.alwaysRender ||
+          hinge.open() ||
+          Math.abs(hinge.group.rotation.y) > 0.001;
       }
     },
     openAll(open) {
@@ -674,8 +726,19 @@ function dressDoor(
   parts: PartSet,
   doorPaint: Material,
   circuit: BucketCircuit,
+  startup: Readable<boolean>,
 ) {
   // The raised panel's middle, where the fittings are centred.
+  const lit = computed(() => circuit.powered.value && startup.value);
+  const screenBoot = (name: string) => {
+    const boot = createScreenBoot(circuit.powered, name);
+    updates.push((delta) => boot.step(delta));
+    return boot;
+  };
+  let operatingHours = 0;
+  updates.push((delta) => {
+    if (circuit.powered.value) operatingHours += delta / 3600;
+  });
   const cx = (PANEL_INSET + width - LATCH_SIDE) / 2;
   let now = 0;
   updates.push((_, clock) => (now = clock));
@@ -745,12 +808,12 @@ function dressDoor(
     colour: OperatorColour,
     x: number,
     y: number,
-    lit: (t: number) => boolean,
+    illumination: (t: number) => boolean,
     scale = 0.9,
   ) => {
     const drive = signal(false);
-    updates.push((_, clock) => (drive.value = lit(clock)));
-    return place(pilotLight(kit, { colour, drive }), x, y, scale);
+    updates.push((_, clock) => (drive.value = illumination(clock)));
+    return place(pilotLight(kit, { colour, drive, power: lit }), x, y, scale);
   };
   const button = (
     colour: OperatorColour,
@@ -780,7 +843,12 @@ function dressDoor(
   const crt = (mode: CrtMode, w: number, y: number, title?: string) => {
     const view = createCrtMonitor(kit, { width: w, mode, seed, title });
     put(view.group, cx - 0.005, y);
-    updates.push((delta) => view.update(delta));
+    const boot = screenBoot(title ?? mode);
+    updates.push((delta) => {
+      view.setOn(lit.value);
+      view.setBoot(boot.booting ? boot.lines() : null);
+      view.update(delta);
+    });
   };
   const running = (_clock: number) => circuit.running.value;
   const top = height / 2 - 0.09;
@@ -803,6 +871,7 @@ function dressDoor(
           479 + Math.sin(clock) * 1.5,
           amps,
           (amps * 479 * 1.73 * 0.86) / 1000,
+          lit.value,
         );
       });
       const danger = createMicroLabel(kit, 'DANGER\n480 VOLTS', {
@@ -811,6 +880,7 @@ function dressDoor(
         plate: '#c42a1e',
       });
       put(danger, cx - 0.1, top - 0.24);
+      danger.position.z += 0.001;
       place(keySwitch(kit, { initial: true }), cx - 0.1, top - 0.36, 1.2);
       caption('KIRK KEY INTERLOCK', cx - 0.1, top - 0.41);
       louvres(0.3, 0.1, cx - 0.04, -height / 2 + 0.09);
@@ -852,7 +922,7 @@ function dressDoor(
           alarms.acknowledge();
         }
         alarms.test = clock < testUntil;
-        panel.set(alarms.lit(clock));
+        panel.set(alarms.lit(clock).map((on) => lit.value && on));
       });
       button(
         'black',
@@ -868,7 +938,7 @@ function dressDoor(
       button('blue', 'RESET', cx + 0.08, top - 0.3);
       const hours = createHourMeterView(kit);
       put(hours.group, cx - 0.02, top - 0.45);
-      updates.push((_, clock) => hours.show(61842.7 + clock / 3600));
+      updates.push(() => hours.show(61842.7 + operatingHours));
       louvres(0.3, 0.08, cx - 0.02, -height / 2 + 0.08);
       break;
     }
@@ -885,7 +955,7 @@ function dressDoor(
       handle('black', 0.9, undefined, 0.04);
       const hours = createHourMeterView(kit);
       put(hours.group, cx - 0.06, -0.22);
-      updates.push((_, clock) => hours.show(23117.4 + clock / 3600));
+      updates.push(() => hours.show(23117.4 + operatingHours));
       break;
     }
     case 'smc': {
@@ -903,7 +973,7 @@ function dressDoor(
         const on = circuit.running.value;
         const ramp = Math.min(1, t / 3);
         starter.set({
-          running: on,
+          running: on && lit.value,
           ramp: on ? ramp : 0,
           fault: false,
           amps: ramp < 1 ? 6 + 30 * ramp : 11.6 + Math.sin(clock * 1.7) * 0.4,
@@ -967,13 +1037,16 @@ function dressDoor(
         cell: 0.0042,
       });
       put(lcd.group, cx - 0.06, -0.03);
+      const boot = screenBoot('AUX DRIVE');
       updates.push((_, clock) =>
         lcd.show(
-          [
-            'M-204  AUX DRIVE',
-            `${(38 + wander(clock, seed) * 22).toFixed(1)} HZ  RUN`,
-          ],
-          true,
+          boot.booting
+            ? boot.lines(2, 16)
+            : [
+                'M-204  AUX DRIVE',
+                `${(38 + wander(clock, seed) * 22).toFixed(1)} HZ  RUN`,
+              ],
+          lit.value,
         ),
       );
       handle('black', 0.55, width - LATCH_SIDE - 0.03, -0.02);
@@ -995,6 +1068,7 @@ function dressDoor(
       const chart = createChartRecorder(kit);
       put(chart.group, cx - 0.07, -0.04);
       updates.push((delta, clock) => {
+        if (!circuit.powered.value) return;
         chart.set([
           wander(clock, seed),
           wander(clock, seed + 3),
@@ -1013,7 +1087,9 @@ function dressDoor(
         });
         put(gauge.group, cx + 0.105, y);
         updates.push((delta, clock) => {
-          gauge.set(0.3 + wander(clock, seed + k * 5) * 0.4);
+          gauge.set(
+            circuit.powered.value ? 0.3 + wander(clock, seed + k * 5) * 0.4 : 0,
+          );
           gauge.update(delta);
         });
       }
@@ -1024,13 +1100,13 @@ function dressDoor(
         const bar = createBarGraph(kit, 14, { pitch: 0.0075, width: 0.012 });
         put(bar.group, cx - 0.14 + k * 0.03, -0.04);
         updates.push((_, clock) =>
-          bar.set(wander(clock * 1.6, seed + k * 1.7)),
+          bar.set(lit.value ? wander(clock * 1.6, seed + k * 1.7) : 0),
         );
       }
       const digits = createSevenSegment(kit, 4, { digitHeight: 0.02 });
       put(digits.group, cx + 0.06, 0.06);
       updates.push((_, clock) =>
-        digits.show((wander(clock, seed) * 999).toFixed(0)),
+        digits.show(lit.value ? (wander(clock, seed) * 999).toFixed(0) : ''),
       );
       caption('SEMIBOLOID COUNT', cx + 0.06, 0.03);
       const matrix = createLedMatrix(kit, {
@@ -1042,6 +1118,7 @@ function dressDoor(
       updates.push((_, clock) =>
         matrix.draw(
           (col, row) =>
+            lit.value &&
             Math.abs(row - 3 - 2.8 * Math.sin(col * 0.5 - clock * 3)) < 0.6,
         ),
       );
@@ -1049,7 +1126,16 @@ function dressDoor(
     }
     case 'plc': {
       const terminal = place(operatorTerminal(kit, {}), cx, height * 0.2).view;
+      const boot = screenBoot('PANELVIEW');
       updates.push((_, clock) => {
+        if (!lit.value) {
+          terminal.draw(null);
+          return;
+        }
+        if (boot.booting) {
+          terminal.draw((c, w, h) => drawBootScreen(c, w, h, boot.lines()));
+          return;
+        }
         terminal.draw((c, w) => {
           c.fillRect(0, 0, w, 18);
           c.fillStyle = '#26476e';
@@ -1088,18 +1174,22 @@ function dressDoor(
         },
       );
       put(warning, cx, 0.1);
+      warning.position.z += 0.001;
       break;
     }
     case 'drive': {
       crt('mimic', 0.34, height / 2 - 0.27, 'VFD-601 PROCESS');
       const keypad = place(driveKeypad(kit, {}), cx - 0.1, 0.02).view;
+      const boot = screenBoot('VFD-601 HIM');
       updates.push((_, clock) => {
         keypad.show(
-          [
-            'VFD-601  RUNNING',
-            `${(1150 + wander(clock, seed) * 40).toFixed(0)} RPM  FWD`,
-          ],
-          true,
+          boot.booting
+            ? boot.lines(2, 16)
+            : [
+                'VFD-601  RUNNING',
+                `${(1150 + wander(clock, seed) * 40).toFixed(0)} RPM  FWD`,
+              ],
+          lit.value,
         );
       });
       pot(cx + 0.07, 0.04);
@@ -1107,8 +1197,11 @@ function dressDoor(
       for (const [colour, dx, on] of [
         ['#3dff5a', 0.05, true],
         ['#ffb01a', 0.09, false],
-      ] as const)
-        put(createJewelLamp(kit, colour, { on }).group, cx + dx, -0.04);
+      ] as const) {
+        const lamp = createJewelLamp(kit, colour, { on: false });
+        put(lamp.group, cx + dx, -0.04);
+        updates.push(() => lamp.set(lit.value && on));
+      }
       louvres(0.36, 0.34, cx - 0.01, -height / 2 + 0.24);
       break;
     }
@@ -1129,6 +1222,7 @@ function dressDoor(
       updates.push((_, clock) =>
         matrix.draw(
           (col, row) =>
+            lit.value &&
             (col + Math.floor(clock * 8)) % 6 < 3 === (row % 2 === 0),
         ),
       );
@@ -1146,17 +1240,19 @@ function dressDoor(
       });
       put(gauge.group, cx - 0.08, 0.0);
       updates.push((delta, clock) => {
-        gauge.set(0.45 + wander(clock * 2, seed) * 0.2);
+        gauge.set(
+          circuit.powered.value ? 0.45 + wander(clock * 2, seed) * 0.2 : 0,
+        );
         gauge.update(delta);
       });
       const hours = createHourMeterView(kit);
       put(hours.group, cx + 0.06, 0.03);
-      updates.push((_, clock) => hours.show(8812.2 + clock / 3600));
+      updates.push(() => hours.show(8812.2 + operatingHours));
       selector(3, cx + 0.06, -0.1, 0.85, 1);
       legend('LOW OFF HIGH', cx + 0.06, -0.07, 0.065);
       // Wired to nothing yet: it toggles its own light all the same.
       place(
-        ledPushbutton(kit, { colour: 'blue', legend: 'BOOST' }),
+        ledPushbutton(kit, { colour: 'blue', legend: 'BOOST', power: lit }),
         cx - 0.08,
         -0.13,
         0.9,
@@ -1171,6 +1267,7 @@ function dressDoor(
           120 + Math.sin(clock * 0.7) * 0.6,
           2 + wander(clock, seed) * 3,
           0.4 + wander(clock, seed + 1) * 0.3,
+          lit.value,
         ),
       );
       station(
@@ -1216,6 +1313,8 @@ function populateInterior(
   installed: MachineDevice[],
   world: ReturnType<typeof createGraph>,
   prefix: string,
+  mainBreaker: ReturnType<typeof createCircuitBreaker>,
+  indicatorPower: Readable<boolean>,
 ): BucketCircuit {
   const request = world.input(`${prefix}.run`, true, {
     where: 'START / STOP station',
@@ -1233,7 +1332,11 @@ function populateInterior(
     props: Parameters<typeof machineComponent>[2] = {},
   ) => {
     const part = parts.add(
-      machineComponent(kit, kind, { name: `${prefix}: ${kind}`, ...props }),
+      machineComponent(kit, kind, {
+        name: `${prefix}: ${kind}`,
+        indicatorPower,
+        ...props,
+      }),
     );
     part.object.position.set(x + px, y + py, pz);
     bay.add(part.object);
@@ -1257,7 +1360,11 @@ function populateInterior(
     h * 0.13,
     -0.32,
     {
-      breaker: createCircuitBreaker(world, `${prefix}.breaker`),
+      breaker:
+        prefix === 'section1.bucket2'
+          ? mainBreaker
+          : createCircuitBreaker(world, `${prefix}.breaker`),
+      power: prefix === 'section1.bucket2' ? undefined : mainBreaker.closed,
     },
   );
   const controlFuse = put('fuse', -w * 0.25, h / 2 - 0.075, -0.27, {
@@ -1289,6 +1396,7 @@ function populateInterior(
     // Custom five-card expansion assembly: 1771-format modules retain
     // catalogue pitch and dimensions rather than stretching to fill the enclosure.
     const assembly = put('backplane', -0.04, 0.27, -0.35, {
+      attachment: 'fixed',
       power: controlFeed,
       running,
       input: load,

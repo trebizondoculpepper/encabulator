@@ -1,5 +1,10 @@
-import { makeBoardPortable } from './portable-board';
-import { createPcbBackplane } from '../scene/pcb-backplane';
+import {
+  MACHINE_DROP_PROFILES,
+  FUSE_CARTRIDGE_DROP,
+} from '../game/machine-drop-profiles';
+import type { Attachment, DropProfile } from '../game/drop-profile';
+import { makeBoardPortable, makeDevicePortable } from './portable-board';
+import { createCardEdgeSlot, createPcbBackplane } from '../scene/pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
 import {
   MACHINE_COMPONENTS,
@@ -25,6 +30,7 @@ import {
   beginPart,
   createPartSet,
   capacitorBoard,
+  electrolyticCapacitor,
   contactor,
   fuse,
   motor,
@@ -38,6 +44,8 @@ import { click } from '../audio/part-audio';
 
 export interface MachineDevice extends Part {
   kind: MachineComponentKind;
+  dropProfile: DropProfile;
+  attachment: Attachment;
   active: Readable<boolean>;
   faulted: Readable<boolean>;
   value: Readable<number>;
@@ -56,9 +64,13 @@ export function machineComponent(
   kind: MachineComponentKind,
   props: {
     name?: string;
+    /** Gallery exhibits can be removed as whole devices. */
+    attachment?: Attachment;
+    dropProfile?: DropProfile;
     rack?: Pick<RackUnitOptions, 'u' | 'style' | 'depth' | 'label'>;
     breaker?: ReturnType<typeof createCircuitBreaker>;
     power?: Readable<boolean>;
+    indicatorPower?: Readable<boolean>;
     running?: Readable<boolean>;
     current?: Readable<number>;
     voltage?: Readable<number>;
@@ -67,6 +79,12 @@ export function machineComponent(
 ): MachineDevice {
   const label = MACHINE_COMPONENTS.find(([key]) => key === kind)![1];
   const name = props.name ?? label;
+  const attachment =
+    props.attachment ??
+    (kind.startsWith('plc-') || ['capacitors'].includes(kind)
+      ? 'detachable'
+      : 'fixed');
+  const dropProfile = props.dropProfile ?? MACHINE_DROP_PROFILES[kind];
   const physicallyConnected = signal(true);
   const power = computed(
     () => physicallyConnected.value && (props.power?.value ?? true),
@@ -113,6 +131,12 @@ export function machineComponent(
           if (bus.connected.state.value) bus.connected.flip();
         },
         'face',
+        dropProfile,
+        () => {
+          physicallyConnected.value = true;
+          if (!bus.connected.state.value) bus.connected.flip();
+        },
+        attachment,
       );
       a.disposers.push(bus.dispose);
       let feed: Readable<boolean> = bus.running;
@@ -126,15 +150,19 @@ export function machineComponent(
         const slots = cardKind === 'plc-cpu' ? 2 : 1;
         const centre = (slot + slots / 2 - slotCount / 2) * 0.03175;
         slot += slots;
+        const socket = createCardEdgeSlot(kit, index);
+        socket.position.x = centre + 0.04;
+        board.add(socket);
         const card = children.add(
           machineComponent(kit, cardKind, {
             name: `${name}: card ${index + 1} ${cardDesignation(cardKind)!.name}`,
             power: feed,
+            indicatorPower: props.indicatorPower,
             running: cardKind === 'plc-output' ? processor : props.running,
             input: props.input,
           }),
         );
-        card.object.position.set(centre + 0.04, 0, 0.012);
+        card.object.position.set(centre + 0.04, 0, 0.004);
         a.object.add(card.object);
         if (cardKind === 'plc-power') feed = card.active;
         if (cardKind === 'plc-cpu') processor = card.active;
@@ -237,7 +265,28 @@ export function machineComponent(
     }
     case 'fuse': {
       const device = fuse(kit, { name, current, rating: 2 });
-      part = device;
+      if (attachment === 'detachable') {
+        const cartridge = beginPart(kit, `${name} cartridge`);
+        device.cartridge.parent!.add(cartridge.object);
+        cartridge.object.add(device.cartridge);
+        makeBoardPortable(
+          cartridge,
+          () => {
+            physicallyConnected.value = false;
+            device.detachCartridge();
+          },
+          'upright',
+          FUSE_CARTRIDGE_DROP,
+          () => {
+            physicallyConnected.value = true;
+            device.restoreCartridge();
+          },
+        );
+        const parts = createPartSet();
+        parts.add(device);
+        parts.add(cartridge.part());
+        part = { object: device.object, ...parts };
+      } else part = device;
       active = computed(() => power.value && device.component.whole.value);
       faulted = device.component.blown;
       test = () => {
@@ -249,6 +298,26 @@ export function machineComponent(
         device.component.replace();
       };
       testLabel = 'OVERLOAD';
+      break;
+    }
+    case 'capacitor': {
+      const device = electrolyticCapacitor(kit, {
+        name,
+        voltage: computed(() =>
+          power.value ? (props.voltage?.value ?? 325) : 0,
+        ),
+        rated: 400,
+        attachment,
+      });
+      part = device;
+      active = computed(() => power.value && device.component.working.value);
+      faulted = computed(() => device.component.health.value === 'vented');
+      value = computed(() => (device.component.working.value ? 680 : 0));
+      test = device.component.fail;
+      repair = () => {
+        device.component.replace();
+      };
+      testLabel = 'FAIL';
       break;
     }
     case 'capacitors': {
@@ -266,6 +335,11 @@ export function machineComponent(
           physicallyConnected.value = false;
         },
         'face',
+        dropProfile,
+        () => {
+          physicallyConnected.value = true;
+        },
+        attachment,
       );
       children.add(a.part());
       part = { object: a.object, ...children };
@@ -348,9 +422,19 @@ export function machineComponent(
       });
       service = module;
       const portable = kind.startsWith('plc-')
-        ? makeBoardPortable(a, () => {
-            if (module.connected.state.value) module.connected.flip();
-          })
+        ? makeBoardPortable(
+            a,
+            () => {
+              if (module.connected.state.value) module.connected.flip();
+            },
+            'side',
+            dropProfile,
+            () => {
+              physicallyConnected.value = true;
+              if (!module.connected.state.value) module.connected.flip();
+            },
+            attachment,
+          )
         : null;
       a.uses.set(view.group, () => {
         if (!portable || portable.phase.value === 'installed')
@@ -359,8 +443,10 @@ export function machineComponent(
       a.updates.push((dt) => {
         module.tick(dt);
         view.set(
-          module.running.value,
-          module.failed.value,
+          module.running.value && (props.indicatorPower?.value ?? true),
+          module.failed.value &&
+            power.value &&
+            (props.indicatorPower?.value ?? true),
           module.connected.state.value,
           module.channels.value,
           dt,
@@ -386,6 +472,22 @@ export function machineComponent(
       break;
     }
   }
+  if (attachment === 'detachable' && !part.object.userData.portable)
+    part = makeDevicePortable(
+      kit,
+      part,
+      dropProfile,
+      () => {
+        physicallyConnected.value = false;
+        if (service?.connected.state.value) service.connected.flip();
+      },
+      () => {
+        physicallyConnected.value = true;
+        if (service && !service.connected.state.value) service.connected.flip();
+      },
+    );
+  part.object.userData.dropProfile = dropProfile;
+  part.object.userData.attachment = attachment;
   if (kind.startsWith('plc-'))
     part.object.userData.boardDesignation = {
       ...BETAFORM_BOARD,
@@ -396,7 +498,9 @@ export function machineComponent(
   return {
     ...part,
     kind,
-    active,
+    dropProfile,
+    attachment,
+    active: computed(() => physicallyConnected.value && active.value),
     faulted,
     value,
     testLabel,
