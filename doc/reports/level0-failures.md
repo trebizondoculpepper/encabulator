@@ -1,0 +1,12 @@
+# Level 0 failures and strangeness: report
+
+Completion notes for `doc/plans/level0-failures.md`, for the owner and the next reviewing agent.
+
+## 2026-10-18, first failure: lube starvation
+
+- **Model** (`src/game/level0-plant.ts`): a lube oil reservoir (`lube.level`), a leak that drains it in a minute, and a low-pressure switch that can stick reporting healthy pressure, so the permits no longer protect the motors. Real pressure sags as the reservoir empties. The main drive motor (M-101) and the drive's motor wear their bearings while they run short of oil, faster the drier (a dry bearing wears out in 90 s, the drive's in proportion to its load). Worn from 30 %: `A10`/`A12` amber, a grinding note and more current; from 70 %: `A11`/`A13` hot, red; at 100 % it seizes: `S01`/`S02`, flashing red, the breakdown. `plant.strain` is the worst bearing wear, `plant.brokenDown` whether anything has seized, `lube.spilled` how much oil is out. RESET (`clearFaults`) refills the reservoir, frees the switch and replaces the worn bearings.
+- **Machine** (`src/rendering/level0-failures.ts`): the oil spill, a black glossy puddle spreading from the base of the lube pump's section as wide as the oil that has leaked, tucked under the plinth (the owner's fix); a dry tick and squeal from each worn motor (the `worn-fan` tone), growing with the wear; the seizure: a bang, sparks and smoke at the motor's unit, its overload and the main breaker tripping. A seized M-101 will not start.
+- **Strangeness** (`src/game/level0-strangeness.ts`, `src/rendering/level0-strangeness.ts`): with the strain, dev1's colour channels and π drift and warp (from 0.15), and dev2's ghosting (from 0.15), geometric patterns (from 0.35) and apparitions (from 0.5), strongest near the end; at the breakdown every one stops at once, and normality ensues. The shared material uniforms go back to normal when the room is left.
+- **Simulator**: a FAULTS row under the scenarios, with LUBE STARVATION (black cap, amber LED).
+- **Tests**: the model's leak, stuck switch, wear stages, seizure, strain and RESET; the strangeness thresholds and the stop at breakdown; end to end from the FAULTS switch to the seizure's trips and normality, and RESET mopping up. Browser: the spill from the cabinet's base.
+- **Not yet**: a player-facing repair (topping up, replacing the switch and the motor); the other failures.
