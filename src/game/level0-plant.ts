@@ -43,6 +43,16 @@ export const PLANT = {
   nominalVolts: 480,
   supplyOhms: 0.1,
   fluctuationVoltsPerAmp: 0.02,
+  /**
+   * The soft-started motors (FEED, AUXILIARY): their SMC Plus starters'
+   * ramps, seconds up and down, and each motor's current, amps: starting,
+   * climbing over the ramp, and once up to speed.
+   */
+  softStartSeconds: 4,
+  softStopSeconds: 2.5,
+  softStartAmps: 8,
+  softRampAmps: 18,
+  motorAmps: 24,
   /** Lube oil, psi: running pressure, and the drive's permissive. */
   oilPressure: 45,
   oilOk: 25,
@@ -252,6 +262,17 @@ export const WINDOWS: readonly ModuleWindow[] = MODULE_WINDOWS.map(
   ([id]) => id,
 );
 
+/**
+ * A soft-started motor's current: climbing from its starting current over
+ * the ramp, its running current once up to speed, none stopped.
+ */
+export const softStartedAmps = (running: boolean, speed: number) =>
+  !running
+    ? 0
+    : speed >= 1
+      ? PLANT.motorAmps
+      : PLANT.softStartAmps + PLANT.softRampAmps * speed;
+
 /** Approach `target` with time constant `tau`, the same at any frame rate. */
 const ease = (value: number, target: number, tau: number, dt: number) =>
   target + (value - target) * Math.exp(-dt / Math.max(1e-6, tau));
@@ -380,6 +401,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     heatsink: g.state('drive.heatsink', 25, { note: '°C' }),
     controlTemp: g.state('control.temperature', 24, { note: '°C' }),
     auxHz: g.state('aux.hz', 0),
+    /** The soft-started motors' speeds, a share of full: up to speed at 1. */
+    feedSpeed: g.state('feed.speed', 0),
+    auxMotorSpeed: g.state('aux.motorSpeed', 0),
     plcElapsed: g.state('plc.elapsed', 0),
     plcHalt: g.state<string | null>('plc.halt', null),
     plcScan: g.state('plc.scan', 0),
@@ -620,6 +644,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.auxHz,
       s.fan,
       controlAmps,
+      s.feedSpeed,
+      s.auxMotorSpeed,
     ],
     (
       mains,
@@ -637,6 +663,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       auxHz,
       fanP,
       control,
+      feedSpeed,
+      auxMotorSpeed,
     ) =>
       !mains
         ? 0
@@ -647,8 +675,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
           (auxDrive ? 1.5 + auxHz * 0.12 : 0) +
           (vent ? 2 : 0) +
           (mainMotor ? 21 : 0) +
-          (feed ? 8 : 0) +
-          (auxMotor ? 12 : 0) +
+          softStartedAmps(feed, feedSpeed) +
+          softStartedAmps(auxMotor, auxMotorSpeed) +
           (hydro ? 7 : 0) +
           (fan ? 2 + fanP * 1.4 : 0) +
           (hz / PLANT.driveMaxHz) * 38,
@@ -1085,6 +1113,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       control.dingleEnable,
       control.fanMode,
       plcOutputs,
+      s.feedSpeed,
+      s.auxMotorSpeed,
+      s.driveHz,
+      driveCommand,
+      control.driveSpeed,
+      s.jog,
+      s.auxHz,
+      control.auxSpeed,
       e.feedReady,
       e.hydraulicReady,
       oilOk,
@@ -1126,6 +1162,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       arm,
       fanMode,
       outputs,
+      feedSpeed,
+      auxMotorSpeed,
+      hz,
+      command,
+      setpoint,
+      jog,
+      auxHz,
+      auxSetpoint,
       feedReady,
       hydraulicReady,
       oil,
@@ -1154,7 +1198,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         'PAN MONITOR': panMonitor,
         PLC: status !== 'off',
         FIELD: field,
-        VFD: vfdOn && vfdReady,
+        // A drive stopped is off; running, it is on.
+        VFD: vfdOn && vfdReady && (command || jog > 0 || hz > 0.5),
         ISOLATOR: isolator,
         DINGLE: dingle && arm === 1,
         HYDRO: hydro,
@@ -1162,7 +1207,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         GRAMMETER: gram,
         SAFETY: incoming,
       };
+      // A motor on a motor controller is starting until it is up to speed.
+      const driveTarget = command ? (setpoint / 10) * PLANT.driveMaxHz : 0;
       const starting: Partial<Record<ModuleWindow, boolean>> = {
+        'M-102': feed && feedSpeed < 1,
+        'M-103': auxMotor && auxMotorSpeed < 1,
+        VFD: Math.abs(hz - driveTarget) > 0.5,
+        'AUX DRIVE': auxDrive && Math.abs(auxHz - auxSetpoint * 6) > 0.5,
         CONTROL: controlUnit && !controlBooted,
         PLC: status === 'booting',
         LUBE: lube && !oil,
@@ -1400,6 +1451,22 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       const load = s.driveHz.peek() / PLANT.driveMaxHz;
       const settle = 28 + load * (e.cooling.peek() ? 30 : 80);
       s.heatsink.set(ease(s.heatsink.peek(), settle, 40, dt));
+    },
+  );
+  g.process(
+    'soft starters',
+    [e.feed, e.auxMotor],
+    [s.feedSpeed, s.auxMotorSpeed],
+    (dt) => {
+      for (const [running, speed] of [
+        [e.feed, s.feedSpeed],
+        [e.auxMotor, s.auxMotorSpeed],
+      ] as const)
+        speed.set(
+          running.peek()
+            ? Math.min(1, speed.peek() + dt / PLANT.softStartSeconds)
+            : Math.max(0, speed.peek() - dt / PLANT.softStopSeconds),
+        );
     },
   );
   g.process(

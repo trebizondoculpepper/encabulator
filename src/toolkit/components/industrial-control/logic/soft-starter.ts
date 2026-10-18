@@ -25,6 +25,9 @@ export function createSoftStarter({
   flash = 0.8,
   /** Running current once up to speed, amps. */
   fullLoad = 11.6,
+  /** The current as a start begins, and how much it climbs over the ramp. */
+  startAmps = 6,
+  rampAmps = 30,
 } = {}) {
   let speed = 0;
   let clock = 0;
@@ -47,7 +50,7 @@ export function createSoftStarter({
         amps: up
           ? fullLoad + Math.sin(clock * 1.7) * 0.4
           : on && !fault
-            ? 6 + 30 * speed
+            ? startAmps + rampAmps * speed
             : fullLoad * speed,
       };
     },

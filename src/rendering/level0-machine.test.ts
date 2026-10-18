@@ -614,6 +614,9 @@ describe('Level 0 status annunciator', () => {
     powerUp();
     machine.plant.control.fanMode.set(2);
     machine.plant.control.dingleEnable.set(1);
+    // A stopped drive is off: start it, and lock the phase reference to it.
+    machine.plant.driveStart();
+    machine.plant.control.phaseTrim.set(PLANT.trimCentre + 2);
     breaker(UNITS.hydro).operate();
     run(20 + SCAN);
     const colour = (window: string) => seen(machine, window, run);
@@ -642,6 +645,39 @@ describe('Level 0 status annunciator', () => {
     expect(
       machine.plant.faults.value.find((f) => f.code === 'U32-F1')!.window,
     ).toBe('COOLING');
+    dispose();
+  });
+
+  it('shows a soft-started motor green only once it is up to speed, at about 24 A', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    machine.plant.control.feedHoa.set(1);
+    run(SCAN);
+    expect(seen(machine, 'M-102', run)).toEqual(new Set([RED]));
+    machine.plant.control.feedHoa.set(0);
+    // Ramping: on but starting, until the motor is up to speed.
+    const feedWindow = () =>
+      machine.plant.windowStates.value.find((w) => w.window === 'M-102')!;
+    let samples = 0;
+    while (machine.plant.state.feedSpeed.value < 1) {
+      run(0.1);
+      if (machine.plant.state.feedSpeed.value >= 1) break;
+      expect(feedWindow().on).toBe(true);
+      expect(feedWindow().starting).toBe(true);
+      samples++;
+    }
+    expect(samples).toBeGreaterThan(30);
+    run(1);
+    expect(feedWindow().starting).toBe(false);
+    run(SCAN);
+    expect(machine.plant.state.feedSpeed.value).toBe(1);
+    expect(seen(machine, 'M-102', run)).toEqual(new Set([GREEN]));
+    // Each soft-started motor draws 24 A up to speed.
+    const before = machine.plant.loadAmps.value;
+    machine.plant.control.feedHoa.set(1);
+    run(5);
+    // 24 A, and its contactor coil.
+    expect(before - machine.plant.loadAmps.value).toBeCloseTo(24, 0);
     dispose();
   });
 

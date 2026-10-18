@@ -1,6 +1,11 @@
 import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { CARD_KINDS, MODULE_WINDOWS, PLANT } from '../game/level0-plant';
+import {
+  CARD_KINDS,
+  MODULE_WINDOWS,
+  PLANT,
+  softStartedAmps,
+} from '../game/level0-plant';
 import type { Level0Plant } from '../game/level0-plant';
 import { STAGE_NAMES } from '../game/dimensionality';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
@@ -441,7 +446,11 @@ export function createLevel0Dresser(
         );
         caption('RESET: PULL OUT, TURN TO OFF', cx + 0.09, -0.18);
         let stopped = false;
-        const softStart = createSoftStarterLogic();
+        const softStart = createSoftStarterLogic({
+          fullLoad: PLANT.motorAmps,
+          startAmps: PLANT.softStartAmps,
+          rampAmps: PLANT.softRampAmps,
+        });
         every((delta) => {
           if (stop.pushed.value) stopped = true;
           else if (p.control.feedHoa.value === 1) stopped = false;
@@ -462,7 +471,11 @@ export function createLevel0Dresser(
         starter.group.name = `${bucket} soft starter display`;
         put(starter.group, cx - 0.045, top - 0.06, 0.95);
         caption('SOFT STARTER', cx - 0.045, top - 0.14);
-        const softStart = createSoftStarterLogic();
+        const softStart = createSoftStarterLogic({
+          fullLoad: PLANT.motorAmps,
+          startAmps: PLANT.softStartAmps,
+          rampAmps: PLANT.softRampAmps,
+        });
         every((delta) => {
           const on = circuit.running.value && lit.value;
           starter.set(softStart.step(delta, on, false));
@@ -486,8 +499,10 @@ export function createLevel0Dresser(
         put(meter.group, cx - 0.07, -0.13);
         caption('MOTOR CURRENT', cx - 0.07, -0.185);
         every((delta, clock) => {
-          meter.set(
-            circuit.running.value ? (12 + Math.sin(clock * 1.3) * 0.4) / 50 : 0,
+          // The motor's current, from its soft start up to its 24 A.
+          const amps = softStartedAmps(
+            circuit.running.value,
+            p.state.auxMotorSpeed.value,
           );
           meter.update(delta);
         });
@@ -502,6 +517,7 @@ export function createLevel0Dresser(
         handle('black', 0.85, undefined, 0.02);
         return true;
       }
+          meter.set(amps ? (amps + Math.sin(clock * 1.3) * 0.4) / 50 : 0);
       case 'small-lamps': {
         lamp(
           'red',

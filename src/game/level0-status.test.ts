@@ -49,7 +49,7 @@ describe('Level 0 status lights', () => {
 });
 
 describe('the slow status scanner', () => {
-  it('waits, flashing green, for each window\'s first scan', () => {
+  it("waits, flashing green, for each window's first scan", () => {
     const scanner = createStatusScanner(3, { secondsPerWindow: 1 });
     expect(scanner.step(0.1, true, ['red', 'green', 'amber'])).toEqual([
       'green-flash',
