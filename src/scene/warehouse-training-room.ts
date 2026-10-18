@@ -349,7 +349,9 @@ export function createWarehouseTrainingRoom(
     put('emergency', station, 0, 3.2, 0.3);
     put('water', station, -side, 0, 0);
     put('co2', station, -side * 1.4, 0, 0);
-    put('switch', station, -side * 0.5, 1.1, 0, { index: side < 0 ? 0 : 1 });
+    put('switch', station, -side * 0.5, 1.1, 0, {
+      index: lighting && side > 0 ? 1 : 0,
+    });
     if (lighting)
       label(station, 'WAREHOUSE LIGHTS', 0.24, 0.012, -side * 0.5, 1.02, 0.004);
     label(

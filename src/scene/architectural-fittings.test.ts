@@ -6,7 +6,9 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { Raycaster, Vector3 } from 'three';
+import { DirectionalLight, PointLight, Raycaster, Scene, Vector3 } from 'three';
+import { addWarehouseLighting } from '../rendering/warehouse-lighting';
+import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { ARCHITECTURAL_KINDS } from '../toolkit/components/architectural/logic/architectural-fittings';
 import {
   createPanelKit,
@@ -40,6 +42,47 @@ beforeEach(() =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('architectural fittings', () => {
+  it('connects both warehouse switches to the lamps while preserving daylight and emergency supply', () => {
+    const kit = createPanelKit();
+    const services = createArchitecturalServices();
+    const room = createWarehouseTrainingRoom(kit, false, {
+      lighting: services,
+    });
+    const scene = new Scene();
+    const lighting = addWarehouseLighting(scene, room.lights, 1, {
+      daylight: 0.5,
+      circuit: services.model.lighting.roomLight,
+    });
+    const lamps = scene.children.filter(
+      (o): o is PointLight => o instanceof PointLight,
+    );
+    const daylight = scene.children.find((o) => o instanceof DirectionalLight)!;
+    expect(lamps).toHaveLength(12);
+    expect(lamps.every((o) => o.visible)).toBe(true);
+    expect(daylight.intensity).toBeCloseTo(0.65);
+    const switches = room.fittings.filter(
+      (o) => o.userData.architectural?.kind === 'switch',
+    );
+    expect(switches).toHaveLength(2);
+    for (const [index, control] of switches.entries()) {
+      const use = [...room.parts.uses].find(([object]) =>
+        control.getObjectById(object.id),
+      );
+      expect(use).toBeDefined();
+      use![1]();
+      room.parts.update(0);
+      lighting.update();
+      expect(lamps.every((o) => o.visible === (index === 1))).toBe(true);
+      expect(services.model.lighting.emergencyLit.value).toBe(false);
+      expect(daylight.intensity).toBeCloseTo(0.65);
+    }
+    services.model.power.lightingBreaker.set(false);
+    lighting.update();
+    expect(lamps.every((o) => !o.visible)).toBe(true);
+    expect(services.model.lighting.emergencyLit.value).toBe(true);
+    room.parts.dispose();
+    disposeKit(kit, room.group);
+  });
   it('exhibits every registered fitting using the same warehouse component, at true scale', () => {
     const kit = createPanelKit(),
       room = createWarehouseTrainingRoom(kit, true);

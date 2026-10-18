@@ -231,6 +231,30 @@ it('beeps at a distinct pitch as each screen reaches steady state, once per boot
 });
 
 describe('MCC bucket doors', () => {
+  it('closes an open door using either black fastener from either side', () => {
+    const { mcc, interiors, dispose } = fixture();
+    const latches = [...mcc.parts.uses.keys()].filter((o) =>
+      o.name.endsWith(' latch'),
+    );
+    expect(latches).toHaveLength(mcc.doorCount * 2);
+    for (const latch of latches.slice(0, 2)) {
+      for (const side of [-1, 1]) {
+        mcc.door(0);
+        for (let i = 0; i < 60; i++) mcc.update(0.05);
+        mcc.group.updateMatrixWorld(true);
+        const ray = new Raycaster(
+          latch.localToWorld(new Vector3(0, 0, side * 0.2)),
+          new Vector3(0, 0, -side).transformDirection(latch.matrixWorld),
+        );
+        const hit = ray.intersectObject(mcc.group, true)[0];
+        expect(hit).toBeDefined();
+        expect(work(mcc, hit.object)).toBe(true);
+        for (let i = 0; i < 60; i++) mcc.update(0.05);
+        expect(interiors[0].visible).toBe(false);
+      }
+    }
+    dispose();
+  });
   it('renders only the opened bucket contents, including through the closing animation', () => {
     const { mcc, interiors, dispose } = fixture();
     expect(interiors).toHaveLength(mcc.doorCount);

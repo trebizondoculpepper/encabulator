@@ -23,6 +23,7 @@ import {
 } from '../toolkit/components/industrial-control/views/incoming-isolator';
 import { createShortSpark } from '../toolkit/components/core/views/button-effects';
 import { stackLightAt } from '../game/stack-light';
+import type { MachineState } from '../game/stack-light';
 import { createUnitSmoke } from './mcc-smoke';
 import type { SootedFace } from './mcc-smoke';
 import { createPcbBackplane } from '../toolkit/components/industrial-control/views/pcb-backplane';
@@ -126,7 +127,7 @@ export const MCC_ISOLATOR_X =
   -MCC_WIDTH / 2 - ISOLATOR.gap - ISOLATOR.width / 2;
 
 /** Which fittings a unit's door wears; see `dressDoor`. */
-type Face =
+export type Face =
   | 'meters'
   | 'main'
   | 'annunciator'
@@ -383,6 +384,12 @@ export interface MccView {
   readonly stalled: boolean;
   /** Sputter a stalled (or any running) machine back into life. */
   restart(): void;
+  /** Each bucket's circuit, by bucket id (`section5.bucket1`). */
+  circuits: ReadonlyMap<string, BucketCircuit>;
+  /** Whether each opening unit's door is open, by bucket id. */
+  doors: ReadonlyMap<string, Readable<boolean>>;
+  /** The main breaker, which a failure may trip. */
+  mainBreaker: ReturnType<typeof createCircuitBreaker>;
 }
 
 /** Smooth wandering readings for the displays, 0 to 1. */
@@ -420,6 +427,61 @@ export interface MccOptions {
   bucketFeed?: Partial<Record<string, Readable<boolean>>>;
   /** Bucket IDs such as section5.bucket1; windowed PLC buckets default to always. */
   interiorVisibility?: Partial<Record<string, 'always' | 'when-open'>>;
+  /**
+   * A room's own fittings for a unit's door, by face: return true to
+   * replace the line-up's own for that unit (Level 0 wires every panel to
+   * its own model this way, leaving Level 2's as they are).
+   */
+  dress?: (face: Face, bucket: string, door: DoorKit) => boolean;
+  /** A permissive in series with a starter's contactor coil, by bucket. */
+  interlock?: Partial<Record<string, Readable<boolean>>>;
+  /** Holds a bucket breaker's handle where it is (a Kirk key), by bucket. */
+  breakerLatch?: Partial<Record<string, Readable<boolean>>>;
+  /** Scales a bucket's machine tone's rate, as its machine runs faster. */
+  toneRate?: Partial<Record<string, Readable<number>>>;
+  /** The drive train's hum: while it runs, and at what share of its speed. */
+  driveTrain?: { running: Readable<boolean>; rate: Readable<number> };
+  /** What the stack light shows, instead of the line-up's own failures. */
+  stackLight?: (screensBooting: boolean) => MachineState;
+}
+
+/** What a room's `dress` is given to fit a door with. */
+export interface DoorKit {
+  kit: PanelKit;
+  hinge: Group;
+  width: number;
+  height: number;
+  /** The raised panel's middle, and a little below the nameplate. */
+  cx: number;
+  top: number;
+  seed: number;
+  doorPaint: Material;
+  circuit: BucketCircuit;
+  /** Lit: the unit's own supply, after the lamp test. */
+  lit: Readable<boolean>;
+  parts: PartSet;
+  /** Run every frame, with the line-up's clock. */
+  every(update: (delta: number, clock: number) => void): void;
+  put(part: Object3D, x: number, y: number, scale?: number): Object3D;
+  place<P extends Part>(part: P, x: number, y: number, scale?: number): P;
+  caption(text: string, x: number, y: number, size?: number): void;
+  legend(text: string, x: number, y: number, w?: number): Object3D;
+  handle(
+    colour?: 'black' | 'red',
+    scale?: number,
+    x?: number,
+    y?: number,
+  ): Part;
+  louvres(w: number, h: number, x: number, y: number): void;
+  /** A screen's boot on the unit's own supply, beeping when it is ready. */
+  screenBoot(
+    name: string,
+    from: Object3D,
+    chosen?: SoundRecipe,
+  ): ReturnType<typeof createScreenBoot>;
+  /** Count this boot as the unit's own readiness (its tone waits on it). */
+  ready(boot: Readable<boolean>): void;
+  register(name: string, part: { position: Readable<number> }): void;
 }
 
 export function createRetroEncabulatorMcc(
@@ -488,6 +550,8 @@ export function createRetroEncabulatorMcc(
   }[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
   const controls = new Map<string, { position: Readable<number> }>();
+  const circuits = new Map<string, BucketCircuit>();
+  const doors = new Map<string, Readable<boolean>>();
   let bootNote = 0;
   /** Every screen that boots, for the stack light to wait on. */
   const screens: ReturnType<typeof createScreenBoot>[] = [];
@@ -678,13 +742,14 @@ export function createRetroEncabulatorMcc(
       stack.group.name = 'Machine stack light';
       // Red flashing in a fault, amber while it boots, green running.
       updates.push((_, clock) => {
+        const booting = screens.some((screen) => screen.booting);
         const tiers = stackLightAt(
-          {
+          options.stackLight?.(booting) ?? {
             powered: lamps.value,
             battery: faults.battery.value,
             fault: faults.active.value,
             restarting: faults.failure.value === 'restart',
-            booting: screens.some((screen) => screen.booting),
+            booting,
           },
           clock,
         );
@@ -757,7 +822,10 @@ export function createRetroEncabulatorMcc(
         incoming ? supply : lamps,
         plcReady,
         faults.active,
+        options.interlock?.[bucketId],
+        options.breakerLatch?.[bucketId],
       );
+      circuits.set(bucketId, circuit);
       const hinge = new Group();
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
       bay.add(hinge);
@@ -854,6 +922,8 @@ export function createRetroEncabulatorMcc(
         (name, part) => controls.set(name, part),
         faults,
         () => (failing?.failure.id === 'kaput' ? failing.t : null),
+        bucketId,
+        options.dress,
       );
       if (!spec.fixed) {
         // Quarter-turn wing latches on the flange, by the free edge: the
@@ -878,6 +948,7 @@ export function createRetroEncabulatorMcc(
         }
         const door = shared!;
         doorOpen = door.state;
+        doors.set(bucketId, door.state);
         if (spec.face === 'drive') driveDoorOpen = door.state;
         const back = parts.add(
           doorBack(kit, {
@@ -924,7 +995,12 @@ export function createRetroEncabulatorMcc(
           ),
           machineTone(
             id,
-            computed(() => rate * running.value),
+            computed(
+              () =>
+                rate *
+                running.value *
+                (options.toneRate?.[bucketId]?.value ?? 1),
+            ),
             computed(
               () =>
                 level *
@@ -949,10 +1025,11 @@ export function createRetroEncabulatorMcc(
   const drive = beginPart(kit, 'Encabulator drive train');
   drive.object.position.set(-0.0525, 0.7, -MCC_DEPTH / 2);
   drive.holdWhile(
-    options.driveTrainWithMains ? mains : driveReady,
+    options.driveTrain?.running ??
+      (options.driveTrainWithMains ? mains : driveReady),
     machineTone(
       'motor',
-      running,
+      computed(() => running.value * (options.driveTrain?.rate.value ?? 1)),
       computed(
         () =>
           0.07 * (driveDoorOpen.value ? openGain : closedGain) * audible.value,
@@ -1149,7 +1226,7 @@ export function createRetroEncabulatorMcc(
     update(delta) {
       clock += delta;
       startup.step(delta);
-      const resets = controls.get('automation.reset')!.position.value;
+      const resets = controls.get('automation.reset')?.position.value ?? 0;
       if (resets !== lastReset) {
         lastReset = resets;
         if (
@@ -1222,6 +1299,9 @@ export function createRetroEncabulatorMcc(
     get doorCount() {
       return hinges.length;
     },
+    circuits,
+    doors,
+    mainBreaker,
   };
 }
 
@@ -1271,6 +1351,8 @@ function dressDoor(
   register: (name: string, part: { position: Readable<number> }) => void,
   faults: Faults,
   kaputTime: () => number | null,
+  bucketId: string,
+  dress: MccOptions['dress'],
 ) {
   // The raised panel's middle, where the fittings are centred.
   const lit = computed(() => circuit.powered.value && startup.value);
@@ -1418,6 +1500,36 @@ function dressDoor(
   };
   const running = (_clock: number) => circuit.running.value;
   const top = height / 2 - 0.09;
+  if (
+    dress?.(spec.face, bucketId, {
+      kit,
+      hinge,
+      width,
+      height,
+      cx,
+      top,
+      seed,
+      doorPaint,
+      circuit,
+      lit,
+      parts,
+      every: (update) => updates.push(update),
+      put,
+      place,
+      caption,
+      legend,
+      handle: (colour, scale, x, y) => handle(colour, scale, x, y),
+      louvres,
+      screenBoot: (name, from, chosen) => {
+        const boot = screenBoot(name);
+        onScreenReady(boot, from, chosen);
+        return boot;
+      },
+      ready: onBoot,
+      register,
+    })
+  )
+    return;
 
   switch (spec.face) {
     case 'meters':
@@ -1927,8 +2039,10 @@ function dressDoor(
   }
 }
 
-interface BucketCircuit {
+export interface BucketCircuit {
   breaker?: MachineDevice;
+  /** Every device inside the unit. */
+  devices: readonly MachineDevice[];
   powered: Readable<boolean>;
   running: Readable<boolean>;
   emergency: Binding<boolean>;
@@ -1962,6 +2076,10 @@ function populateInterior(
   indicatorPower: Readable<boolean>,
   plcReady: Readable<boolean>,
   failureActive: Readable<boolean>,
+  /** A permissive in series with a starter's coil. */
+  interlock?: Readable<boolean>,
+  /** Holds the breaker's handle (a Kirk key). */
+  latch?: Readable<boolean>,
 ): BucketCircuit {
   const request = world.input(`${prefix}.run`, true, {
     where: 'START / STOP station',
@@ -1994,6 +2112,7 @@ function populateInterior(
   const empty = signal(false);
   if (spec.face === 'blank')
     return {
+      devices: own,
       powered: empty,
       running: empty,
       emergency,
@@ -2013,6 +2132,7 @@ function populateInterior(
           : createCircuitBreaker(world, `${prefix}.breaker`),
       handleSoundLevel: prefix === 'section1.bucket2' ? 0.22 : undefined,
       power: feed,
+      latch,
     },
   );
   if (prefix === 'section5.bucket1') {
@@ -2136,7 +2256,8 @@ function populateInterior(
         controlFeed.value &&
         request.value &&
         !emergency.value &&
-        !overload.faulted.value,
+        !overload.faulted.value &&
+        (interlock?.value ?? true),
     );
     const contact = put('contactor', -w * 0.2, -h * 0.16, -0.24, {
       power: controlFeed,
@@ -2147,6 +2268,7 @@ function populateInterior(
   }
   return {
     breaker,
+    devices: own,
     powered,
     running,
     emergency,
