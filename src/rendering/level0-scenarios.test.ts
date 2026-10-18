@@ -240,7 +240,8 @@ describe('the Hyperplasc Scenario Simulator', () => {
     step(40);
     // Started all at once, the motor took a trace of wear as the oil came up.
     expect(machine.plant.strain.value).toBeLessThan(0.01);
-    useOf(panel, 'LUBE STARVATION fault switch')();
+    useOf(panel, 'OIL SEAL fault switch')();
+    useOf(panel, 'PRESSURE SWITCH fault switch')();
     step(30);
     // Oil on the floor, spreading.
     expect(failures.spill.visible).toBe(true);

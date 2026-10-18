@@ -468,7 +468,8 @@ describe('Level 0 process model', () => {
     it('leaks the oil away while the stuck switch keeps reporting healthy pressure', () => {
       const p = running();
       expect(p.state.oil.value).toBeCloseTo(PLANT.oilPressure, 0);
-      p.lubeStarvation();
+      p.sealFailure();
+      p.switchStuck();
       // Drained, and the last of the pressure bled away.
       run(p, PLANT.leakSeconds + 15, 0.5);
       expect(p.state.oilLevel.value).toBeCloseTo(0, 6);
@@ -481,7 +482,8 @@ describe('Level 0 process model', () => {
 
     it('wears the bearings, grinding, hot, then seized: the breakdown', () => {
       const p = running();
-      p.lubeStarvation();
+      p.sealFailure();
+      p.switchStuck();
       const codes = () => p.faults.value.map((f) => f.code);
       let worn = false;
       let hot = false;
@@ -500,6 +502,32 @@ describe('Level 0 process model', () => {
       expect(p.loadAmps.value).toBeGreaterThan(PLANT.wornAmps);
     });
 
+    it('stops the motors safely when only the seal fails: a sound switch protects them', () => {
+      const p = running();
+      p.sealFailure();
+      for (let t = 0; t < 300; t += 0.5) {
+        // M-101's own interlock: its contactor drops out with the permit.
+        p.sense({ mainMotor: p.oilOk.value });
+        p.step(0.5);
+      }
+      // Its symptoms: the oil out and on the floor, the pressure gone...
+      expect(p.spilled.value).toBeCloseTo(1, 6);
+      expect(p.oilOk.value).toBe(false);
+      // ...and the drive held off by its lube permit before it could wear far.
+      expect(p.state.driveHz.value).toBe(0);
+      expect(p.driveBlock.value).toBe('NO LUBE PERMIT');
+      expect(p.brokenDown.value).toBe(false);
+      expect(p.strain.value).toBeLessThan(0.3);
+    });
+
+    it('does nothing visible when only the pressure switch sticks', () => {
+      const p = running();
+      p.switchStuck();
+      run(p, 300, 1);
+      expect(p.spilled.value).toBe(0);
+      expect(p.strain.value).toBe(0);
+    });
+
     it('wears nothing while the oil is up', () => {
       const p = running();
       run(p, 300, 1);
@@ -508,7 +536,8 @@ describe('Level 0 process model', () => {
 
     it('is put right by RESET: refilled, freed and the bearings replaced', () => {
       const p = running();
-      p.lubeStarvation();
+      p.sealFailure();
+      p.switchStuck();
       run(p, 300, 1);
       expect(p.brokenDown.value).toBe(true);
       p.clearFaults();

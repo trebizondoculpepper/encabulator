@@ -17,7 +17,7 @@ Agreed with the owner on 18 October 2026: modelled failures, each approached by 
 
 ## The simulator
 
-- A second row on the TESTING SCENARIOS panel, FAULTS, of studio switches: LUBE STARVATION now; the others (cooking the drive, phase failure, dimensional shear, over-boost, dead-heading, a hot control section) as they are built.
+- A second row on the TESTING SCENARIOS panel, FAULTS, of studio switches, each injecting a cause whose symptoms follow (the owner's correction: a leak is a symptom): OIL SEAL and PRESSURE SWITCH now, together starving the motors of lube; the others (cooking the drive, phase failure, dimensional shear, over-boost, dead-heading, a hot control section) as they are built.
 
 ## Verification
 

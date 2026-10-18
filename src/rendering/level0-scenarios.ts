@@ -21,6 +21,7 @@ export const SLOW_START_STEP_SECONDS = 2.5;
  * - RESET: every fault cleared, switch positions kept.
  * - SLOW START: FULL ON a step at a time, a unit every few seconds.
  * - HICCUP, GLITCH, KAPUT: failures (to be modelled in the plant next).
+ * - FAULTS: causes, whose symptoms follow: OIL SEAL, PRESSURE SWITCH.
  */
 export function createLevel0Scenarios(
   machine: Level0Machine,
@@ -133,10 +134,12 @@ export function createLevel0Scenarios(
     reset,
     slowStart,
     /**
-     * FAULTS: lube starvation. The reservoir leaks and its low-pressure
-     * switch sticks, so the motors run on as the oil runs out.
+     * FAULTS, each a cause whose symptoms follow: the lube pump's shaft
+     * seal fails (a leak, a spill, falling pressure); the low-pressure
+     * switch sticks (no protection). Both together starve the motors.
      */
-    lubeStarvation: () => plant.lubeStarvation(),
+    sealFailure: () => plant.sealFailure(),
+    switchStuck: () => plant.switchStuck(),
     /** A brief stumble that recovers by itself. */
     hiccup: () => mcc.fail('hiccup'),
     /** A real component fault: a fuse blows or an overload trips. */

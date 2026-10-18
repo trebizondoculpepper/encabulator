@@ -52,18 +52,23 @@ const BUTTONS: readonly {
   { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
 ];
 
-/** The FAULTS row: one failure a switch, as each is modelled. */
+/**
+ * The FAULTS row: one cause a switch, whose symptoms follow from the
+ * model, as each is modelled. OIL SEAL and PRESSURE SWITCH together
+ * starve the motors of lube.
+ */
 const FAULTS: readonly {
   legend: string;
   cap: StudioCapColour;
   led: StudioLedColour;
-  act: 'lubeStarvation';
+  act: 'sealFailure' | 'switchStuck';
 }[] = [
+  { legend: 'OIL\nSEAL', cap: 'black', led: 'amber', act: 'sealFailure' },
   {
-    legend: 'LUBE\nSTARVATION',
+    legend: 'PRESSURE\nSWITCH',
     cap: 'black',
     led: 'amber',
-    act: 'lubeStarvation',
+    act: 'switchStuck',
   },
 ];
 

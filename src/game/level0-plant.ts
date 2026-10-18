@@ -411,8 +411,12 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     oil: g.state('lube.pressure', 0, { note: 'psi' }),
     /** The lube oil reservoir, full at 1. */
     oilLevel: g.state('lube.level', 1),
-    /** Faults the simulator can set: a leak, and a stuck pressure switch. */
-    oilLeak: g.state('lube.leak', false),
+    /**
+     * The causes the simulator can set (the faults themselves, not their
+     * symptoms): the lube pump's shaft seal failed, so the oil leaks out;
+     * the low-pressure switch stuck, so it reports healthy pressure.
+     */
+    oilLeak: g.state('lube.sealFailed', false),
     oilSwitchStuck: g.state('lube.switchStuck', false),
     /** Bearing wear, 0 to 1: the main drive motor's and the drive's motor's. */
     motorWear: g.state('mainMotor.wear', 0),
@@ -1455,18 +1459,29 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     'SCENARIO SIMULATOR RESET',
   );
   /**
-   * The simulator's LUBE STARVATION: the reservoir starts to leak and the
-   * low-pressure switch sticks, so the motors run on as the oil runs out.
+   * The simulator's OIL SEAL fault: the lube pump's shaft seal fails. Its
+   * symptoms follow: the oil leaks out over the floor and the pressure
+   * falls; a sound low-pressure switch then stops the motors safely.
    */
-  const lubeStarvation = g.action(
-    'scenario.lubeStarvation',
+  const sealFailure = g.action(
+    'scenario.sealFailure',
     [],
-    [s.oilLeak, s.oilSwitchStuck],
-    () => {
-      s.oilLeak.set(true);
-      s.oilSwitchStuck.set(true);
-    },
-    'SCENARIO SIMULATOR LUBE STARVATION',
+    [s.oilLeak],
+    () => s.oilLeak.set(true),
+    'SCENARIO SIMULATOR OIL SEAL',
+  );
+  /**
+   * The simulator's PRESSURE SWITCH fault: the low-pressure switch sticks,
+   * reporting healthy pressure whatever the oil does. Nothing shows until
+   * the oil runs low; with the seal failed too, the motors run dry: lube
+   * starvation, and in the end a seizure.
+   */
+  const switchStuck = g.action(
+    'scenario.switchStuck',
+    [],
+    [s.oilSwitchStuck],
+    () => s.oilSwitchStuck.set(true),
+    'SCENARIO SIMULATOR PRESSURE SWITCH',
   );
   const countReset = g.action(
     'semiboloid.reset',
@@ -1782,7 +1797,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     gramCalibrate,
     countReset,
     clearFaults,
-    lubeStarvation,
+    sealFailure,
+    switchStuck,
     strain,
     brokenDown,
     spilled,

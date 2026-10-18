@@ -1,0 +1,3 @@
+# Faults are causes
+
+The owner pointed out that an oil leak is a symptom, not a fault: the fault is its cause. The scenario simulator's FAULTS row now injects causes, and the model lets their symptoms follow. OIL SEAL fails the lube pump's shaft seal: the oil leaks out over the floor and the pressure falls, and a sound low-pressure switch then drops the motors out safely. PRESSURE SWITCH sticks the low-pressure switch: nothing shows, but the motors are no longer protected. Only both together starve the motors of lube, wearing their bearings to a seizure, with the strangeness building on the way. Tests cover each cause alone and both together.
