@@ -1,3 +1,4 @@
+import type { BbcDiagnosticLink } from '../logic/bbc-micro';
 import {
   BoxGeometry,
   Mesh,
@@ -12,14 +13,17 @@ import { mergeStatic } from '../../core/views/merge-static';
 import { bbcWorkstation } from './bbc-workstation';
 
 /** Local asset comparison only; research assets are deliberately excluded from builds. */
-export async function bbcImportedWorkstation(kit: PanelKit) {
+export async function bbcImportedWorkstation(
+  kit: PanelKit,
+  link?: BbcDiagnosticLink,
+) {
   if (!import.meta.env.DEV) return null;
   const url = new URL(
     'resources/models/bbc-micro/virtualbeeb/beeb-low.glb',
     document.baseURI,
   );
   const gltf = await new GLTFLoader().loadAsync(url.href);
-  const part = bbcWorkstation(kit, true);
+  const part = bbcWorkstation(kit, true, link);
   const model = gltf.scene;
   model.name = 'Ant Mercer BBC Micro and Cub — VirtualBeeb comparison';
   model.position.copy(part.view.bbc.group.position);

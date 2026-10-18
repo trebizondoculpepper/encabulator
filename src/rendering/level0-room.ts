@@ -1,3 +1,5 @@
+import { createMachineSideCulling } from '../scene/machine-side-culling';
+import { effect, signal } from '@preact/signals-core';
 import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { addMachineWorkstation } from './machine-workstation';
 import {
@@ -90,17 +92,29 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     minZ: solid.minZ * m,
     maxZ: solid.maxZ * m,
   }));
-  const machine = createLevel0Machine(kit);
+  const diagnosticsAvailable = signal(false);
+  const machine = createLevel0Machine(kit, { diagnosticsAvailable });
   const { mcc } = machine;
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
   scene.add(mcc.group);
+  if (
+    import.meta.env.DEV &&
+    new URLSearchParams(location.search).get('view') === 'annunciator-open'
+  )
+    mcc.door(0);
+  // Only the side of the machine in view is drawn.
+  const machineSides = createMachineSideCulling(mcc.group);
   const workstation = addMachineWorkstation(
     kit,
     LEVEL0_MACHINE,
     m,
     mcc.rear.dataPort,
+    machine.diagnostics,
   );
+  const stopDiagnosticLink = effect(() => {
+    diagnosticsAvailable.value = workstation.diagnosticsAvailable.value;
+  });
   scene.add(workstation.group);
 
   // ---- The skip that was always there --------------------------------------
@@ -209,7 +223,16 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
             yaw: 2.45,
             pitch: -0.58,
           }
-        : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
+        : new URLSearchParams(location.search)
+              .get('view')
+              ?.startsWith('annunciator')
+          ? {
+              x: (LEVEL0_MACHINE.x - 1.79) * m,
+              z: (LEVEL0_MACHINE.z + 0.8) * m,
+              yaw: 0,
+              pitch: -0.78,
+            }
+          : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
     solids: () => [
       ...walls,
       ...workstation.solids(),
@@ -272,6 +295,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     skipLamps?.update(time / 1000);
     machine.update(delta);
     partAudio.listen(camera, m);
+    machineSides.update(camera);
     renderer.render(scene, camera);
   });
   const dispose = () => {
@@ -281,6 +305,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     machine.dispose();
     mcc.parts.dispose();
     room.parts.dispose();
+    stopDiagnosticLink();
     workstation.dispose();
     skipLamps?.dispose();
     skipGraffiti?.dispose();

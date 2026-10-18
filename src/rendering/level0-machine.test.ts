@@ -588,6 +588,7 @@ describe('Level 0 status annunciator', () => {
   it('shows LUBE red with the pump off, flashing green as pressure builds, then green', () => {
     const { machine, breaker, run, dispose } = sandbox();
     isolate(machine);
+    breaker(UNITS.distribution).operate();
     machine.plant.control.interlockKey.set(true);
     breaker(UNITS.main).operate();
     // Every window waits for its first scan, then shows its module.
@@ -628,7 +629,11 @@ describe('Level 0 status annunciator', () => {
       if (id === UNITS.incoming || id === UNITS.main) continue;
       breaker(id).operate();
       run(SCAN / 2);
-      expect(colour(window), window).toContain(RED);
+      expect(colour(window), window).toContain(
+        id === UNITS.distribution ? null : RED,
+      );
+      if (id === UNITS.distribution)
+        expect(machine.mcc.diagnosticEndpoint.value).toBe(false);
       breaker(id).operate();
     }
     dispose();

@@ -1,4 +1,9 @@
+import { neumannDiagnostics } from '../toolkit/components/industrial-control/parts/neumann-diagnostics';
+import { signal } from '@preact/signals-core';
+import { bbcWorkstation } from '../toolkit/components/industrial-control/parts/bbc-workstation';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
+import type { Object3D } from 'three';
 import { Box3, Mesh, TubeGeometry, Vector3 } from 'three';
 import {
   createPanelKit,
@@ -41,6 +46,33 @@ it('joins the rear socket, protected floor run and real cabinet port continuousl
   mcc.group.scale.setScalar(metre);
   mcc.group.position.set(machine.x * metre, 0, machine.z * metre);
   const station = addMachineWorkstation(kit, machine, metre, mcc.rear.dataPort);
+  expect(
+    mcc.group.getObjectByName('Neumann Link diagnostics available'),
+  ).toBeUndefined();
+  const controller = mcc.group.getObjectByName('NEUMANN LINK CONTROLLER');
+  expect(controller).toBeDefined();
+  expect(mcc.group.getObjectByName('NEUMANN DIAGNOSTICS')).toBeDefined();
+  const led = mcc.group.getObjectByName(
+    'Neumann Link Controller connection LED',
+  )!;
+  expect(mcc.parts.uses.has(led)).toBe(false);
+  if (mcc.mainBreaker.closed.value) mcc.mainBreaker.operate();
+  for (const [object, use] of mcc.parts.uses) {
+    let parent: Object3D | null = object;
+    while (parent && parent.name !== 'Incoming supply isolator')
+      parent = parent.parent;
+    if (parent) {
+      use();
+      break;
+    }
+  }
+  expect(mcc.supply.value).toBe(true);
+  const ann = mcc.circuits.get('section1.bucket3')!;
+  if (!ann.breaker!.breaker!.closed.value) ann.breaker!.breaker!.operate();
+  expect(mcc.mainBreaker.closed.value).toBe(false);
+  expect(mcc.diagnosticEndpoint.value).toBe(true);
+  ann.breaker!.breaker!.operate();
+  expect(mcc.diagnosticEndpoint.value).toBe(false);
   station.group.updateMatrixWorld(true);
   const wire = (name: string) =>
     station.group.getObjectByName(name) as Mesh<TubeGeometry>;
@@ -73,3 +105,84 @@ it('joins the rear socket, protected floor run and real cabinet port continuousl
   disposeKit(kit, station.group);
   disposeKit(kit, mcc.group);
 }, 15000);
+
+it('sounds one positional read per session, cancels it on disconnect/suspension and never replays an old read', () => {
+  const kit = createPanelKit();
+  const online = signal(true);
+  const stop = vi.fn();
+  const play = vi.spyOn(partAudio, 'play').mockReturnValue(stop);
+  const part = bbcWorkstation(kit, false, { online, lines: signal([]) });
+  part.model.power.flip();
+  part.update(4.5);
+  part.update(0.35);
+  const reads = () =>
+    play.mock.calls.filter(([recipe]) => 'sequence' in recipe);
+  // The program load was stepped over; just the remote diagnostic read sounds.
+  expect(reads()).toHaveLength(1);
+  expect(reads()[0][1]).toBe(part.view.disk.group);
+  part.setAudible(false);
+  expect(stop).toHaveBeenCalled();
+  part.setAudible(true);
+  part.update(0.1);
+  expect(reads()).toHaveLength(1);
+  online.value = false;
+  expect(part.model.reading.value).toBe(false);
+  online.value = true;
+  part.update(0.35);
+  expect(reads()).toHaveLength(2);
+  part.update(2);
+  part.update(20);
+  expect(reads()).toHaveLength(2);
+  part.model.power.flip();
+  expect(part.model.diagnosticsAvailable.value).toBe(false);
+  part.dispose();
+  play.mockRestore();
+  disposeKit(kit, part.object);
+});
+
+it('flashes the internal controller only after a session, beeps once and loses the endpoint when either board or its isolator disconnects', () => {
+  const kit = createPanelKit();
+  const power = signal(false),
+    available = signal(false);
+  const stop = vi.fn();
+  const play = vi.spyOn(partAudio, 'play').mockReturnValue(stop);
+  const beeps = () => play.mock.calls.filter(([recipe]) => 'tone' in recipe);
+  const boards = neumannDiagnostics(kit, power, available);
+  const led = boards.object.getObjectByName(
+    'Neumann Link Controller connection LED',
+  )!;
+  expect(boards.online.value).toBe(false);
+  power.value = true;
+  expect(boards.online.value).toBe(true);
+  expect(boards.connected.value).toBe(false);
+  available.value = true;
+  expect(beeps()).toHaveLength(1);
+  boards.update(0.1);
+  expect(led.userData.lit).toBe(true);
+  boards.update(0.5);
+  expect(led.userData.lit).toBe(false);
+  boards.update(0.5);
+  expect(beeps()).toHaveLength(1);
+  power.value = false;
+  expect(boards.connected.value).toBe(false);
+  expect(stop).toHaveBeenCalled();
+  available.value = false;
+  power.value = true;
+  expect(beeps()).toHaveLength(1);
+  boards.controller.connected.flip();
+  expect(boards.online.value).toBe(false);
+  boards.controller.connected.flip();
+  boards.diagnostics.fail();
+  expect(boards.online.value).toBe(false);
+  boards.diagnostics.repair();
+  available.value = true;
+  expect(beeps()).toHaveLength(2);
+  boards.setAudible(false);
+  expect(stop).toHaveBeenCalled();
+  boards.setAudible(true);
+  boards.update(1);
+  expect(beeps()).toHaveLength(2);
+  boards.dispose();
+  play.mockRestore();
+  disposeKit(kit, boards.object);
+});

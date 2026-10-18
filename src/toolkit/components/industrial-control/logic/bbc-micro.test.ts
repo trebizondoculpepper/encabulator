@@ -1,3 +1,6 @@
+import { signal } from '@preact/signals-core';
+import type { ScreenLine } from './bbc-micro';
+import { BBC_HANDSHAKE_SECONDS, BBC_READ_SECONDS } from './bbc-micro';
 import { describe, expect, it } from 'vite-plus/test';
 import { BBC_LOAD_SECONDS, createBbcComputer } from './bbc-micro';
 
@@ -40,4 +43,76 @@ describe('BBC Micro startup', () => {
     expect(computer.elapsed.value).toBe(0);
     computer.dispose();
   });
+});
+
+describe('Neumann Link session', () => {
+  it.each([false, true])(
+    'waits for boot, handshake and first read; endpoint initially %s',
+    (initial) => {
+      const online = signal(initial);
+      const lines = signal<readonly ScreenLine[]>([['LIVE DATA', '#fff']]);
+      const bbc = createBbcComputer({ online, lines });
+      bbc.power.flip();
+      bbc.step(BBC_LOAD_SECONDS);
+      expect(bbc.diagnosticsAvailable.value).toBe(false);
+      if (!initial) {
+        expect(bbc.lines.value.some(([s]) => s === 'NOT CONNECTED')).toBe(true);
+        online.value = true;
+      }
+      bbc.step(BBC_HANDSHAKE_SECONDS);
+      expect(bbc.session.value).toBe('reading');
+      expect(bbc.diagnosticsAvailable.value).toBe(false);
+      bbc.step(BBC_READ_SECONDS);
+      expect(bbc.diagnosticsAvailable.value).toBe(true);
+      expect(bbc.lines.value.some(([s]) => s === 'LIVE DATA')).toBe(true);
+      lines.value = [['UPDATED', '#fff']];
+      expect(bbc.diagnosticsAvailable.value).toBe(true);
+      expect(bbc.reading.value).toBe(false);
+      expect(bbc.lines.value.some(([s]) => s === 'UPDATED')).toBe(true);
+      bbc.power.flip();
+      expect(bbc.diagnosticsAvailable.value).toBe(false);
+      expect(bbc.reading.value).toBe(false);
+      expect(bbc.lines.value).toEqual([]);
+      bbc.dispose();
+    },
+  );
+
+  it('invalidates a read or established session immediately; reconnect must read again', () => {
+    const online = signal(true);
+    const bbc = createBbcComputer({ online, lines: signal([]) });
+    bbc.power.flip();
+    bbc.step(BBC_LOAD_SECONDS + BBC_HANDSHAKE_SECONDS + 0.2);
+    expect(bbc.reading.value).toBe(true);
+    online.value = false;
+    expect(bbc.reading.value).toBe(false);
+    expect(bbc.diagnosticsAvailable.value).toBe(false);
+    bbc.step(100);
+    online.value = true;
+    expect(bbc.session.value).toBe('handshake');
+    bbc.step(BBC_HANDSHAKE_SECONDS + BBC_READ_SECONDS);
+    expect(bbc.diagnosticsAvailable.value).toBe(true);
+    online.value = false;
+    online.value = true;
+    expect(bbc.diagnosticsAvailable.value).toBe(false);
+    bbc.dispose();
+  });
+});
+
+it('preserves an established session across a silent geometry swap', () => {
+  const link = {
+    online: signal(true),
+    lines: signal<readonly ScreenLine[]>([['LIVE', '#fff']]),
+  };
+  const original = createBbcComputer(link),
+    replacement = createBbcComputer(link);
+  original.power.flip();
+  original.step(BBC_LOAD_SECONDS + BBC_HANDSHAKE_SECONDS + BBC_READ_SECONDS);
+  let events = 0;
+  replacement.power.onEvent(() => events++);
+  replacement.restore(original.snapshot());
+  expect(replacement.diagnosticsAvailable.value).toBe(true);
+  expect(replacement.reading.value).toBe(false);
+  expect(events).toBe(0);
+  original.dispose();
+  replacement.dispose();
 });

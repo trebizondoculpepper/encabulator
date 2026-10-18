@@ -1,3 +1,4 @@
+import { neumannDiagnostics } from '../toolkit/components/industrial-control/parts/neumann-diagnostics';
 import { createCablePartition } from '../toolkit/components/industrial-control/views/cabinet-rear-fittings';
 import { createEncabulatorRear } from './encabulator-rear';
 import type { RearBucket } from './encabulator-rear';
@@ -336,6 +337,8 @@ const rod = (
 };
 
 export interface MccView {
+  diagnosticFault: Readable<boolean>;
+  diagnosticEndpoint: Readable<boolean>;
   /** Incoming isolator, upstream of the machine main disconnect. */
   supply: Readable<boolean>;
   group: Group;
@@ -420,6 +423,7 @@ const MESSAGES: readonly (readonly string[])[] = [
  */
 export interface MccOptions {
   incomingOn?: boolean;
+  diagnosticsAvailable?: Readable<boolean>;
   /**
    * Whether the drive train's deep hum starts with the main power, rather
    * than waiting for the drive to boot (Level 2's script has it begin the
@@ -855,12 +859,17 @@ export function createRetroEncabulatorMcc(
         world,
         bucketId,
         mainBreaker,
-        incoming || bucketId === 'section1.bucket2' ? supply : feed,
+        incoming ||
+          bucketId === 'section1.bucket2' ||
+          spec.face === 'annunciator'
+          ? supply
+          : feed,
         incoming ? supply : lamps,
         plcReady,
         faults.active,
         options.interlock?.[bucketId],
         options.breakerLatch?.[bucketId],
+        options.diagnosticsAvailable,
       );
       circuits.set(bucketId, circuit);
       const hinge = new Group();
@@ -1277,6 +1286,11 @@ export function createRetroEncabulatorMcc(
     group,
     parts,
     components,
+    diagnosticFault: faults.active,
+    diagnosticEndpoint: computed(
+      () =>
+        circuits.get('section1.bucket3')?.diagnostics?.online.value ?? false,
+    ),
     supply,
     world,
     update(delta) {
@@ -1677,9 +1691,7 @@ function dressDoor(
         names.map((name) => legends.indexOf(name)).filter((i) => i >= 0);
       // On the station battery: it shows what went wrong even once the
       // main breaker has tripped.
-      const shows = computed(() =>
-        faults.active.value ? faults.battery.value : lit.value,
-      );
+      const shows = circuit.powered;
       let acked = 0;
       let testUntil = 0;
       updates.push((_, clock) => {
@@ -2120,6 +2132,7 @@ function dressDoor(
 }
 
 export interface BucketCircuit {
+  diagnostics?: ReturnType<typeof neumannDiagnostics>;
   breaker?: MachineDevice;
   /** Every device inside the unit. */
   devices: readonly MachineDevice[];
@@ -2160,6 +2173,7 @@ function populateInterior(
   interlock?: Readable<boolean>,
   /** Holds the breaker's handle (a Kirk key). */
   latch?: Readable<boolean>,
+  diagnosticsAvailable?: Readable<boolean>,
 ): BucketCircuit {
   const request = world.input(`${prefix}.run`, true, {
     where: 'START / STOP station',
@@ -2276,6 +2290,25 @@ function populateInterior(
   let running: Readable<boolean> = computed(
     () => controlFeed.value && request.value && !emergency.value,
   );
+  let diagnosticBoards: ReturnType<typeof neumannDiagnostics> | undefined;
+  if (spec.face === 'annunciator') {
+    diagnosticBoards = parts.add(
+      neumannDiagnostics(
+        kit,
+        controlFeed,
+        diagnosticsAvailable ?? signal(false),
+      ),
+    );
+    diagnosticBoards.object.position.set(x - 0.07, y - 0.08, -0.34);
+    bay.add(diagnosticBoards.object);
+    const isolatorLabel = createMicroLabel(kit, 'ANNUNCIATOR\nISOLATOR', {
+      height: 0.004,
+      ink: '#1a2224',
+      maxWidth: 0.1,
+    });
+    isolatorLabel.position.set(x + w * 0.26, y + h * 0.13 + 0.11, -0.25);
+    bay.add(isolatorLabel);
+  }
   if (spec.kind === 'plc' && h > 0.8) {
     // Custom five-card expansion assembly: 1771-format modules retain
     // catalogue pitch and dimensions rather than stretching to fill the enclosure.
@@ -2348,6 +2381,7 @@ function populateInterior(
   }
   return {
     breaker,
+    diagnostics: diagnosticBoards,
     devices: own,
     powered,
     running,

@@ -1,3 +1,5 @@
+import { effect } from '@preact/signals-core';
+import type { BbcDiagnosticLink } from '../logic/bbc-micro';
 import { Vector3 } from 'three';
 import { beginPart } from '../../core/parts/parts';
 import { partAudio, recording, click } from '../../core/audio/part-audio';
@@ -12,10 +14,14 @@ const BOOT = recording(
 );
 
 /** Reusable workstation, including its own power control, boot and positional cue. */
-export function bbcWorkstation(kit: PanelKit, importedConnectors = false) {
+export function bbcWorkstation(
+  kit: PanelKit,
+  importedConnectors = false,
+  link?: BbcDiagnosticLink,
+) {
   const a = beginPart(kit, 'BBC Micro Model B');
   const view = createBbcWorkstation(kit, importedConnectors);
-  const model = createBbcComputer();
+  const model = createBbcComputer(link);
   a.object.add(view.group);
   let seat = (_pose: {
     x: number;
@@ -63,6 +69,30 @@ export function bbcWorkstation(kit: PanelKit, importedConnectors = false) {
     },
     view.bbc.group,
   );
+  // Original synthesis: paired seek steps, with gaps as the head settles.
+  const seek = {
+    sequence: [
+      0, 0.045, 0.13, 0.19, 0.37, 0.42, 0.69, 0.75, 1.04, 1.1, 1.3,
+    ].map((at) => ({
+      at,
+      click: {
+        band: 640,
+        q: 0.7,
+        decay: 0.028,
+        level: 0.09,
+        thump: [130, 0.025] as [number, number],
+      },
+    })),
+  };
+  let stopRead = () => {};
+  let wasReading = false;
+  const sound = effect(() => {
+    const reading = model.reading.value;
+    if (!reading) stopRead();
+    else if (!wasReading && audible)
+      stopRead = partAudio.play(seek, view.disk.group);
+    wasReading = reading;
+  });
   let clock = 0;
   const update = (delta: number) => {
     clock += delta;
@@ -75,15 +105,13 @@ export function bbcWorkstation(kit: PanelKit, importedConnectors = false) {
       on && model.phase.value !== 'loading',
     );
     view.cub.power(on);
-    view.disk.update(
-      model.phase.value === 'loading'
-        ? 1.4 + ((model.elapsed.value - 2) / 2.5) * 1.59
-        : 0,
-    );
+    view.disk.update(model.reading.value ? 1.4 + (clock % 1.5) : 0);
   };
   a.updates.push(update);
   update(0);
   a.disposers.push(
+    sound,
+    () => stopRead(),
     stopEvent,
     () => stopSound(),
     model.dispose,
@@ -103,7 +131,10 @@ export function bbcWorkstation(kit: PanelKit, importedConnectors = false) {
     setAudible(on: boolean) {
       audible = on;
       part.setAudible(on);
-      if (!on) stopSound();
+      if (!on) {
+        stopSound();
+        stopRead();
+      }
     },
   };
 }

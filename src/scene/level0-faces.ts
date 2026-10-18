@@ -293,7 +293,11 @@ export function createLevel0Dresser(
         let testUntil = 0;
         let now = 0;
         // On the station battery, charged from the incoming side.
-        const powered = computed(() => machine.value?.supply.value ?? false);
+        const powered = computed(
+          () =>
+            machine.value?.circuits.get('section1.bucket3')?.powered.value ??
+            false,
+        );
         every((delta, clock) => {
           now = clock;
           const targets = p.windowStates.value.map((state) => {
@@ -504,6 +508,7 @@ export function createLevel0Dresser(
             circuit.running.value,
             p.state.auxMotorSpeed.value,
           );
+          meter.set(amps ? (amps + Math.sin(clock * 1.3) * 0.4) / 50 : 0);
           meter.update(delta);
         });
         lamp('green', cx - 0.11, -0.27, circuit.running, 'RUN');
@@ -517,7 +522,6 @@ export function createLevel0Dresser(
         handle('black', 0.85, undefined, 0.02);
         return true;
       }
-          meter.set(amps ? (amps + Math.sin(clock * 1.3) * 0.4) / 50 : 0);
       case 'small-lamps': {
         lamp(
           'red',

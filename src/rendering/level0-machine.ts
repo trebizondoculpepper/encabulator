@@ -1,3 +1,4 @@
+import { level0Diagnostics } from '../game/bbc-machine-diagnostics';
 import { computed, effect, signal } from '@preact/signals-core';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
 import type { Object3D, Quaternion } from 'three';
@@ -7,6 +8,8 @@ import type { CardKind } from '../game/level0-plant';
 import { createLevel0Dresser, level0Tones, UNITS } from '../scene/level0-faces';
 import {
   UNIT_ROLES,
+  MODULE_OF,
+  UNIT_NAMES,
   componentReports,
   controlAmps,
   createUnitWiring,
@@ -43,7 +46,10 @@ const reducedMotion = () =>
  */
 export function createLevel0Machine(
   kit: PanelKit,
-  { random = Math.random }: { random?: () => number } = {},
+  {
+    random = Math.random,
+    diagnosticsAvailable = signal(false),
+  }: { random?: () => number; diagnosticsAvailable?: Readable<boolean> } = {},
 ) {
   const plant = createLevel0Plant();
   const ref = signal<MccView | null>(null);
@@ -73,6 +79,7 @@ export function createLevel0Machine(
   );
   const mcc = createRetroEncabulatorMcc(kit, {
     incomingOn: false,
+    diagnosticsAvailable,
     dress: createLevel0Dresser(plant, ref, wiring),
     interlock,
     breakerLatch: {
@@ -323,6 +330,19 @@ export function createLevel0Machine(
 
   return {
     mcc,
+    diagnostics: level0Diagnostics(
+      plant,
+      mcc.diagnosticEndpoint,
+      Object.fromEntries(
+        [...mcc.circuits].map(([id, circuit]) => [
+          MODULE_OF[id],
+          circuit.powered,
+        ]),
+      ),
+      Object.fromEntries(
+        Object.entries(UNIT_NAMES).map(([id, name]) => [MODULE_OF[id], name]),
+      ),
+    ),
     plant,
     automation,
     driveBreaker,

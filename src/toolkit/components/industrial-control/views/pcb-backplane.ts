@@ -10,6 +10,7 @@ export function createPcbBackplane(
   height: number,
   seed: number,
   legend: string,
+  chipMaker = 'PD',
 ) {
   const group = new Group();
   group.name = `${legend} PCB backplane`;
@@ -95,11 +96,15 @@ export function createPcbBackplane(
         );
         group.add(lead);
       }
-    const mark = createMicroLabel(kit, `U${chip + 1}\nPD-${271 + chip}`, {
-      height: 0.0012,
-      maxWidth: w * 0.8,
-      ink: '#9b9d95',
-    });
+    const mark = createMicroLabel(
+      kit,
+      `U${chip + 1}\n${chipMaker}-${271 + chip}`,
+      {
+        height: 0.0012,
+        maxWidth: w * 0.8,
+        ink: '#9b9d95',
+      },
+    );
     mark.position.set(x, y, 0.0051);
     group.add(mark);
   }

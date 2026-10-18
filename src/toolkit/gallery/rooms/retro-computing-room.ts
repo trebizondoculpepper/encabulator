@@ -1,3 +1,10 @@
+import { neumannDiagnostics } from '../../components/industrial-control/parts/neumann-diagnostics';
+import type { Readable } from '../../components/core/logic/world/components';
+import { computed, signal } from '@preact/signals-core';
+import type {
+  BbcDiagnosticLink,
+  ScreenLine,
+} from '../../components/industrial-control/logic/bbc-micro';
 import {
   AmbientLight,
   Box3,
@@ -93,18 +100,52 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
   sign.position.set(-1.6, 2.5, FLOOR.minZ + 0.154);
   room.add(sign);
   const parts = createPartSet();
-  const exhibit = parts.add(bbcWorkstation(kit));
+  const endpoint = signal(true);
+  const sessions = signal<Readable<boolean>[]>([]);
+  const boards = parts.add(
+    neumannDiagnostics(
+      kit,
+      endpoint,
+      computed(() => sessions.value.some((s) => s.value)),
+    ),
+  );
+  boards.object.position.set(-2.6, 1.35, -0.7);
+  room.add(boards.object);
+  const boardStand = new Mesh(
+    new BoxGeometry(0.48, 0.5, 0.02),
+    kitPaint(kit, '#d9dacd'),
+  );
+  boardStand.position.z = -0.025;
+  boards.object.add(boardStand);
+  const boardLabel = createMicroLabel(
+    kit,
+    'NEUMANN LINK / DIAGNOSTICS\nEXHIBIT LOOPBACK ENDPOINT',
+    { height: 0.007, maxWidth: 0.44, ink: '#202520' },
+  );
+  boardLabel.position.set(0, 0.2, 0);
+  boards.object.add(boardLabel);
+  const demo: BbcDiagnosticLink = {
+    online: boards.online,
+    lines: signal<readonly ScreenLine[]>([
+      ['EXHIBIT LOOPBACK TEST', '#f4e04a'],
+      ['SIMULATED ENDPOINT / NO MACHINE', '#ffffff'],
+      ['SERIAL SESSION ESTABLISHED', '#6ef06e'],
+      ['Use ENDPOINT to test disconnects.', '#ffffff'],
+    ]),
+  };
+  const exhibit = parts.add(bbcWorkstation(kit, false, demo));
   exhibit.object.position.set(0, 0, -0.7);
   exhibit.object.rotation.y = -0.15;
   room.add(exhibit.object);
   // Gallery controls sit on each desk; the actual computer rockers work too.
   const powerPanel = (station: ReturnType<typeof bbcWorkstation>) => {
+    sessions.value = [...sessions.value, station.model.diagnosticsAvailable];
     const panel = new Group();
     panel.position.set(-0.43, station.view.top + 0.01, 0.23);
     panel.rotation.x = -Math.PI / 2;
     station.object.add(panel);
     const sheet = new Mesh(
-      new BoxGeometry(0.18, 0.15, 0.008),
+      new BoxGeometry(0.3, 0.15, 0.008),
       kitPaint(kit, '#d9dacd'),
     );
     panel.add(sheet);
@@ -126,6 +167,26 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
     });
     label.position.set(0, 0.045, 0.006);
     panel.add(label);
+    const endpointSwitch = parts.add(
+      pushButton(kit, {
+        name: 'Demo annunciator endpoint power',
+        colour: 'amber',
+        head: 'illuminated',
+        lamp: endpoint,
+        action: () => {
+          endpoint.value = !endpoint.value;
+        },
+      }),
+    );
+    endpointSwitch.object.position.set(0.1, -0.015, 0.005);
+    panel.add(endpointSwitch.object);
+    const endpointLabel = createMicroLabel(kit, 'ENDPOINT', {
+      height: 0.0035,
+      ink: '#202520',
+      maxWidth: 0.08,
+    });
+    endpointLabel.position.set(0.1, 0.015, 0.006);
+    panel.add(endpointLabel);
   };
   powerPanel(exhibit);
   const plaque = new Mesh(
@@ -174,7 +235,7 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
   let disposed = false;
   let candidate: Awaited<ReturnType<typeof bbcImportedWorkstation>> = null;
   let audible = true;
-  void bbcImportedWorkstation(kit)
+  void bbcImportedWorkstation(kit, demo)
     .then((loaded) => {
       if (!loaded) return;
       if (disposed) {

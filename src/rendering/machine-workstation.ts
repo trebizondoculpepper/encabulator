@@ -1,3 +1,5 @@
+import { computed, signal } from '@preact/signals-core';
+import type { BbcDiagnosticLink } from '../toolkit/components/industrial-control/logic/bbc-micro';
 import {
   Box3,
   Group,
@@ -23,6 +25,7 @@ export function addMachineWorkstation(
   machine: { x: number; z: number },
   metre: number,
   dataPort: Object3D,
+  link?: BbcDiagnosticLink,
 ) {
   const group = new Group();
   group.name = 'Encabulator diagnostic workstation';
@@ -34,7 +37,8 @@ export function addMachineWorkstation(
   );
   group.rotation.y = 1.3;
   const parts = createPartSet();
-  let station = parts.add(bbcWorkstation(kit));
+  let station = parts.add(bbcWorkstation(kit, false, link));
+  const active = signal(station.model);
   group.add(station.object);
   let sit: Parameters<typeof station.onSit>[0] = () => {};
   station.onSit((pose) => sit(pose));
@@ -122,20 +126,19 @@ export function addMachineWorkstation(
   connectData();
   let disposed = false;
   let audible = true;
-  void bbcImportedWorkstation(kit)
+  void bbcImportedWorkstation(kit, link)
     .then((loaded) => {
       if (!loaded) return;
       if (disposed) {
         loaded.dispose();
         return;
       }
-      if (station.model.power.state.value) {
-        loaded.model.power.flip();
-        loaded.model.step(station.model.elapsed.value);
-      }
+      loaded.setAudible(false);
+      loaded.model.restore(station.model.snapshot());
       station.object.removeFromParent();
       parts.remove(station);
       station = parts.add(loaded);
+      active.value = station.model;
       station.onSit((pose) => sit(pose));
       station.setAudible(audible);
       group.add(station.object);
@@ -168,6 +171,9 @@ export function addMachineWorkstation(
   };
   return {
     group,
+    diagnosticsAvailable: computed(
+      () => active.value.diagnosticsAvailable.value,
+    ),
     parts,
     solids,
     onSit(callback: typeof sit) {

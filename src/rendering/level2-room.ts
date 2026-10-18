@@ -1,3 +1,5 @@
+import { createMachineSideCulling } from '../scene/machine-side-culling';
+import { narrativeDiagnostics } from '../game/bbc-machine-diagnostics';
 import { addMachineWorkstation } from './machine-workstation';
 import {
   createLevel2NormalOperations,
@@ -26,7 +28,7 @@ import {
   Vector2,
 } from 'three';
 import type { Object3D } from 'three';
-import { signal } from '@preact/signals-core';
+import { computed, effect, signal } from '@preact/signals-core';
 import { createLevel2Voice } from '../audio/level2-voice';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
@@ -106,6 +108,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     minZ: s.minZ * m,
     maxZ: s.maxZ * m,
   }));
+  const diagnosticsAvailable = signal(false);
   const oilFeed = signal(false);
   const driveFeed = signal(false);
   const hydroFeed = signal(true);
@@ -113,6 +116,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const hydroTone = signal(false);
   const driveTone = signal(false);
   const mcc = createRetroEncabulatorMcc(kit, {
+    diagnosticsAvailable,
     incomingOn: false,
     driveTrainWithMains: true,
     bucketFeed: {
@@ -129,12 +133,23 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL2_MACHINE.x * m, 0, LEVEL2_MACHINE.z * m);
   scene.add(mcc.group);
+  // Only the side of the machine in view is drawn.
+  const machineSides = createMachineSideCulling(mcc.group);
   const workstation = addMachineWorkstation(
     kit,
     LEVEL2_MACHINE,
     m,
     mcc.rear.dataPort,
+    narrativeDiagnostics(
+      mcc.diagnosticEndpoint,
+      computed(() => mcc.mainBreaker.closed.value),
+      mcc.controls.get('main.kirk')!.position,
+      mcc.diagnosticFault,
+    ),
   );
+  const stopDiagnosticLink = effect(() => {
+    diagnosticsAvailable.value = workstation.diagnosticsAvailable.value;
+  });
   scene.add(workstation.group);
   const device = (id: string) =>
     mcc.components.find((item) => item.object.name === `${id}: breaker`)!
@@ -838,6 +853,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         !alive || flicker ? '#344038' : dim ? '#5c7850' : '#73bb67',
       );
     });
+    machineSides.update(camera);
     renderer.render(scene, camera);
   });
   const dispose = () => {
@@ -852,6 +868,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     voice.dispose();
     mcc.parts.dispose();
     room.parts.dispose();
+    stopDiagnosticLink();
     workstation.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.remove(skipModel.group, chairs);

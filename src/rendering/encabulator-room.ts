@@ -1,3 +1,4 @@
+import { createMachineSideCulling } from '../scene/machine-side-culling';
 import {
   AmbientLight,
   BoxGeometry,
@@ -117,6 +118,8 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(0, 0, -3.8 * m);
   scene.add(mcc.group);
+  // Only the side of the machine in view is drawn.
+  const machineSides = createMachineSideCulling(mcc.group);
   // The failure simulator, in front of the line-up and to one side.
   const CONSOLE = { x: 1.3, z: -2.3 };
   const failures = createFailureConsole(kit, mcc);
@@ -285,6 +288,7 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     failures.parts.update(delta);
     partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
+    machineSides.update(camera);
     renderer.render(scene, camera);
     if (import.meta.env.DEV && params.has('stats') && time - lastStats > 500) {
       canvas.dataset.drawCalls = String(renderer.info.render.calls);
