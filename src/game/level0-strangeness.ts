@@ -34,12 +34,13 @@ const ramp = (x: number, [from, to]: readonly [number, number]) =>
  * dev2's full strength (dev1's activity 1 is the VX3's end-state chaos),
  * so the room is unsettling, not unreadable. The owner found the first
  * tuning (activity 1, ghosting 0.55, patterns 0.65, 14 a minute) far too
- * strong.
+ * strong, and the patterns at 0.2 still too strong.
  */
 export const MOST: Strangeness = {
   activity: 0.3,
   ghosting: 0.25,
-  patterns: 0.2,
+  // Much fainter again, at the owner's word: a ghost of a pattern.
+  patterns: 0.06,
   apparitionsPerMinute: 4,
 };
 

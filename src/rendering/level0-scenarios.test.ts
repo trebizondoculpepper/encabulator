@@ -258,7 +258,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
       );
     }
     expect(failures.spill.scale.x).toBeGreaterThan(early);
-    expect(strange).toBeGreaterThan(0.15);
+    expect(strange).toBeGreaterThan(0.04);
     // The breakdown: seized, its overload and the main breaker tripped.
     expect(machine.plant.brokenDown.value).toBe(true);
     expect(machine.mcc.mainBreaker.position.value).toBe('tripped');

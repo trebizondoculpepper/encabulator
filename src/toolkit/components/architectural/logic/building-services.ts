@@ -1,4 +1,5 @@
 import { createGraph } from '../../core/logic/world/graph';
+import { createFireAlarmSystem } from '../../fire/logic/fire-alarm-system';
 
 /**
  * Dev8's world model: the building services of one room of a present-day
@@ -46,15 +47,17 @@ import { createGraph } from '../../core/logic/world/graph';
  *   sounds and lights an alarm until reset.
  */
 
+export {
+  ALL_CLEAR_SECONDS,
+  HEAD_OPENS_AT,
+  INVESTIGATION_SECONDS,
+  SMOKE_ALARM,
+  SMOKE_RISE,
+} from '../../fire/logic/fire-alarm-system';
+export type { FireStage } from '../../fire/logic/fire-alarm-system';
+
 /** Seconds without movement before the occupancy sensor turns the lights off. */
 export const VACANCY_SECONDS = 90;
-/**
- * The investigation period of a two-stage alarm (BS 5839-1): how long
- * the alert stage lasts after a detector, before full evacuation.
- */
-export const INVESTIGATION_SECONDS = 90;
-/** How long the all-clear lasts before the system is normal again. */
-export const ALL_CLEAR_SECONDS = 10;
 /**
  * Lighting the bin: it smoulders, smoking a little, for `SMOULDER_SECONDS`;
  * then flames catch at `FIRE_START` and grow at `IGNITION_GROWTH` a second
@@ -68,10 +71,6 @@ export const IGNITION_GROWTH = 0.02;
 export const IGNITION_SIZE = 0.2;
 export const FIRE_GROWTH = 0.015;
 export const FIRE_QUENCH = 0.04;
-/** How fast smoke builds up at the detector, a second: a few seconds' worth. */
-export const SMOKE_RISE = 0.06;
-/** A sprinkler head's glass bulb bursts at this temperature, °C. */
-export const HEAD_OPENS_AT = 68;
 /** Where the waste-paper bin stands, under the smoke detector: mid-room. */
 export const FIRE_SEAT = { x: 0.4, z: 0.3 };
 /** The sprinkler heads in the ceiling, metres. */
@@ -87,8 +86,6 @@ export const SPRINKLER_HEADS: readonly { x: number; z: number }[] = [
   { x: 4.5, z: -2 },
   { x: -4.5, z: -2 },
 ];
-/** The fire alarm's stages. */
-export type FireStage = 'normal' | 'alert' | 'evacuate' | 'all-clear';
 
 /**
  * The hot gas at sprinkler head `i` under a fire of `size` (0 to 1):
@@ -103,8 +100,6 @@ export function headTemperature(size: number, i: number) {
 export const DOOR_RELEASE_SECONDS = 6;
 /** Seconds the WC extractor runs on after its light goes off. */
 export const FAN_RUN_ON_SECONDS = 20;
-/** Smoke at the detector, 0 to 1, above which it goes into alarm. */
-export const SMOKE_ALARM = 0.3;
 export const OUTSIDE_TEMPERATURE = 9;
 /** Air-conditioning modes, in the order the MODE button steps them. */
 export const HVAC_MODES = ['auto', 'heat', 'cool', 'fan'] as const;
@@ -204,256 +199,81 @@ export function createBuildingServices() {
   );
 
   // ---- Fire ------------------------------------------------------------
-  const panelKey = g.input('fire.panel.key', false, {
-    where: 'fire panel access key',
-  });
-  const riserValve = g.input('sprinkler.main', true, {
-    where: 'sprinkler main valve',
-  });
-  const callPoint = g.state('fire.callPoint', false);
+  // The fire in the bin; the alarm and sprinklers are the shared system
+  // (`../../fire/logic/fire-alarm-system.ts`), which the bin's smoke and
+  // heat set off.
   /** The fire itself: 0 when out, growing towards 1. */
   const fireSize = g.state('fire.size', 0);
   /** Seconds the lit bin has left to smoulder before its flames catch. */
   const smoulder = g.state('fire.smoulder', 0);
-  /**
-   * What the investigation will find (decided, at random, when the alert
-   * begins): a fire, or a false alarm.
-   */
-  const willFindFire = g.state('fire.willFindFire', true);
-  /** A false alarm has been called while the bin still smoulders. */
-  const calledFalse = g.state('fire.calledFalse', false);
-  const smoke = g.state('fire.smoke', 0);
-  const detector = g.state('fire.detector', false);
-  const silenced = g.state('fire.silenced', false);
-  const brigade = g.state('fire.brigade', false);
-  const stage = g.state<FireStage>('fire.stage', 'normal');
-  const investigation = g.state('fire.investigation', 0);
-  const allClearFor = g.state('fire.allClearFor', 0);
-  /** One-off announcements, numbered so a repeat is heard as new. */
-  const message = g.state<{
-    kind: 'false-alarm' | 'all-clear' | null;
-    n: number;
-  }>('fire.message', { kind: null, n: 0 });
-  /** Each sprinkler head's glass bulb: burst, or whole. */
-  const bulbs = g.state<boolean[]>(
-    'sprinkler.bulbs',
-    SPRINKLER_HEADS.map(() => false),
-    { equals: (a: boolean[], b: boolean[]) => a.every((v, i) => v === b[i]) },
+  const alight = g.derive(
+    'fire.alight',
+    [fireSize, smoulder],
+    (size, left) => size > 0 || left > 0,
   );
-  const heads = g.output(
-    'sprinkler.heads',
-    [bulbs, riserValve],
-    (burst, open) => burst.map((b) => ({ burst: b, spraying: b && open })),
-    {
-      where: 'sprinkler heads',
-      equals: (
-        a: { burst: boolean; spraying: boolean }[],
-        b: { burst: boolean; spraying: boolean }[],
-      ) =>
-        a.every(
-          (h, i) => h.burst === b[i].burst && h.spraying === b[i].spraying,
-        ),
-    },
+  const smokeTarget = g.derive(
+    'fire.smokeMade',
+    [fireSize, smoulder],
+    (size, left) =>
+      size > 0 ? Math.min(1, 0.3 + size * 1.5) : left > 0 ? 0.22 : 0,
   );
-  const discharging = g.output(
-    'sprinkler.discharge',
-    [heads],
-    (hs) => hs.some((h) => h.spraying),
-    { where: 'sprinkler flow switch and alarm bell' },
+  const headTemperatures = g.derive('sprinkler.heat', [fireSize], (size) =>
+    SPRINKLER_HEADS.map((_, i) => headTemperature(size, i)),
   );
-  const fire = g.derive(
-    'fire.fire',
-    [callPoint, detector, discharging],
-    (c, d, flow) => c || d || flow,
-  );
-  const alarm = g.derive(
-    'fire.alarm',
-    [stage],
-    (s) => s === 'alert' || s === 'evacuate',
-  );
-  const sounding = g.output(
-    'fire.sounding',
-    [alarm, silenced],
-    (a, s) => a && !s,
-    { where: 'sounder-beacons' },
-  );
-  const voice = g.output(
-    'fire.voice',
-    [stage, silenced],
-    (s, quiet): 'alert' | 'evacuate' | null =>
-      quiet ? null : s === 'alert' || s === 'evacuate' ? s : null,
-    { where: 'voice alarm speakers' },
-  );
-  const announcement = g.output('fire.announcement', [message], (m) => m, {
-    where: 'voice alarm speakers',
+  const system = createFireAlarmSystem(g, {
+    heads: SPRINKLER_HEADS.length,
+    mains: main,
+    smokeTarget,
+    alight,
+    headTemperatures,
   });
-  const doorsHeld = g.output(
-    'fire.doorsHeld',
-    [alarm, main],
-    (a, m) => !a && m,
-    { where: 'door holders' },
-  );
+  const {
+    panelKey,
+    riserValve,
+    callPoint,
+    calledFalse,
+    smoke,
+    detector,
+    stage,
+    sounding,
+    voice,
+    announcement,
+    doorsHeld,
+    panelLamps,
+    heads,
+    discharging,
+    smokeShown,
+    pressCallPoint,
+    resetCallPoint,
+    silence,
+    evacuate,
+    reset,
+    resetSprinklers,
+  } = system;
   const flames = g.output('fire.flames', [fireSize], (s) => s, {
     where: 'the fire in the bin',
   });
-  const smokeShown = g.output('fire.smokeShown', [smoke], (s) => s, {
-    where: 'smoke under the ceiling',
-  });
-  const panelLamps = g.output(
-    'fire.panel.lamps',
-    [
-      fire,
-      callPoint,
-      detector,
-      discharging,
-      stage,
-      investigation,
-      silenced,
-      brigade,
-      main,
-      panelKey,
-    ],
-    (f, c, d, flow, s, left, quiet, called, m, key) => ({
-      fire: f,
-      zone1: c,
-      zone2: d || flow,
-      alarm: s === 'alert' || s === 'evacuate',
-      stage: s,
-      countdown: Math.ceil(left),
-      sprinkler: flow,
-      brigade: called,
-      silenced: quiet,
-      power: true,
-      onBattery: !m,
-      enabled: key,
-    }),
-    {
-      where: 'fire alarm panel',
-      equals: (a: Record<string, unknown>, b: Record<string, unknown>) =>
-        Object.keys(a).every((k) => a[k] === b[k]),
-    },
-  );
-  const announce = (kind: 'false-alarm' | 'all-clear') =>
-    message.set({ kind, n: message.peek().n + 1 });
-  const finish = (kind: 'false-alarm' | 'all-clear') => {
-    stage.set('all-clear');
-    allClearFor.set(ALL_CLEAR_SECONDS);
-    silenced.set(false);
-    brigade.set(false);
-    announce(kind);
-  };
-  g.process(
-    'fire',
-    [riserValve, callPoint, smoulder],
-    [
-      fireSize,
-      smoulder,
-      willFindFire,
-      calledFalse,
-      smoke,
-      detector,
-      bulbs,
-      stage,
-      investigation,
-      brigade,
-      allClearFor,
-      silenced,
-      message,
-    ],
-    (dt, random) => {
-      // The fire in the bin: smouldering while it is investigated, growing
-      // once the building is evacuating, and put out by a sprinkler head.
-      const spraying = bulbs
-        .peek()
-        .filter((burst) => burst && riserValve.peek()).length;
-      let size = fireSize.peek();
-      if (smoulder.peek() > 0) {
-        // Smouldering: smoke, no flames yet; water puts it out.
-        smoulder.set(spraying ? 0 : Math.max(0, smoulder.peek() - dt));
-        if (smoulder.peek() <= 0 && !spraying) size = FIRE_START;
-      } else if (size > 0) {
-        const rate =
-          spraying > 0
-            ? -FIRE_QUENCH
-            : stage.peek() === 'evacuate'
-              ? FIRE_GROWTH
-              : size < IGNITION_SIZE
-                ? IGNITION_GROWTH
-                : 0;
-        size = Math.min(1, Math.max(0, size + dt * rate));
-      }
-      if (size !== fireSize.peek()) fireSize.set(size);
-      const lit = size > 0 || smoulder.peek() > 0;
-      // Heat at each head, from the fire's size and the head's distance:
-      // a head's bulb bursts at 68 °C.
-      const burst = bulbs.peek();
-      const next = burst.map(
-        (b, i) => b || headTemperature(size, i) >= HEAD_OPENS_AT,
-      );
-      if (next.some((b, i) => b !== burst[i])) bulbs.set(next);
-      // Smoke builds up over a few seconds and clears slowly.
-      const target =
-        size > 0
-          ? Math.min(1, 0.3 + size * 1.5)
-          : smoulder.peek() > 0
-            ? 0.22
+  g.process('fire', [heads, stage, smoulder], [fireSize, smoulder], (dt) => {
+    // The fire in the bin: smouldering while it is investigated, growing
+    // once the building is evacuating, and put out by a sprinkler head.
+    const spraying = heads.peek().some((h) => h.spraying);
+    let size = fireSize.peek();
+    if (smoulder.peek() > 0) {
+      // Smouldering: smoke, no flames yet; water puts it out.
+      smoulder.set(spraying ? 0 : Math.max(0, smoulder.peek() - dt));
+      if (smoulder.peek() <= 0 && !spraying) size = FIRE_START;
+    } else if (size > 0) {
+      const rate = spraying
+        ? -FIRE_QUENCH
+        : stage.peek() === 'evacuate'
+          ? FIRE_GROWTH
+          : size < IGNITION_SIZE
+            ? IGNITION_GROWTH
             : 0;
-      const now = smoke.peek();
-      smoke.set(
-        target > now
-          ? Math.min(target, now + dt * SMOKE_RISE)
-          : Math.max(target, now - dt * 0.03),
-      );
-      if (smoke.peek() > SMOKE_ALARM) detector.set(true);
-      // The fire alarm's stages.
-      const flow = spraying > 0;
-      switch (stage.peek()) {
-        case 'normal':
-          if (callPoint.peek() || flow) {
-            stage.set('evacuate');
-            silenced.set(false);
-          } else if (detector.peek()) {
-            // A second activation after a false alarm is not investigated
-            // again: everyone leaves.
-            if (calledFalse.peek()) stage.set('evacuate');
-            else {
-              stage.set('alert');
-              investigation.set(INVESTIGATION_SECONDS);
-              willFindFire.set(random() < 0.5);
-            }
-            silenced.set(false);
-          }
-          break;
-        case 'alert':
-          investigation.set(Math.max(0, investigation.peek() - dt));
-          if (callPoint.peek() || flow) {
-            stage.set('evacuate');
-            silenced.set(false);
-          } else if (investigation.peek() <= 0) {
-            if (willFindFire.peek()) {
-              stage.set('evacuate');
-              silenced.set(false);
-            } else {
-              // Called a false alarm, and the panel reset, though the bin
-              // is still alight: its smoke will soon be back.
-              detector.set(false);
-              smoke.set(Math.min(smoke.peek(), SMOKE_ALARM * 0.5));
-              calledFalse.set(lit);
-              finish('false-alarm');
-            }
-          }
-          break;
-        case 'evacuate':
-          // The panel calls the fire brigade (an alarm receiving centre).
-          if (!brigade.peek()) brigade.set(true);
-          break;
-        case 'all-clear':
-          allClearFor.set(allClearFor.peek() - dt);
-          if (allClearFor.peek() <= 0) stage.set('normal');
-          break;
-      }
-    },
-  );
+      size = Math.min(1, Math.max(0, size + dt * rate));
+    }
+    if (size !== fireSize.peek()) fireSize.set(size);
+  });
   /** LIGHT THE BIN: set fire to the waste-paper bin under the detector. */
   const startFire = g.action('fire.start', [], [smoulder, calledFalse], () => {
     if (fireSize.peek() > 0 || smoulder.peek() > 0) return false;
@@ -461,63 +281,6 @@ export function createBuildingServices() {
     calledFalse.set(false);
     return true;
   });
-  const pressCallPoint = g.action('fire.callPoint.press', [], [callPoint], () =>
-    callPoint.set(true),
-  );
-  const resetCallPoint = g.action('fire.callPoint.reset', [], [callPoint], () =>
-    callPoint.set(false),
-  );
-  /** SILENCE: quiet the sounders and the voice, with the key turned. */
-  const silence = g.action(
-    'fire.panel.silence',
-    [panelKey, alarm],
-    [silenced],
-    () => {
-      if (!panelKey.peek() || !alarm.peek()) return false;
-      silenced.set(true);
-      return true;
-    },
-  );
-  /** RESOUND or EVACUATE: sound full evacuation, with the key turned. */
-  const evacuate = g.action(
-    'fire.panel.evacuate',
-    [panelKey],
-    [stage, silenced],
-    () => {
-      if (!panelKey.peek()) return false;
-      stage.set('evacuate');
-      silenced.set(false);
-      return true;
-    },
-  );
-  /**
-   * RESET, with the key turned. It succeeds only once nothing is still in
-   * alarm: no call point latched, no water flowing, no fire and the smoke
-   * cleared; then the voice gives the all-clear.
-   */
-  const reset = g.action(
-    'fire.panel.reset',
-    [panelKey, smoke, fireSize, callPoint, discharging],
-    [detector, stage, silenced, brigade, allClearFor, message],
-    () => {
-      if (!panelKey.peek()) return false;
-      const clear =
-        !callPoint.peek() &&
-        !discharging.peek() &&
-        fireSize.peek() <= 0 &&
-        smoulder.peek() <= 0 &&
-        smoke.peek() <= SMOKE_ALARM;
-      if (!clear) return false;
-      detector.set(false);
-      if (stage.peek() === 'normal') return true;
-      finish('all-clear');
-      return true;
-    },
-  );
-  /** At the valve set: replace the burst heads (shut the main valve first). */
-  const resetSprinklers = g.action('sprinkler.reset', [], [bulbs], () =>
-    bulbs.set(SPRINKLER_HEADS.map(() => false)),
-  );
 
   // ---- Climate ---------------------------------------------------------
   const outside = g.fixed('weather.outside', OUTSIDE_TEMPERATURE);
