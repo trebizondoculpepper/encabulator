@@ -2,6 +2,7 @@ import type { Object3D, PerspectiveCamera } from 'three';
 import { createObjectHandling } from './object-handling';
 import type { DropPlacement } from './object-handling';
 import type { PortableObject, SupportSurface } from './object-handling';
+import { lockUnavailable } from '../logic/pointer-lock';
 import { slide } from '../logic/walk-collision';
 import type { Footprint } from '../logic/walk-collision';
 import { PAD, controlsHelp, deadZone } from '../logic/controls';
@@ -171,6 +172,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
   const tapped = new Set<string>();
   const nudge = { forward: 0, right: 0 };
   let lockRefused = false;
+  /** When the mouse was last released (Esc), for the browser's cooldown. */
+  let releasedAt = -Infinity;
   // While held, the room has the camera: no input walks or looks.
   let holding = false;
 
@@ -313,10 +316,15 @@ export function createFirstPerson(options: FirstPersonOptions) {
   };
   const lockChange = () => {
     crosshair.hidden = !(locked() || input === 'gamepad');
-    if (!locked()) forget();
+    if (!locked()) {
+      forget();
+      releasedAt = performance.now();
+    }
   };
+  // Refused straight after Esc, the next click tries again; refused
+  // otherwise, capture is not allowed here and looking is by dragging.
   const refuseLock = () => {
-    lockRefused = true;
+    if (lockUnavailable(performance.now() - releasedAt)) lockRefused = true;
   };
 
   // Without a captured mouse, dragging looks and a still click uses.
