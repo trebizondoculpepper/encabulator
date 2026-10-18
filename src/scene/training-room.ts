@@ -42,6 +42,7 @@ import type { PanelKit } from './eighties-controls';
 import { mergeStatic } from './merge-static';
 import { createCanvasTexture } from './screens';
 import { seeded } from './worn-paint';
+import { CHAIR_STACK_HALF, createChairStack } from './chair-stack';
 
 const SANS = 'Arial, Helvetica, sans-serif';
 const { minX, maxX, minZ, maxZ } = TRAINING_BOUNDS;
@@ -1323,32 +1324,20 @@ export function createTrainingRoom(kit: PanelKit) {
   const fabric = paint('#2c4775', 0.95);
   const chairShell = paint('#1d1f22', 0.6);
   const chairStack = (x: number, z: number, count: number, yaw: number) => {
-    const stack = new Group();
+    const stack = createChairStack(count, {
+      fabric,
+      shell: chairShell,
+      chrome,
+    });
     stack.position.set(x, 0, z);
     stack.rotation.y = yaw;
     inside.add(stack);
-    for (let i = 0; i < count; i++) {
-      const y = 0.45 + i * 0.075;
-      box(stack, fabric, 0.46, 0.05, 0.44, 0, y, 0);
-      const back = box(stack, fabric, 0.44, 0.34, 0.04, 0, y + 0.3, -0.23);
-      back.rotation.x = -0.12;
-      box(stack, chairShell, 0.47, 0.012, 0.45, 0, y - 0.03, 0);
-      for (const sx of [-0.21, 0.21]) {
-        cylinder(stack, chrome, 0.011, 0.47, sx, y - 0.24, 0.19, 8);
-        const rear = cylinder(
-          stack,
-          chrome,
-          0.011,
-          0.82,
-          sx,
-          y + 0.02,
-          -0.22,
-          8,
-        );
-        rear.rotation.x = 0.1;
-      }
-    }
-    solid(x - 0.3, z - 0.3, x + 0.3, z + 0.3);
+    solid(
+      x - CHAIR_STACK_HALF,
+      z - CHAIR_STACK_HALF,
+      x + CHAIR_STACK_HALF,
+      z + CHAIR_STACK_HALF,
+    );
   };
   chairStack(6.45, northFace + 0.4, 8, 0.1);
   chairStack(5.75, northFace + 0.4, 6, -0.06);

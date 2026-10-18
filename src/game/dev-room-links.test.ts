@@ -44,8 +44,8 @@ describe('the rooms', () => {
     expect(devPortals('level2', bounds, 1)).toEqual([]);
   });
 
-  it('keeps the old Hall and rhombus URLs as aliases', () => {
-    expect(resolveRoomId('dev4')).toBe('hall');
+  it('keeps the old rhombus URL as an alias, and dev4 is a room again', () => {
+    expect(resolveRoomId('dev4')).toBe('dev4');
     expect(resolveRoomId('dev5')).toBe('rhombus');
     expect(resolveRoomId('hall')).toBe('hall');
     expect(resolveRoomId('rhombus')).toBe('rhombus');

@@ -16,6 +16,7 @@ export type DevRoomId =
   | 'dev1'
   | 'dev2'
   | 'dev3'
+  | 'dev4'
   | 'dev6'
   | 'dev7'
   | 'dev8'
@@ -45,6 +46,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev1',
   'dev2',
   'dev3',
+  'dev4',
   'dev6',
   'dev7',
   'dev8',
@@ -68,7 +70,6 @@ export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall', 'level2'];
 
 /** Historic URLs remain usable without changing the address bar. */
 export function resolveRoomId(id: string | null): RoomId | undefined {
-  if (id === 'dev4') return 'hall';
   if (id === 'dev5') return 'rhombus';
   return ROOMS.includes(id as RoomId) ? (id as RoomId) : undefined;
 }
@@ -78,6 +79,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev1: 'DEV1 · EFFECTS',
   dev2: 'DEV2 · HALLUCINATIONS',
   dev3: 'DEV3 · RACKS',
+  dev4: 'DEV4 · BRANDS AND LOGOS',
   dev6: 'DEV6 · RETRO ENCABULATOR',
   dev7: 'DEV7 · UNDERGROUND CORRIDOR',
   dev8: 'DEV8 · BUILDING FITTINGS',
@@ -102,6 +104,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev1: '#d0732c',
   dev2: '#8a4fd6',
   dev3: '#3f7fe0',
+  dev4: '#c8a227',
   dev6: '#9a9685',
   dev7: '#2d9ca0',
   dev8: '#b8433a',

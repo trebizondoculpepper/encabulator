@@ -1,0 +1,3 @@
+# Merge local work after the warehouse and Level 2 updates
+
+Pulled `main` through the warehouse update, then integrated the preserved local work. A second incoming update revised the Level 2 normal-operation scenario and narrator script while the merge was in progress. Kept that newer inbound Level 2 implementation, script, cue manifest and recordings. Integrated the distinct local Brands and Logos room as dev4, graffiti room changes, and chair-stack component and training-room use alongside the incoming dev17 warehouse and dev18 gallery. Removed two superseded Level 2 narration files that the inbound sequence no longer references. The original local changes remain in a stash as a recovery copy.

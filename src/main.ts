@@ -57,6 +57,8 @@ const openRoom = async () => {
       .startArchitecturalGalleryRoom;
   else if (room === 'dev17')
     start = (await import('./rendering/warehouse-room')).startWarehouseRoom;
+  else if (room === 'dev4')
+    start = (await import('./rendering/brands-room')).startBrandsRoom;
   else if (room === 'dev16')
     start = (await import('./rendering/graffiti-room')).startGraffitiRoom;
   else if (room === 'dev15')

@@ -53,24 +53,44 @@ interface Hang {
 }
 const WALL_OFF = 0.15 + 0.06;
 const DIVIDER_OFF = DIVIDER.thick / 2 + 0.05;
+// Numbered in order walking round: along the north wall from the west,
+// down the east end, back along the south wall, up the west end, then
+// each partition from the west, its north face and then its south,
+// each run left to right as it is seen.
+const ALONG = Array.from({ length: 9 }, (_, i) => -14.4 + i * 3.6);
+const ENDS = [-8, -4.5, -1, 2.5, 6];
 const HANGS: Hang[] = [
-  // Nine along each long wall.
-  ...Array.from({ length: 9 }, (_, i) => -14.4 + i * 3.6).flatMap((x) => [
-    { x, z: FLOOR.minZ, facing: 0, off: WALL_OFF },
-    { x, z: FLOOR.maxZ, facing: Math.PI, off: WALL_OFF },
+  ...ALONG.map((x) => ({ x, z: FLOOR.minZ, facing: 0, off: WALL_OFF })),
+  // The ends keep clear of the portals near their south corners.
+  ...ENDS.map((z) => ({
+    x: FLOOR.maxX,
+    z,
+    facing: -Math.PI / 2,
+    off: WALL_OFF,
+  })),
+  ...[...ALONG]
+    .reverse()
+    .map((x) => ({ x, z: FLOOR.maxZ, facing: Math.PI, off: WALL_OFF })),
+  ...[...ENDS].reverse().map((z) => ({
+    x: FLOOR.minX,
+    z,
+    facing: Math.PI / 2,
+    off: WALL_OFF,
+  })),
+  ...DIVIDERS.flatMap((x) => [
+    ...[1.5, -1.5].map((dx) => ({
+      x: x + dx,
+      z: 0,
+      facing: Math.PI,
+      off: DIVIDER_OFF,
+    })),
+    ...[-1.5, 1.5].map((dx) => ({
+      x: x + dx,
+      z: 0,
+      facing: 0,
+      off: DIVIDER_OFF,
+    })),
   ]),
-  // Five on each end, clear of the portals near the south corners.
-  ...[-8, -4.5, -1, 2.5, 6].flatMap((z) => [
-    { x: FLOOR.minX, z, facing: Math.PI / 2, off: WALL_OFF },
-    { x: FLOOR.maxX, z, facing: -Math.PI / 2, off: WALL_OFF },
-  ]),
-  // Two on each face of each partition.
-  ...DIVIDERS.flatMap((x) =>
-    [-1.5, 1.5].flatMap((dx) => [
-      { x: x + dx, z: 0, facing: Math.PI, off: DIVIDER_OFF },
-      { x: x + dx, z: 0, facing: 0, off: DIVIDER_OFF },
-    ]),
-  ),
 ];
 
 /**
@@ -230,6 +250,19 @@ export function startGraffitiRoom(canvas: HTMLCanvasElement) {
     );
     label.position.set(card.position.x, card.position.y, 0.004);
     exhibit.add(label);
+    // Its number, big, on a black plate at the panel's top left corner,
+    // so it can be named from across the room.
+    const number = createMicroLabel(kit, String(i + 1), {
+      height: 0.16,
+      ink: '#f5f5f5',
+      plate: '#141414',
+    });
+    number.position.set(
+      -PANEL.w / 2 + 0.16,
+      PANEL.y + PANEL.h / 2 - 0.14,
+      0.035,
+    );
+    exhibit.add(number);
   });
 
   // ---- Walking --------------------------------------------------------------
@@ -297,6 +330,44 @@ export function startGraffitiRoom(canvas: HTMLCanvasElement) {
       walk.place(x * m, z * m, yaw, pitch);
     },
     pieces: () => GRAFFITI.map((p, i) => `${i + 1}. ${p.title} (${p.kind})`),
+    /**
+     * Lay every piece out, numbered, on one sheet over the view, to look
+     * through them at once; `sheet(false)` takes it away.
+     */
+    sheet(show = true) {
+      document.getElementById('graffiti-sheet')?.remove();
+      if (!show) return;
+      const columns = 7;
+      const cell = { w: 240, h: 150 + 22 };
+      const sheet = document.createElement('canvas');
+      sheet.id = 'graffiti-sheet';
+      sheet.width = columns * cell.w;
+      sheet.height = Math.ceil(GRAFFITI.length / columns) * cell.h;
+      Object.assign(sheet.style, {
+        position: 'fixed',
+        inset: '0',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        background: '#8f8c85',
+        zIndex: '10',
+      });
+      const ctx = sheet.getContext('2d')!;
+      ctx.fillStyle = '#8f8c85';
+      ctx.fillRect(0, 0, sheet.width, sheet.height);
+      GRAFFITI.forEach((art, i) => {
+        const x = (i % columns) * cell.w;
+        const y = Math.floor(i / columns) * cell.h;
+        const image = graffitiTexture(art).image as HTMLCanvasElement;
+        ctx.drawImage(image, x + 4, y + 22, cell.w - 8, 150 - 4);
+        ctx.fillStyle = '#141414';
+        ctx.fillRect(x + 4, y + 2, cell.w - 8, 20);
+        ctx.fillStyle = '#f5f5f5';
+        ctx.font = 'bold 15px sans-serif';
+        ctx.fillText(`${i + 1}. ${art.title}`, x + 10, y + 17, cell.w - 20);
+      });
+      document.body.append(sheet);
+    },
   };
 
   // ---- Each frame -------------------------------------------------------------
