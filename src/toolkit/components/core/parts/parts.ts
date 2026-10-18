@@ -694,7 +694,8 @@ export function potentiometer(
       : undefined,
   });
   a.voice(part, { detent: KNOB });
-  a.uses.set(view.knob, (direction = 1) => part.turn(direction));
+  // Include its visible mounting ring, so edge clicks still turn the knob.
+  a.uses.set(view.group, (direction = 1) => part.turn(direction));
   a.updates.push((delta) => {
     view.set(part.share.value);
     view.update(delta);
@@ -920,7 +921,8 @@ export function driveKeypad(
       power: props.power,
     });
     a.voice(button, { press: KEY }, key.group);
-    a.uses.set(key.cap, () => {
+    // The key includes its narrow bezel as well as the coloured cap.
+    a.uses.set(key.group, () => {
       key.press();
       button.press();
     });

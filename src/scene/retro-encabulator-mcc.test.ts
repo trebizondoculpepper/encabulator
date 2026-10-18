@@ -51,9 +51,9 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function fixture() {
+function fixture(options?: Parameters<typeof createRetroEncabulatorMcc>[1]) {
   const kit = createPanelKit();
-  const mcc = createRetroEncabulatorMcc(kit);
+  const mcc = createRetroEncabulatorMcc(kit, options);
   const interiors: Group[] = [];
   mcc.group.traverse((o) => {
     if (o.name.endsWith(' contents')) interiors.push(o as Group);
@@ -1250,5 +1250,81 @@ it('places the first low round data entry on its real rear plate, independent of
       .distanceTo(metrePosition.multiplyScalar(3).add(new Vector3(6, 0, 12))),
   ).toBeLessThan(0.000001);
   expect(port.parent!.getObjectByName('Right entry blank')).toBeUndefined();
+  dispose();
+});
+
+it('preserves Level2 isolation, five removable cards and RESET after their removal', () => {
+  const { mcc, dispose } = fixture({
+    incomingOn: false,
+    driveTrainWithMains: true,
+  });
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.1) mcc.update(0.1);
+  };
+  expect(mcc.supply.value).toBe(false);
+  expect(mcc.mainBreaker.closed.value).toBe(false);
+  isolate(mcc);
+  mcc.mainBreaker.operate();
+  run(16);
+  expect(mcc.mainBreaker.closed.value).toBe(true);
+  for (const name of [
+    'drive.speed',
+    'fan.mode',
+    'fan.boost',
+    'hydraulic.key',
+    'incoming.phase',
+    'main.kirk',
+    'feed.hoa',
+    'annunciator.tests',
+    'auxiliary.stop',
+    'automation.reset',
+  ])
+    expect(mcc.controls.has(name), name).toBe(true);
+  const cards = mcc.components
+    .filter((d) => d.kind === 'backplane')
+    .flatMap((d) => d.cards ?? []);
+  expect(cards).toHaveLength(5);
+  cards.find((d) => d.kind === 'plc-power')!.test();
+  mcc.fail('sputter');
+  run(7);
+  expect(mcc.stalled).toBe(true);
+  mcc.door(14);
+  expect(mcc.doors.get('section5.bucket1')!.value).toBe(true);
+  mcc.circuits.get('section5.bucket1')!.breaker!.breaker!.operate();
+  for (const card of cards) {
+    const portable = card.object.userData.portable as PortableObject;
+    portable.component.setLocked(false);
+    portable.component.pickUp();
+    portable.detach();
+    expect(portable.component.phase.value).toBe('held');
+    expect(card.active.value).toBe(false);
+  }
+  let plcHinge: Object3D | undefined;
+  mcc.group.traverse((object) => {
+    if (
+      object.name.includes('AUTOMATION CONTROL') &&
+      object.name.endsWith(' door')
+    )
+      plcHinge = object.parent!;
+  });
+  let reset: Object3D | undefined;
+  for (const object of mcc.parts.uses.keys()) {
+    let resetButton = false;
+    for (let at: Object3D | null = object; at; at = at.parent) {
+      if (at.name === 'RESET push button') resetButton = true;
+      if (at === plcHinge && resetButton) reset = object;
+    }
+    if (reset) break;
+  }
+  expect(reset).toBeDefined();
+  work(mcc, reset!);
+  mcc.update(0.1);
+  expect(mcc.failure).toBe('restart');
+  run(5);
+  expect(mcc.failure).toBeNull();
+  expect(mcc.mainBreaker.closed.value).toBe(true);
+  mcc.fail('kaput');
+  run(9);
+  expect(mcc.mainBreaker.closed.value).toBe(false);
   dispose();
 });

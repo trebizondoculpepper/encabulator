@@ -6,7 +6,10 @@ import {
   drawNormalOperations,
 } from '../game/level2-normal-operations';
 import { createNarrationPause } from '../game/narration-pause';
-import { createLevel2FinalAction } from '../game/level2-final-action';
+import {
+  createLevel2Closing,
+  createLevel2FinalAction,
+} from '../game/level2-final-action';
 import { createLevel2Startup } from '../game/level2-startup';
 import { ejectCabinetDrop } from '../game/cabinet-drop';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
@@ -305,7 +308,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let finalTestPrompted = false;
   const finalTest = createLevel2FinalAction();
   const reminderPause = createNarrationPause();
-  const funeralPause = createNarrationPause(20);
+  const closing = createLevel2Closing();
   let smokeOn = false;
   const lesson = createLevel2NormalOperations();
   // Draw two distinct controls, then assign them one at a time.
@@ -603,12 +606,15 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         for (const line of LEVEL2_FAREWELL) voice.say(line);
       }
     }
-    // Leave twenty seconds of silence after the final farewell, then Auden.
-    if (phase === 12) {
-      funeralPause.step(delta, voice.busy);
-      if (!voice.busy && funeralPause.take()) {
+    // Completion follows the recital, never the first quiet farewell frame.
+    if (phase === 12 || phase === 13) {
+      const event = closing.step(delta, voice.busy);
+      if (event === 'recite') {
         voice.queue(96);
         phase = 13;
+      } else if (event === 'complete') {
+        phase = 14;
+        completionTimer = window.setTimeout(jingle, 3000);
       }
     }
     if (phase === 11) {
@@ -633,10 +639,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
           voice.say(LEVEL2_RESET.remind);
         }
       }
-    }
-    if (phase === 12 && !voice.busy) {
-      phase = 13;
-      completionTimer = window.setTimeout(jingle, 3000);
     }
     if (phase === 0) {
       const instruction = startup.step(mcc.supply.value, main.closed.value);

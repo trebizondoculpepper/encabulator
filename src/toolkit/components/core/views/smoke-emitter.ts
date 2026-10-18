@@ -25,6 +25,8 @@ export function createSmokeEmitter(puffCount = 14, colour = '222, 222, 216') {
     });
     const sprite = new Sprite(material);
     sprite.userData.noCollision = true;
+    // Smoke is visual only, even while its emitter is hidden or transparent.
+    sprite.raycast = () => {};
     group.add(sprite);
     return sprite;
   });

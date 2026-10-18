@@ -1,6 +1,14 @@
+import { createLevel0Failures } from './level0-failures';
 import { createBbcComputer } from '../toolkit/components/industrial-control/logic/bbc-micro';
 import { createLevel0Scenarios } from './level0-scenarios';
-import { Box3, Group, PerspectiveCamera, Raycaster, Vector3 } from 'three';
+import {
+  Box3,
+  Group,
+  PerspectiveCamera,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from 'three';
 import type { Object3D } from 'three';
 import {
   afterEach,
@@ -747,7 +755,6 @@ it('announces readiness only after full operation, never at a settled partial st
   dispose();
 });
 
-
 it('lets a front click reach every VFD keypad key and its speed knob', () => {
   const { machine, dispose } = sandbox();
   machine.mcc.group.updateMatrixWorld(true);
@@ -755,12 +762,59 @@ it('lets a front click reach every VFD keypad key and its speed knob', () => {
   expect(targets.length).toBeGreaterThan(8);
   for (const target of targets) {
     const centre = new Box3().setFromObject(target).getCenter(new Vector3());
-    const ray = new Raycaster(centre.clone().add(new Vector3(0, 0, 1)), new Vector3(0, 0, -1));
+    const ray = new Raycaster(
+      centre.clone().add(new Vector3(-0.7, 0.6, 1)),
+      new Vector3(0.7, -0.6, -1).normalize(),
+    );
     ray.camera = new PerspectiveCamera();
     const hit = ray.intersectObject(machine.mcc.group, true)[0];
     let reached: Object3D | null = hit?.object ?? null;
     while (reached && reached !== target) reached = reached.parent;
-    expect(reached, `target ${target.name}; hit ${hit?.object.name}; parent ${hit?.object.parent?.name}`).toBe(target);
+    expect(
+      reached,
+      `target ${target.name}; hit ${hit?.object.name}; parent ${hit?.object.parent?.name}`,
+    ).toBe(target);
   }
+  dispose();
+});
+
+it('works the VFD speed ring and keypad edges through actual front hits', () => {
+  const { machine, powerUp, dispose } = sandbox();
+  const failures = createLevel0Failures(createPanelKit(), machine);
+  powerUp();
+  machine.plant.control.driveSpeed.set(0);
+  machine.plant.control.driveLocal.set(true);
+  machine.mcc.group.updateMatrixWorld(true);
+  const targets = inputsOn(machine, 'MAIN ENCABULATOR');
+  const knob = targets.find(
+    (target) => target.parent?.name === 'potentiometer',
+  )!;
+  const key = targets.find(
+    (target) => target.name === 'Key I' || target.getObjectByName('Key I'),
+  )!;
+  const click = (point: Vector3, direction = 1) => {
+    const ray = new Raycaster(
+      point.clone().add(new Vector3(0, 0, 1)),
+      new Vector3(0, 0, -1),
+    );
+    const camera = new PerspectiveCamera(55, 1, 0.01, 100);
+    camera.position.copy(point).add(new Vector3(0, 0.2, 1));
+    camera.lookAt(point);
+    camera.updateMatrixWorld(true);
+    ray.setFromCamera(new Vector2(), camera);
+    const hit = ray.intersectObject(machine.mcc.group, true)[0];
+    let object: Object3D | null = hit?.object ?? null;
+    while (object && !machine.mcc.parts.uses.has(object))
+      object = object.parent;
+    expect(object, `No use for hit ${hit?.object.name}`).not.toBeNull();
+    machine.mcc.parts.uses.get(object!)!(direction);
+  };
+  // The visible outer ring, beyond the turning cap itself.
+  click(knob.localToWorld(new Vector3(0.019, 0, 0)));
+  expect(machine.plant.control.driveSpeed.value).toBe(1);
+  // The black edge of START's key, immediately beside the green cap.
+  click(key.localToWorld(new Vector3(0.0075, 0, 0)));
+  expect(machine.plant.state.driveRun.value).toBe(true);
+  failures.dispose();
   dispose();
 });
