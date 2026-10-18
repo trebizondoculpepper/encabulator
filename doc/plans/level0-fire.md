@@ -21,6 +21,12 @@ Fires start in three cabinets, lower ones (so the smoke and soot rise up the fac
 4. **The simulator**: FIRE under FAULTS becomes the causes as they are modelled; FIRE under SYMPTOMS stays as smoke and soot alone.
 5. **Tests**: the plant's fire (growth, dying when isolated); detection and the alarm stages from the machine's smoke; heads opening from the machine fire's heat; water ruining a live machine and not a dead one.
 
-## Open question for the owner
+## Stopping it (the owner's answer, 2026-10-19: realistic)
 
-What the player must do to stop the sprinklers (asked one question at a time; recorded here when answered).
+Silencing or resetting the alarm stops only the noise; the sprinkler bulbs burst from heat whatever the panel says. The player saves the machine by cutting its power (so the fire is no longer fed) and putting the fire out with the CO₂ extinguisher, the right one for an electrical fire, before the heads over the machine reach 68 °C. Water on a dead machine does no electrical harm.
+
+## Progress
+
+- Done: the alarm and sprinklers extracted from dev8's model as a shared fire component, `createFireAlarmSystem` (`src/toolkit/components/fire/logic/fire-alarm-system.ts`, tested), set off by any host's smoke and heat; dev8 runs on it unchanged.
+- Done: the FIRE symptom as smoke from the drive section's seams and soot, no flames.
+- Next: the machine fire in the plant model (three lower units), the system on the plant's graph with heads over the line-up, the water fault (sparks, then total shutdown), the CO₂ extinguisher, then the warehouse's fittings bound to it in Level 0.
