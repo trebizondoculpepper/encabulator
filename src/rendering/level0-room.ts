@@ -193,11 +193,13 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // while the player is looking into the cabinet.
   machine.onBoardRemoved(conjureSkip);
 
-  // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
-  const scenarios = createLevel0Scenarios(machine, Math.random, symptoms);
   // What the machine's failures look and sound like: the oil spill, worn
-  // bearings grinding, the seizure.
+  // bearings grinding, the seizure, the fire's smoke and soot, the water.
   const failures = createLevel0Failures(kit, machine);
+  // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
+  const scenarios = createLevel0Scenarios(machine, Math.random, symptoms, () =>
+    failures.clean(),
+  );
   const simulator = createScenarioSimulator(kit, scenarios);
   simulator.group.scale.setScalar(m);
   simulator.group.position.set(

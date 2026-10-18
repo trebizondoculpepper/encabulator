@@ -589,3 +589,53 @@ describe('a sprinkler head failing over the machine', () => {
     expect(p.fire.discharging.value).toBe(false);
   });
 });
+
+describe('a fire in the machine', () => {
+  it('sets the alarm off by its smoke, bursts the heads by its heat, and the water ruins the live machine', () => {
+    const p = plant(RUNNING);
+    run(p, 5, 0.5);
+    p.ignite();
+    expect(p.faults.value.map((f) => f.code)).toContain('S04');
+    run(p, 10, 0.5);
+    expect(p.fire.detector.value).toBe(true);
+    expect(p.fire.stage.value).toBe('alert');
+    expect(p.fire.discharging.value).toBe(false);
+    // Silencing the alarm stops only the noise: the heat still bursts them.
+    p.fire.panelKey.set(true);
+    p.fire.silence();
+    run(p, 50, 0.5);
+    expect(p.fire.discharging.value).toBe(true);
+    expect(p.fire.stage.value).toBe('evacuate');
+    run(p, 5, 0.5);
+    expect(p.drowned.value).toBe(true);
+    expect(p.ruined.value).toBe(true);
+    // The water puts the fire out.
+    run(p, 30, 0.5);
+    expect(p.fireSize.value).toBe(0);
+  });
+
+  it('dies down before the heads burst if the power is cut in time', () => {
+    const p = plant(RUNNING);
+    p.ignite();
+    run(p, 15, 0.5);
+    p.sense({ mains: false });
+    run(p, 120, 0.5);
+    expect(p.fireSize.value).toBe(0);
+    expect(p.fire.discharging.value).toBe(false);
+    expect(p.ruined.value).toBe(false);
+  });
+
+  it('burns the machine out if the water is shut off', () => {
+    const p = plant(RUNNING);
+    p.fire.riserValve.set(false);
+    p.ignite();
+    run(p, 120, 0.5);
+    expect(p.fire.discharging.value).toBe(false);
+    expect(p.ruined.value).toBe(true);
+    expect(p.faults.value.map((f) => f.code)).toContain('S05');
+    p.clearFaults();
+    p.fire.restore();
+    expect(p.ruined.value).toBe(false);
+    expect(p.fireSize.value).toBe(0);
+  });
+});

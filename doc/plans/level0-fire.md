@@ -29,4 +29,5 @@ Silencing or resetting the alarm stops only the noise; the sprinkler bulbs burst
 
 - Done: the alarm and sprinklers extracted from dev8's model as a shared fire component, `createFireAlarmSystem` (`src/toolkit/components/fire/logic/fire-alarm-system.ts`, tested), set off by any host's smoke and heat; dev8 runs on it unchanged.
 - Done: the FIRE symptom as smoke from the drive section's seams and soot, no flames.
-- Next: the machine fire in the plant model (three lower units), the system on the plant's graph with heads over the line-up, the water fault (sparks, then total shutdown), the CO₂ extinguisher, then the warehouse's fittings bound to it in Level 0.
+- Done (2026-10-19): the system on the plant's graph with the warehouse's hundred heads; the warehouse's fittings bound to it in Level 0 with a voice alarm; the SPRINKLER fault (a failed head: water, a shorted live bus, sparks, total shutdown, secondary faults) and symptom; the machine fire (FIRE fault: three lower cabinets, smoke and soot, detectors, alarm, heads bursting by heat, the water ruining the live machine, or burning out with the water off; cutting the power saves it). See `doc/reports/level0-failures.md`.
+- Next: a carryable CO₂ extinguisher to put the fire out by hand; ruined components inside; smoke filling the warehouse.

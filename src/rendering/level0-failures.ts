@@ -1,7 +1,9 @@
 import { computed, effect } from '@preact/signals-core';
 import { Mesh, MeshStandardMaterial, Shape, ShapeGeometry } from 'three';
 import type { Object3D } from 'three';
+import { sootAfter } from '../game/machine-failure';
 import { UNITS } from '../scene/level0-faces';
+import { createUnitSmoke } from '../scene/mcc-smoke';
 import { BAY_WIDTHS, MCC_WIDTH } from '../scene/retro-encabulator-mcc';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import type { SoundRecipe } from '../toolkit/components/core/audio/part-audio';
@@ -196,6 +198,28 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     unit.section.add(spark.group);
     return spark;
   });
+  // ---- The fire: smoke from three lower cabinets, soot on the faces above.
+  const burning = [UNITS.auxMotor, UNITS.panMonitor, UNITS.grammeter].map(
+    (id, i) => {
+      const source = mcc.unitFaces.get(id)!;
+      const faces = [...mcc.unitFaces.values()]
+        .filter(
+          (u) => u.bay === source.bay && u.face.bottom >= source.face.bottom,
+        )
+        .map((u) => u.face);
+      return {
+        soot: 0,
+        view: createUnitSmoke(source.section, {
+          x: source.centre,
+          width: source.face.width,
+          seam: source.face.top + 0.003,
+          z: mcc.doorFront,
+          seed: 6100 + i,
+          faces,
+        }),
+      };
+    },
+  );
   let flashes = 0;
   let wasDrowned = plant.drowned.peek();
   const stopDrowning = effect(() => {
@@ -212,14 +236,23 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         );
     }
     wasDrowned = drowned;
-    // Shorted, the bus will not hold: the main breaker trips straight out.
-    if (drowned && live) mcc.mainBreaker.trip();
+    // Shorted or burnt out, the bus will not hold: the main breaker trips
+    // straight out, whenever it is closed, until the machine is repaired.
+    if ((drowned || plant.ruined.value) && live) mcc.mainBreaker.trip();
   });
 
   let clock = 0;
   return {
     spill,
     flood,
+    /** How sooted the fire has left the faces above it, 0 to 1. */
+    get soot() {
+      return Math.max(...burning.map((seat) => seat.soot));
+    },
+    /** Cleaned up, as if it had never burnt (the simulator's RESET). */
+    clean() {
+      for (const seat of burning) seat.soot = 0;
+    },
     /** `symptom`: oil the simulator's OIL LEAK has spread, 0 to 1. */
     update(delta: number, symptom = 0) {
       clock += delta;
@@ -242,6 +275,14 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         flashes--;
       }
       for (const spark of shorting) spark.update(delta, reducedMotion());
+      // The fire's smoke, thicker as it grows, and the soot it leaves.
+      // Plainly smoking from the start, pouring as it takes hold.
+      const size = plant.fireSize.value;
+      const smoke = size > 0 ? Math.min(1, 0.4 + size * 1.5) : 0;
+      for (const seat of burning) {
+        seat.soot = sootAfter(seat.soot, smoke, delta);
+        seat.view.update(clock, smoke, seat.soot);
+      }
       for (const hazard of hazards) {
         if (hazard.sparks > 0 && Math.random() < delta * 6) {
           hazard.spark.fire();
@@ -258,6 +299,7 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     dispose() {
       stop();
       stopDrowning();
+      for (const seat of burning) seat.view.dispose();
       waterMaterial.dispose();
       oil.dispose();
       spill.geometry.dispose();

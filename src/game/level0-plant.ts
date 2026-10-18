@@ -12,7 +12,11 @@ import {
 } from './dimensionality';
 import type { DimensionConditions } from './dimensionality';
 import { worstSeverity } from './level0-status';
-import { LEVEL0_MACHINE_HEADS } from './level0-room-plan';
+import {
+  LEVEL0_MACHINE,
+  LEVEL0_MACHINE_HEADS,
+  headInRoom,
+} from './level0-room-plan';
 import { createFireAlarmSystem } from '../toolkit/components/fire/logic/fire-alarm-system';
 import { WAREHOUSE_HEADS } from '../toolkit/components/architectural/logic/warehouse-services';
 import type { Severity } from './level0-status';
@@ -70,6 +74,20 @@ export const PLANT = {
   drySeconds: 600,
   /** Water in the cabinets at which it shows, and shorts a live bus. */
   wetCabinets: 0.08,
+  /** A machine fire as it starts, and how fast it grows while fed, a second. */
+  fireStart: 0.04,
+  fireGrowth: 0.012,
+  /** How fast it dies down with its power cut, and under water, a second. */
+  fireStarved: 0.005,
+  fireQuench: 0.05,
+  /** Seconds at its fiercest (above `fireFierce`) that burn the machine out. */
+  fireFierce: 0.9,
+  burnOutSeconds: 30,
+  /**
+   * The fire's heat at the ceiling: a head over the machine sees
+   * `fireHeat` × size °C above the room, less with distance (metres).
+   */
+  fireHeat: 130,
   leakSeconds: 60,
   dryWearSeconds: 90,
   wearGrinding: 0.3,
@@ -443,6 +461,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
      * machine is dried out and repaired (the simulator's RESET).
      */
     drowned: g.state('machine.drowned', false),
+    /**
+     * The fire in the machine, 0 (out) to 1: in three of its lower cabinets,
+     * fed while their bus is live, quenched by water.
+     */
+    fireSize: g.state('machine.fire', 0),
+    /** Seconds the fire has raged at its fiercest: long enough, burnt out. */
+    burnedFor: g.state('machine.burnedFor', 0),
     hydraulic: g.state('hydraulic.pressure', 0, { note: 'psi' }),
     flow: g.state('hydro.flow', 0, { note: 'share of rated flow' }),
     fan: g.state('fan.pressure', 0, { note: 'inWC' }),
@@ -971,6 +996,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.seized,
       s.water,
       s.drowned,
+      s.fireSize,
+      s.burnedFor,
     ],
     (
       incoming,
@@ -1008,6 +1035,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       seized,
       water,
       drowned,
+      fireNow,
+      burned,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -1086,6 +1115,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         else if (wear >= PLANT.wearGrinding)
           add({ code: warn, text: `${name} WORN`, window });
       }
+      if (fireNow > 0)
+        add({ code: 'S04', text: 'FIRE IN CABINETS', window: 'SAFETY' });
+      if (burned >= PLANT.burnOutSeconds)
+        add({ code: 'S05', text: 'MACHINE BURNT OUT', window: 'SAFETY' });
       if (drowned)
         add({
           code: 'S03',
@@ -1346,22 +1379,56 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     where: 'the oil spill on the floor',
   });
   // ---- The building's fire alarm and sprinklers ---------------------------
-  // The warehouse's own system (BS 5839), set off by the machine's fire
-  // once it is modelled: for now no fire makes smoke or heat, but a head
-  // can still fail and spray (the simulator's SPRINKLER fault).
+  // The warehouse's own system (BS 5839), set off by the machine's fire:
+  // its smoke at the detectors, its heat at the sprinkler heads, which
+  // burst at 68 °C whatever the panel says. A head can also fail and spray
+  // on its own (the simulator's SPRINKLER fault).
+  const fireSmoke = g.derive('machine.fireSmoke', [s.fireSize], (size) =>
+    size > 0 ? Math.min(1, 0.25 + size * 1.2) : 0,
+  );
+  const fireAlight = g.derive(
+    'machine.fireAlight',
+    [s.fireSize],
+    (size) => size > 0,
+  );
+  const headHeat = g.derive('sprinkler.heat', [s.fireSize], (size) =>
+    WAREHOUSE_HEADS.map((_, i) => {
+      const at = headInRoom(i);
+      const d = Math.hypot(
+        at.x - LEVEL0_MACHINE.x,
+        at.z - (LEVEL0_MACHINE.z - 0.25),
+      );
+      return 20 + (PLANT.fireHeat * size) / (1 + (d * d) / 4);
+    }),
+  );
   const fire = createFireAlarmSystem(g, {
     heads: WAREHOUSE_HEADS.length,
     mains: g.fixed('building.mains', true),
-    smokeTarget: g.fixed('machine.fireSmoke', 0),
-    alight: g.fixed('machine.fireAlight', false),
-    headTemperatures: g.fixed(
-      'sprinkler.heat',
-      WAREHOUSE_HEADS.map(() => 20),
-    ),
+    smokeTarget: fireSmoke,
+    alight: fireAlight,
+    headTemperatures: headHeat,
   });
   /** A sprinkler head over the machine is spraying on it. */
   const raining = g.derive('machine.raining', [fire.heads], (heads) =>
     LEVEL0_MACHINE_HEADS.some((i) => heads[i].spraying),
+  );
+  g.process(
+    'machine fire',
+    [raining, e.mains, s.fireSize, s.burnedFor],
+    [s.fireSize, s.burnedFor],
+    (dt) => {
+      const size = s.fireSize.peek();
+      if (size <= 0) return;
+      // Fed by the live bus, starved without it, quenched by the water.
+      const rate = raining.peek()
+        ? -PLANT.fireQuench
+        : e.mains.peek()
+          ? PLANT.fireGrowth
+          : -PLANT.fireStarved;
+      const next = Math.max(0, Math.min(1, size + dt * rate));
+      s.fireSize.set(next);
+      if (next >= PLANT.fireFierce) s.burnedFor.set(s.burnedFor.peek() + dt);
+    },
   );
   g.process('water ingress', [raining, e.mains], [s.water, s.drowned], (dt) => {
     const wet = s.water.peek();
@@ -1382,6 +1449,20 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const drowned = g.output('machine.shorted', [s.drowned], (d) => d, {
     where: 'the shutdown and its sparks',
   });
+  /** How big the fire is, 0 to 1: its smoke and soot. */
+  const fireSize = g.output('machine.fireShown', [s.fireSize], (f) => f, {
+    where: 'smoke from the burning cabinets',
+  });
+  /**
+   * The machine is ruined: its live bus shorted by the water, or burnt out
+   * by a fire left to rage. Nothing will run until it is repaired.
+   */
+  const ruined = g.output(
+    'machine.ruined',
+    [s.drowned, s.burnedFor],
+    (drowned, burned) => drowned || burned >= PLANT.burnOutSeconds,
+    { where: 'the machine, dead' },
+  );
 
   /**
    * How close the machine is to breaking down, 0 to 1: the worst of each
@@ -1526,9 +1607,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.seized,
       s.water,
       s.drowned,
+      s.fireSize,
+      s.burnedFor,
     ],
     () => {
-      // Dried out and its shorted bus repaired.
+      // The fire out, dried out, and its shorted bus and burnt works repaired.
+      s.fireSize.set(0);
+      s.burnedFor.set(0);
       s.water.set(0);
       s.drowned.set(false);
       // Refilled, the switch freed, the worn bearings replaced.
@@ -1577,6 +1662,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
    * into the cabinets and, if the bus is live, shorts it.
    */
   const sprinklerFailure = () => fire.fail(LEVEL0_MACHINE_HEADS[0]);
+  /**
+   * The simulator's FIRE fault: a loose termination overheats and sets
+   * fire to the wiring in three of the lower cabinets. Its consequences
+   * follow from the model: smoke at the detectors and the alarm; the fire
+   * growing while the bus feeds it, dying down if the power is cut; its
+   * heat bursting the heads over the machine; their water shorting a live
+   * bus; and the machine ruined, by the water or by burning out.
+   */
+  const ignite = g.action('scenario.fire', [], [s.fireSize], () => {
+    if (s.fireSize.peek() > 0) return false;
+    s.fireSize.set(PLANT.fireStart);
+    return true;
+  });
   const countReset = g.action(
     'semiboloid.reset',
     [e.panMonitor],
@@ -1898,6 +1996,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     wetness,
     drowned,
     sprinklerFailure,
+    ignite,
+    fireSize,
+    ruined,
     strain,
     brokenDown,
     spilled,

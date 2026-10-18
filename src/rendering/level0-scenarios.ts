@@ -33,6 +33,8 @@ export function createLevel0Scenarios(
   random: () => number = Math.random,
   /** The symptoms alone, if the room shows them. */
   symptoms?: Level0Symptoms,
+  /** What else RESET puts right: the room's soot and the like. */
+  cleanUp: () => void = () => {},
 ) {
   const { mcc, plant } = machine;
   const { control } = plant;
@@ -132,6 +134,7 @@ export function createLevel0Scenarios(
     plant.fire.restore();
     plant.plcReset();
     symptoms?.reset();
+    cleanUp();
   };
   const slowStart = () => {
     queue = steps();
@@ -149,6 +152,8 @@ export function createLevel0Scenarios(
      */
     sealFailure: () => plant.sealFailure(),
     switchStuck: () => plant.switchStuck(),
+    /** FAULTS: a fire starts in three of the machine's lower cabinets. */
+    ignite: () => plant.ignite(),
     /** FAULTS: a sprinkler head over the machine fails and sprays. */
     sprinklerFailure: () => plant.sprinklerFailure(),
     /** SYMPTOMS: the heads over the machine spray, and nothing follows. */

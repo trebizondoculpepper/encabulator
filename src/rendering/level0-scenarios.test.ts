@@ -427,4 +427,42 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(symptoms.raining.value).toBe(false);
     dispose();
   });
+
+  it('runs a fire from its FAULTS switch to the alarm, the sprinklers and a ruined machine', () => {
+    const { machine, panel, symptoms, dispose } = sandbox();
+    const failures = createLevel0Failures(createPanelKit(), machine);
+    const step = (seconds: number) => {
+      for (let t = 0; t < seconds; t += 0.5) {
+        panel.update(0.5);
+        machine.update(0.5);
+        symptoms.update(0.5);
+        failures.update(0.5);
+      }
+    };
+    useOf(panel, 'FULL ON states switch')();
+    step(40);
+    useOf(panel, 'FIRE faults switch')();
+    step(15);
+    const f = machine.plant.fire;
+    // The smoke has set the detectors off: the alarm is investigating.
+    expect(f.detector.value).toBe(true);
+    expect(f.stage.value).toBe('alert');
+    expect(failures.soot).toBeGreaterThan(0);
+    // Left alone, the heat bursts the heads over the machine...
+    step(50);
+    expect(f.discharging.value).toBe(true);
+    expect(f.stage.value).toBe('evacuate');
+    // ...the water shorts the live bus, and the machine is ruined.
+    step(10);
+    expect(machine.plant.ruined.value).toBe(true);
+    expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
+    expect(machine.plant.electrical.mains.value).toBe(false);
+    failures.clean();
+    useOf(panel, 'RESET states switch')();
+    step(1);
+    expect(machine.plant.ruined.value).toBe(false);
+    expect(failures.soot).toBe(0);
+    failures.dispose();
+    dispose();
+  });
 });

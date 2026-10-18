@@ -78,6 +78,7 @@ const GROUPS: readonly {
   {
     title: 'FAULTS',
     switches: [
+      { legend: 'FIRE', cap: 'red', led: 'red', act: 'ignite' },
       { legend: 'OIL\nSEAL', cap: 'black', led: 'amber', act: 'sealFailure' },
       {
         legend: 'PRESSURE\nSWITCH',
