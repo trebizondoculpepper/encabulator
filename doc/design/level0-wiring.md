@@ -1,0 +1,95 @@
+# Level 0 wiring inventory
+
+How Level 0's Retro Encabulator line-up (`?room=level0`) is wired: every functional unit, its physical inputs, what it shows, what it depends on, how it fails and how it recovers, and every component inside. Written for `doc/prompts/level0-wire-machine.md`; the plan is `doc/plans/level0-wiring.md` and progress is reported in `doc/reports/level0-wiring-implementation.md`.
+
+## Where the wiring lives
+
+- `src/game/level0-plant.ts`: the process model, one world graph. Electrical component states are bridged in as inputs (`sense`, `senseCard`, `report`); operator controls bind to its inputs and actions; pressures, temperatures, speeds, the PLC's boot, latched faults, the dimensionality, counters and the event log are states advanced by processes; every reading, lamp, window, diagnostic and machine-tone parameter is an output. Tested in `level0-plant.test.ts`.
+- `src/rendering/level0-wiring.ts`: what each terminal, relay and chassis inside each unit carries, and the components' own fault reports.
+- `src/rendering/level0-machine.ts`: the line-up built with Level 0's door dressing, interlocks, breaker latch, tones and stack light; the bridge into the model; the random failure scheduler; sparks and smoke at a failed, energised rack power card; isolation locks and reseating. Tested in `level0-machine.test.ts`.
+- `src/scene/level0-faces.ts`: every unit's door: inputs, labels and displays bound to the model. `src/scene/level0-pictures.ts`: the Dimensionality, drive mimic and event log pictures.
+- `src/rendering/level0-room.ts`: the room, the skip swap and reseating through the shared release.
+- The shared line-up (`src/scene/retro-encabulator-mcc.ts`) provides hooks (`dress`, `interlock`, `breakerLatch`, `toneRate`, `driveTrain`, `stackLight`, and the `circuits` and `doors` it exposes); Level 2 and dev6 do not use them and are unchanged.
+
+## Power and isolation
+
+The incoming isolator feeds MAIN INCOMING and charges the station battery; the main disconnect then feeds every bucket (`mains`). Each bucket has its own breaker (Q) and control fuse (F1); a unit is supplied while both are sound and closed. How each unit's breaker is worked, by the owner's direction:
+
+- Flange operating handles on the door: MAIN DRIVE MOTOR, FEED MOTOR, AUXILIARY MOTOR; red handles on MAIN DISCONNECT and DRIVE ISOLATOR.
+- Small illuminated I/O rockers on the door: LUBE OIL PUMP, COOLING FAN, HYDRAULIC PUMP, AUXILIARY DRIVE, VENTILATION FAN.
+- Isolator inside only (open the door, work the breaker): ENCABULATOR CONTROL, MODIAL INTERACTION, PHASE REFERENCE, PANENDERMIC MONITOR, AUTOMATION CONTROL (with its green/red isolator LED), FIELD TERMINATIONS, VFD-601, RECIPROCATING DINGLE ARM, HYDROCOPTIC PUMP, PANENDERMIC FAN, CARDINAL GRAMMETER. MAIN INCOMING's breaker is behind its fixed cover and is never worked.
+
+Power removal darkens a unit's lamps and displays and brings its meters to zero; machine tones run down; screens boot again when power returns. Closing a door or culling an interior never suspends the model.
+
+## Units
+
+Each row: the unit (bucket), its purpose, its physical inputs, what it shows, its dependencies, its faults, and its recovery policy.
+
+| Unit | Purpose | Inputs (labels) | Shows | Depends on | Faults | Recovery |
+| --- | --- | --- | --- | --- | --- | --- |
+| MAIN INCOMING (1A) | Supply metering | AMMETER PHASE selector L1 L2 L3 | LINE VOLTS: three voltmeters, 480 V less load sag | Incoming isolator | — | Automatic |
+| MAIN DISCONNECT (1B) | Isolates the line-up | Red handle (MAIN DISCONNECT ON/OFF); Kirk key (KIRK KEY INTERLOCK, IN = CLOSE PERMITTED) | Power monitor: V, A of the selected phase, kW | Incoming; the Kirk key in before it will close; the key trapped while closed | Tripped breaker (U12-Q) | Handle OFF then ON |
+| DISTRIBUTION (1C) | Fault annunciator | TEST, ACK, RESET | Twelve windows (below); BUS HOURS RUN | Station battery (incoming) | — | Sequence M: ACK steadies, RESET clears what has cleared |
+| MAIN DRIVE MOTOR M-101 (2A) | Main motor | Handle; START, STOP, O/L RESET | RUN, NO LUBE, O/L TRIP lamps; MOTOR HOURS RUN | Lube oil pressure ≥ 25 psi (interlock in its coil); X2 | Overload trip (U21-F2), fuse, welded contactor | O/L RESET once cool, then START |
+| FEED MOTOR M-102 (2B) | Soft-started feed | Handle; HAND OFF AUTO | Soft starter ramp; RUN | AUTO: the PLC's 30-in-40 s cycle through its outputs and the feed's X4 | Overload, fuse | Automatic in AUTO when the PLC returns |
+| AUXILIARY MOTOR M-103 (2C) | Auxiliary motor | Handle; EMERGENCY STOP; START | MOTOR CURRENT ammeter; RUN, STOPPED | X2 | Overload, fuse | Pull the stop out, then START (release alone does not restart) |
+| LUBE OIL PUMP M-201 (3A) | Lube oil | POWER I/O rocker | STOPPED, RUN, OIL PRESS | X2 | Fuse (random), overload | Replace the fuse; restarts with power |
+| COOLING FAN M-202 (3B) | Cools the drive heatsink | POWER rocker; START, STOP | RUN | X2 | Fuse, overload | START |
+| HYDRAULIC PUMP M-203 (3C) | Pressure for the dingle arm | POWER rocker; LOCAL REMOTE key | RUN, PRESSURE | LOCAL: runs; REMOTE: the PLC runs it while the arm is on, through X4 | Fuse, overload | Automatic |
+| AUXILIARY DRIVE M-204 (3D) | Auxiliary drive | POWER rocker; SPEED knob 0–60 Hz | OUTPUT FREQUENCY LCD | X2 | Fuse, overload | Automatic |
+| VENTILATION FAN M-205 (3E) | Cools the control section | POWER rocker | STOPPED, RUN | X2 | Fuse, overload | Automatic |
+| SPARE SPACE (3F) | — | — (passive blank plate) | — | — | — | — |
+| ENCABULATOR CONTROL (4A) | Encabulation controller | DISPLAY selector TREND / DIMENSIONALITY | ENCABULATOR SYSTEMS LCD: trend of drive Hz, fan pressure, dimension; or Dimensionality | X2 and K1 (enable), its controller's boot | Fuse, open X2, welded K1 | Automatic: boots on power |
+| MODIAL INTERACTION (4B) | Recorder | CHART DRIVE selector STOP / RUN | Chart: dimension, lube psi, heatsink; LUBE OIL psi and VFD HEATSINK °F gauges | X3/K3 for its display | Fuse | Automatic |
+| PHASE REFERENCE (4C) | Phase reference | PHASE TRIM knob, −30° to +30°, 5° a step | PHASE REFERENCE SCOPE: vector figure, still when locked, slipping when not; TRIM, LAG, LOCK/SLIP | Drive speed (lag 20° at 60 Hz, reversed in REV); X2/K1; its X4/K2 to the analogue card | Unlocked while running (A05) | Turn the trim to the lag |
+| PANENDERMIC MONITOR (4D) | Semiboloid metering | COUNT RESET | FAN, FLOW, HYD, DIM bars; SEMIBOLOID COUNT; SEMIBOLOID PHASE matrix | Fan pressure and dimension (count rate), phase error (matrix) | — | Automatic |
+| AUTOMATION CONTROL (5A) | PLC-5 and PanelView | RESET; PanelView F1–F8 pages, 1–8 ↵ go to page, . clear; isolator inside | PanelView pages; PLC RUN, PLC FAULT; isolator LED | Cabinet supply, X1 (backplane supply), backplane bus, power card and processor; RU1 and X2 for the PanelView | Rack halt E01/E10/E20, I/O E31/E32/E41/E51, E11 earth fault, E02 PanelView lost, E61/E62 remote I/O | RESET restarts the boot unconditionally while the cabinet is powered; a power cycle also boots it; a missing or failed card is diagnosed again |
+| FIELD TERMINATIONS (5B) | 24 VDC field I/O | Isolator inside; 24 VDC ON lamp (push to test) | 24 VDC ON | X2 and K1 (supply contactor) | Open terminal, welded relay | Automatic |
+| VFD-601 (6A) | Main encabulator drive | Keypad START, STOP/RESET, JOG, REV, UP, DOWN, SEL, ESC, ENTER (LOCAL/REMOTE); SPEED knob 0–60 Hz | Drive mimic LCD; keypad pages; RUN, FAULT jewels | Power stage and DC bus capacitors sound, X2 (enable), drive isolator, lube oil; REMOTE: the PLC through X4 | F07 power stage/DC bus (latched), F04 heatsink over 85 °C (latched), A09 heatsink hot | STOP resets a fault whose cause has cleared; a power cycle clears it; START again (it does not restart by itself) |
+| DRIVE ISOLATOR (6B) | Isolates the drive motor | Red handle | DRIVE MOTOR CURRENT ammeter; CLOSED, VFD FAULT | Its output filter board (the board inside) and X2 | Filter capacitors failed (U62-C1) | Automatic |
+| RECIPROCATING DINGLE ARM (7A) | The arm | DINGLE ARM selector OFF / ON; isolator inside | DINGLE ARM LOGGER: arm state, strokes, the event log | Hydraulic pressure ≥ 1800 psi, the PLC's outputs, its X4 | No stroke when on (A06) | Automatic |
+| HYDROCOPTIC PUMP (7B) | Hydrocoptic loop | Isolator inside; lamps push to test | FLOW PULSE matrix; RUN, FLOW OK | The PLC's Hydrocoptic Phase Regulator (output card) through X4, or it only recirculates at 30 % | — | Automatic |
+| PANENDERMIC FAN (7C) | Panendermic pressure | LOW OFF HIGH selector; BOOST; isolator inside | FAN PRESSURE gauge (inWC), BOOST into the red; FAN HOURS RUN | Its contactor; the selector | Not running when selected (A04) | Automatic |
+| CARDINAL GRAMMETER (7D) | Grammage | CALIBRATE, ZERO; isolator inside | CARDINAL GRAMMAGE LCD: reading, zero and span drift | Dimension | Drift (A07) | ZERO clears zero drift; CALIBRATE (4 s) clears span drift |
+
+The annunciator's windows: BUS OVERVOLT (VFD F07, failed capacitors or power stage), GROUND FAULT (E11, a failed rack power card), PHASE LOSS (A05), BREAKER TRIP (tripped breakers and overloads, blown fuses), DINGLE ARM (A06), MODIAL HI (PLC halt and I/O faults), BEARING TEMP (heatsink hot or tripped), LUBE LOW (A01), FAN FAIL (A02 drive cooling off while running, A03 control section hot, A04), GRAM-METER (A07), DOOR OPEN (a door open on a live unit, advisory only), CONTROL CCT (welded contacts, open terminals, withdrawn chassis, the PanelView or remote I/O lost; this window replaces Level 2's SPARE).
+
+The stack light: red flashing while any fault (not the advisory door) stands or a failed part is installed; amber while anything boots or the dimensionality is still building; green running; dark without supply.
+
+## Inside each unit
+
+The line-up builds the same devices into every bucket; Level 0 gives each a role.
+
+- Breaker (Q): isolation; trips; reports U..-Q.
+- Control fuse (F1): protects the unit's control circuit; blown, the unit is dead; replaced by working it in the open bucket; reports U..-F1.
+- Terminal strip: X1 control supply (open, the unit is dead); X2 run circuit (a starter's coil, a control unit's enable, the drive's enable, the PanelView's supply, the drive isolator's output); X3 indication supply (the door's lamps, meters and displays); X4 PLC signal (FEED MOTOR, HYDRAULIC PUMP, VFD-601, HYDROCOPTIC PUMP, DINGLE ARM, PHASE REFERENCE, FIELD TERMINATIONS' output link; spare elsewhere); X5 and on spare, wired to nothing. A terminal is loosened or remade by working it; X1 to X4 report themselves when open (U..-Xn).
+- Starters: contactor (KM) closed by the coil circuit (X2, the run request, the emergency stop, the overload contact and any permissive); overload relay (F2), heated by the motor current, trips and resets once cool. Welded contacts report U..-KM.
+- Control units and FIELD TERMINATIONS: relays K1, K2, K3 as listed above; a welded relay reports U..-Kn.
+- AUTOMATION CONTROL: the PCB backplane (its supply connector can be pulled, E01) and five cards: 1 Betaform Amplifier (rack power), 2 Modial Interaction Controller (processor), 3 Plynost Modulation Rectifier (inputs), 4 Hydrocoptic Phase Regulator (outputs), 5 Baltovsky Flux Compensator (analogue: lube, heatsink and phase measurements on the PanelView read ---- without it, and the phase lock cannot be measured). Each slot is wired to whichever card is seated in it. Presence, condition and power are separate: an isolated card is still healthy, a failed card stays failed unpowered, an absent card is diagnosed as missing. RU1, the PanelView interface chassis; RU2, the remote I/O adapter. Withdrawn, each reports U51-RUn.
+- VFD-601: drive power stage and DC bus capacitor board (detachable, locked while the drive's breaker is closed; reseated by letting go of it while looking into its place with the drive isolated).
+- DRIVE ISOLATOR: the same drive board builds into this bucket; Level 0 treats it as the isolator's output filter, which must be sound for the isolator to pass power to the motor.
+- Fixed, board-mounted parts (the backplane, the capacitor cans on their board, the fuse holders, the terminal rails) stay attached; their parent assembly is what is serviced.
+
+## Dimensionality
+
+The ENCABULATOR SYSTEMS display's DIMENSIONALITY mode draws live n-cubes (`src/game/dimensionality.ts`), at most the 192 edges of a six-cube at twelve frames a second. Each stage needs every condition before it: 1 the Encabulator Control unit supplied and its controller booted; 2 Automation Control running; 3 VFD-601 at 40 % or more with lube oil; 4 the phase reference locked, measured through the analogue card and PHASE REFERENCE's X4/K2, with the control section under 45 °C; 5 hydrocoptic flow established and the panendermic fan at 2 inWC or more; 6 the dingle arm stroking. A stage builds over 4 s, so the progression is seen after the display's boot; a lost condition collapses it at 2 a second; without the unit's supply it is gone at once and the screen is dark. Coherence falls with phase error and in BOOST. The achieved dimension is a world value: the grammeter, the semiboloid count and the chart read it.
+
+## Random failures
+
+`src/game/level0-incidents.ts`: one injected failure at a time, after 180 to 300 s of operation (mains on and the PLC running), on simulation time, with an injected random source. None comes while any fault stands; every return to health draws a fresh wait. The pool, each with a repair the player can make with the shared use: a powered unit's control fuse blows (replace it); a running starter's overload trips (reset it once cool). Card failures are kept out of the pool while there are no spares to fit (the spares bench is set aside by the owner); a failed card can still be studied through the development hook `level0.inflict('card:plc-power')`, and a rack power card failing while energised sparks and smokes from the card itself until its cabinet is isolated, the smoke then drifting off.
+
+## The skip
+
+The first time an installed board (a PLC card or the drive's capacitor board) is taken out of the machine, the chairs at the south end are replaced by Level 2's skip, once per room instance, with no narration. Touching a board, a refused pickup from a live cabinet, opening a door or removing anything else does not trigger it. Boards can be carried, dropped and thrown in with the shared bin tossing; a board in the skip repairs nothing.
+
+## Labels
+
+Every button, knob, selector, handle, rocker and lamp has a legend plate or printed caption beside it naming its function and, where it has positions or a range, those; every display has a caption naming the quantity and unit. Printed captions never take a click. Repeated TEST, ACK and RESET buttons are told apart by their panels' captions (LAMP TEST · ACKNOWLEDGE · RESET CLEARED on the annunciator, PLC RESTART under Automation Control's RESET, O/L RESET on M-101). Interior devices carry the line-up's own labels.
+
+## Graph analysis
+
+`createLevel0Plant().graph.analyse()` reports no unseen controls, no constant outputs, no unwritten states and nothing invisible (tested). It lists as "dead controls" inputs that change no state: these are the display selections (drive page, terminal page, display mode, chart drive), the ammeter phase, the Kirk key (it acts on the main breaker's latch outside the graph), the main, feed and auxiliary motors' running states (they only load the supply) and the failed-part flag (it only gates health): each reaches an output, which is all they need to do.
+
+## Not yet supported
+
+Spare cards and their bench (deferred by the owner); card failures in the random pool; replacing the drive's capacitor board with a spare (its cans can be replaced by working them, the existing component's own replacement).

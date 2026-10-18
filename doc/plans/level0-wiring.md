@@ -6,7 +6,9 @@ The plan for `doc/prompts/level0-wire-machine.md`. Progress and results are repo
 
 - The world graph holds a Level 0 process model (`src/game/level0-plant.ts`): pressures, temperatures, speeds, permissives, the PLC's boot and diagnostics, fault identities and the achieved dimensionality, with the electrical components' states bridged into it as graph inputs.
 - The shared line-up gains hooks (door dressing, interlocks, tone rates, stack-light source, board mounts) so that Level 0 can wire its own panels without changing Level 2 or dev6.
-- Replaceable boards: the PLC backplane's slots accept a compatible card again, and the drive's DC bus capacitor board has a mount; a spares shelf supplies healthy replacements.
+- Replaceable boards: the PLC backplane's slots accept a compatible card again, and the drive's DC bus capacitor board goes back in its place. A spares bench was built and then set aside by the owner (2026-10-18); card failures stay out of the random pool until it returns.
+- Internal wiring, added at the owner's direction: every terminal, relay and chassis in every unit has a role, and every component reports its own faults.
+- Power switches varied by unit, at the owner's direction: handles, rockers or isolators inside.
 - One injected random failure at a time (`src/game/level0-incidents.ts`), on simulation time, with a fresh interval after recovery.
 - The first removal of an installed board swaps the chairs for the skip, once.
 
