@@ -9,9 +9,9 @@ import {
 import {
   createPartSet,
   doorLatch,
-  pushButton,
+  studioSwitch,
 } from '../toolkit/components/core/parts/parts';
-import type { OperatorColour } from '../toolkit/components/industrial-control/views/industrial-controls';
+import type { StudioLedColour } from '../toolkit/components/industrial-control/views/studio-controls';
 import {
   createRackCabinet,
   createRackUnit,
@@ -29,7 +29,7 @@ export const SIMULATOR_HALF = 0.5;
 
 const BUTTONS: readonly {
   legend: string;
-  colour: OperatorColour;
+  led: StudioLedColour;
   act:
     | 'fullOff'
     | 'fullOn'
@@ -39,13 +39,13 @@ const BUTTONS: readonly {
     | 'glitch'
     | 'kaput';
 }[] = [
-  { legend: 'FULL OFF', colour: 'red', act: 'fullOff' },
-  { legend: 'FULL ON', colour: 'green', act: 'fullOn' },
-  { legend: 'SLOW START', colour: 'white', act: 'slowStart' },
-  { legend: 'RESET', colour: 'blue', act: 'reset' },
-  { legend: 'HICCUP', colour: 'amber', act: 'hiccup' },
-  { legend: 'GLITCH', colour: 'amber', act: 'glitch' },
-  { legend: 'KAPUT', colour: 'red', act: 'kaput' },
+  { legend: 'FULL OFF', led: 'red', act: 'fullOff' },
+  { legend: 'FULL ON', led: 'green', act: 'fullOn' },
+  { legend: 'SLOW START', led: 'green', act: 'slowStart' },
+  { legend: 'RESET', led: 'blue', act: 'reset' },
+  { legend: 'HICCUP', led: 'amber', act: 'hiccup' },
+  { legend: 'GLITCH', led: 'amber', act: 'glitch' },
+  { legend: 'KAPUT', led: 'red', act: 'kaput' },
 ];
 
 /**
@@ -162,21 +162,27 @@ export function createScenarioSimulator(
   });
   title.position.set(0, 0.075, 0.002);
   panel.face.add(title);
-  const columns = 4;
+  // Studio switches, two years newer than the line-up's controls: one
+  // row of graphite caps, each LED showing its press; SLOW START's stays
+  // lit while the start goes on.
+  const starting = signal(false);
+  const pitch = 0.052;
   BUTTONS.forEach((spec, i) => {
     const button = parts.add(
-      pushButton(kit, {
-        colour: spec.colour,
+      studioSwitch(kit, {
+        name: `${spec.legend} scenario switch`,
         legend: spec.legend,
+        led: spec.led,
+        cap: 'graphite',
+        lamp: spec.act === 'slowStart' ? starting : undefined,
         action: () => scenarios[spec.act](),
       }),
     );
     button.object.position.set(
-      -0.165 + (i % columns) * 0.11,
-      0.035 - Math.floor(i / columns) * 0.075,
+      (i - (BUTTONS.length - 1) / 2) * pitch,
+      -0.01,
       0.002,
     );
-    button.object.scale.setScalar(0.8);
     controls.add(button.object);
   });
 
@@ -258,6 +264,7 @@ export function createScenarioSimulator(
       return open.value;
     },
     update(delta: number) {
+      starting.value = scenarios.starting;
       twinkle(delta);
       parts.update(delta);
       scenarios.update(delta);

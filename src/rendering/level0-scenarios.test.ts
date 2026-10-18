@@ -145,7 +145,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     const { machine, panel, run, dispose } = sandbox();
     workDoor(panel);
     run(0.5);
-    useOf(panel, 'FULL ON push button')();
+    useOf(panel, 'FULL ON scenario switch')();
     // Everything boots and builds: six dimensions take about a minute.
     run(60);
     const { plant } = machine;
@@ -154,7 +154,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(plant.state.driveHz.value).toBeCloseTo(PLANT.driveMaxHz, 3);
     expect(plant.phaseLocked.value).toBe(true);
     expect(plant.achieved.value).toBe(6);
-    useOf(panel, 'FULL OFF push button')();
+    useOf(panel, 'FULL OFF scenario switch')();
     run(10);
     expect(machine.mcc.supply.value).toBe(false);
     expect(plant.electrical.mains.value).toBe(false);
