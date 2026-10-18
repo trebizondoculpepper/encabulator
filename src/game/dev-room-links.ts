@@ -27,7 +27,8 @@ export type DevRoomId =
   | 'dev14'
   | 'dev15'
   | 'dev16'
-  | 'dev17';
+  | 'dev17'
+  | 'dev18';
 export type RoomId = DevRoomId | 'hall' | 'rhombus' | 'training' | 'level2';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
@@ -56,6 +57,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev15',
   'dev16',
   'dev17',
+  'dev18',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -88,6 +90,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev15: 'DEV15 · THE APPEARING SKIP',
   dev16: 'DEV16 · GRAFFITI GALLERY',
   dev17: 'DEV17 · WAREHOUSE TRAINING ROOM',
+  dev18: 'DEV18 · ARCHITECTURAL FITTINGS',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
@@ -111,6 +114,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev15: '#d9a43a',
   dev16: '#e8306b',
   dev17: '#a7b4b1',
+  dev18: '#b6be9d',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',
@@ -146,6 +150,13 @@ export function devPortals(
         z: bounds.minZ,
       },
     ];
+  if (id === 'dev17' || id === 'dev18') {
+    const x = bounds.maxX - 1.1 * metre;
+    return [
+      { to: before, side: 'south', x, z: bounds.maxZ },
+      { to: after, side: 'north', x, z: bounds.minZ },
+    ];
+  }
   if (id === 'rhombus')
     return [{ to: before, side: 'east', x: bounds.maxX, z: 0 }];
   const z = bounds.maxZ - 1.1 * metre;

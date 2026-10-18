@@ -1,11 +1,9 @@
+import { addWarehouseLighting } from './warehouse-lighting';
+import { partAudio } from '../audio/part-audio';
 import {
-  AmbientLight,
-  DirectionalLight,
   Group,
-  HemisphereLight,
   Mesh,
   PerspectiveCamera,
-  PointLight,
   Raycaster,
   Scene,
   Vector2,
@@ -22,7 +20,11 @@ import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
 /** Dev17 previews the empty architectural shell for a future training scenario. */
-export function startWarehouseRoom(canvas: HTMLCanvasElement) {
+export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
+  return startWarehouseRoom(canvas, true);
+}
+export function startWarehouseRoom(canvas: HTMLCanvasElement, gallery = false) {
+  const id = gallery ? 'dev18' : 'dev17';
   const m = METRE;
   const scene = new Scene();
   const renderer = createRenderer(canvas);
@@ -30,36 +32,11 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement) {
   renderer.shadowMap.enabled = true;
   const freeEnvironment = useEnvironment(renderer, scene, 0.32);
   const camera = new PerspectiveCamera(65, 1, 0.05, 100 * m);
-  scene.add(
-    new HemisphereLight('#e1e9ec', '#6f7067', 0.85),
-    new AmbientLight('#e9ece5', 0.3),
-  );
-  const daylight = new DirectionalLight('#edf3f5', 1.3);
-  daylight.position.set(7 * m, 24 * m, 5 * m);
-  daylight.castShadow = true;
-  daylight.shadow.mapSize.set(2048, 2048);
-  Object.assign(daylight.shadow.camera, {
-    left: -22 * m,
-    right: 22 * m,
-    top: 22 * m,
-    bottom: -22 * m,
-    near: m,
-    far: 60 * m,
-  });
-  daylight.shadow.bias = -0.00015;
-  daylight.shadow.normalBias = 0.02 * m;
-  daylight.shadow.radius = 4;
-  scene.add(daylight);
   const kit = createPanelKit();
-  const room = createWarehouseTrainingRoom(kit);
+  const room = createWarehouseTrainingRoom(kit, gallery);
   room.group.scale.setScalar(m);
   scene.add(room.group);
-  // Broad, overlapping pools from the high suspended fittings.
-  for (const { x, y, z } of room.lights) {
-    const light = new PointLight('#f2f3e9', 8 * m * m, 13 * m, 2);
-    light.position.set(x * m, y * m, z * m);
-    scene.add(light);
-  }
+  addWarehouseLighting(scene, room.lights, m);
   const bounds = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -73,15 +50,18 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement) {
     minZ: s.minZ * m,
     maxZ: s.maxZ * m,
   }));
-  const portals = createPortals('dev17', devPortals('dev17', bounds, m), 0, m);
+  const portals = createPortals(id, devPortals(id, bounds, m), 0, m);
   scene.add(portals.group);
   const raycaster = new Raycaster(),
     pointer = new Vector2();
   const portalAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObject(portals.group, true)[0];
+    const hit = raycaster.intersectObjects(
+      [portals.group, ...room.fittings],
+      true,
+    )[0];
     for (let o: Object3D | null = hit?.object ?? null; o; o = o.parent) {
-      const use = portals.uses.get(o as Mesh);
+      const use = portals.uses.get(o as Mesh) ?? room.parts.uses.get(o);
       if (use) return use;
     }
     return null;
@@ -94,8 +74,18 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement) {
     doors: { x: -6 * m, z: 5 * m, yaw: -Math.PI / 2 + 0.45, pitch: 0.12 },
     roof: { x: 0, z: 5 * m, yaw: 0, pitch: 0.65 },
     utilities: { x: 0, z: -7 * m, yaw: 0, pitch: 0.08 },
+    gallery: { x: -7.5 * m, z: 11 * m, yaw: Math.PI, pitch: 0 },
+    hardware: { x: 4.5 * m, z: 12 * m, yaw: Math.PI, pitch: -0.1 },
+    distribution: { x: 10 * m, z: -12.5 * m, yaw: 0, pitch: 0.03 },
     floor: { x: 0, z: 6 * m, yaw: 0, pitch: -0.65 },
   };
+  if (gallery) views.room = { ...views.gallery };
+  for (const view of Object.values(views)) {
+    const x = view.x;
+    view.x = view.z;
+    view.z = -x;
+    view.yaw -= Math.PI / 2;
+  }
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
     canvas,
@@ -141,6 +131,8 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
+    room.parts.update(delta);
+    partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
     renderer.render(scene, camera);
   });
@@ -149,12 +141,19 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement) {
     observer.disconnect();
     walk.dispose();
     portals.dispose();
+    room.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
     renderer.dispose();
     delete (window as unknown as { devWarehouse?: unknown }).devWarehouse;
   };
   return Object.assign(dispose, {
+    suspend() {
+      room.parts.setAudible(false);
+    },
+    resume() {
+      room.parts.setAudible(true);
+    },
     enter(previous: string | null) {
       const pose =
         views[new URLSearchParams(location.search).get('view') ?? ''] ??

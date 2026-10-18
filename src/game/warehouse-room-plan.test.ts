@@ -27,8 +27,8 @@ describe('the warehouse training shell', () => {
   });
   it('provides opposing pedestrian escape routes and leaves the utility doorway faces clear', () => {
     const portals = devPortals('dev17', WAREHOUSE_BOUNDS, 1);
-    expect(portals.map((p) => p.to)).toEqual(['dev16', 'rhombus']);
-    expect(portals.map((p) => p.side)).toEqual(['west', 'east']);
+    expect(portals.map((p) => p.to)).toEqual(['dev16', 'dev18']);
+    expect(portals.map((p) => p.side)).toEqual(['south', 'north']);
     expect(WAREHOUSE_UTILITIES.map((d) => d.label)).toEqual([
       'TOILETS',
       'ACCESSIBLE WC',

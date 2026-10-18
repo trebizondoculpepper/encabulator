@@ -1,3 +1,4 @@
+import { createKeepClearMarking } from './keep-clear-markings';
 import {
   BoxGeometry,
   Group,
@@ -15,24 +16,53 @@ import {
 import type { Footprint } from '../game/walk-collision';
 import type { PanelKit } from './eighties-controls';
 import { createMicroLabel, kitGlow } from './eighties-controls';
-import {
-  createCallPoint,
-  createSounderBeacon,
-  createExitSign,
-  createEmergencyLight,
-  createExtinguisher,
-  createSmokeDetector,
-  createTwinSocket,
-  createDistributionBoard,
-} from './building-fittings';
+import { architecturalPart } from '../rendering/architectural-parts';
+import { createPartSet } from '../rendering/parts';
+import type { ArchitecturalKind } from '../game/architectural-fittings';
+import { ARCHITECTURAL_FITTINGS } from '../game/architectural-fittings';
+import { WAREHOUSE_HEADS } from '../game/warehouse-services';
 import { mergeStatic } from './merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
 
 /** Empty early-1990s Guildford industrial shell. No Level 2 apparatus or utility interiors. */
-export function createWarehouseTrainingRoom(kit: PanelKit) {
+export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
   const group = new Group();
   group.name = 'Guildford warehouse training room';
   const p = warehouseSurfaces(kit);
+  const parts = createPartSet();
+  const fitted = new Set<Object3D>();
+  const seen = new Set<ArchitecturalKind>();
+  const put = (
+    kind: ArchitecturalKind,
+    parent: Object3D,
+    x: number,
+    y: number,
+    z: number,
+    options: Parameters<typeof architecturalPart>[3] = {},
+  ) => {
+    const part = parts.add(architecturalPart(kit, kind, undefined, options));
+    part.object.position.set(x, y, z);
+    parent.add(part.object);
+    fitted.add(part.object);
+    if (gallery && !seen.has(kind)) {
+      seen.add(kind);
+      const spec = ARCHITECTURAL_FITTINGS[kind];
+      const label = createMicroLabel(kit, `${spec.title}\n${spec.reference}`, {
+        height: 0.025,
+        maxWidth: kind === 'loadingdoor' ? 4 : 1.8,
+        ink: '#253a42',
+        plate: '#e5e8df',
+      });
+      label.position.set(
+        x,
+        y +
+          (kind === 'utilitydoor' ? 2.4 : kind === 'loadingdoor' ? 5.5 : -0.2),
+        z + 0.24,
+      );
+      parent.add(label);
+    }
+    return part;
+  };
   const solids: Footprint[] = [];
   const box = (
     parent: Object3D,
@@ -150,7 +180,7 @@ export function createWarehouseTrainingRoom(kit: PanelKit) {
   const north = wall(0, -15, 0);
   wall(0, 15, Math.PI);
   const west = wall(-15, 0, Math.PI / 2, true);
-  wall(15, 0, -Math.PI / 2);
+  const east = wall(15, 0, -Math.PI / 2);
 
   // An I-section column at each truss bearing, with bolted base plates.
   for (const z of WAREHOUSE_TRUSSES)
@@ -242,66 +272,12 @@ export function createWarehouseTrainingRoom(kit: PanelKit) {
       );
     }
 
-  // A 6 × 5 m bi-parting folding door, patterned after galvanised industrial shutters.
-  const loading = new Group();
-  loading.name = 'Galvanised folding loading door';
-  west.add(loading);
-  for (const x of [-3.08, 3.08])
-    box(loading, p.zinc, 0.16, 5.2, 0.16, x, 2.6, 0.1);
-  box(loading, p.zinc, 6.4, 0.2, 0.22, 0, 5.15, 0.15);
-  for (let i = 0; i < 4; i++) {
-    const x = -2.25 + i * 1.5;
-    box(loading, p.zinc, 1.488, 5, 0.055, x, 2.5, 0.09);
-    for (const y of [0.08, 2.5, 4.92])
-      box(loading, p.zinc, 1.44, 0.065, 0.055, x, y, 0.14);
-    for (const dx of [-0.7, 0.7])
-      box(loading, p.zinc, 0.055, 4.9, 0.04, x + dx, 2.5, 0.14);
-    for (let dx = -0.5; dx <= 0.5; dx += 0.25)
-      box(loading, p.zinc, 0.025, 4.8, 0.018, x + dx, 2.5, 0.13);
-    for (const y of [0.5, 2.5, 4.5])
-      box(loading, p.dark, 0.045, 0.16, 0.055, x - 0.75, y, 0.16);
-  }
-  for (const x of [-0.17, 0.17]) {
-    box(loading, p.dark, 0.025, 0.35, 0.09, x, 1.15, 0.22);
-    box(loading, p.zinc, 0.018, 4.65, 0.025, x, 2.45, 0.19);
-  }
-  label(loading, 'KEEP CLEAR', 1, 0.06, 0, 0.5, 0.125, '#303936');
-  // A lower track and threshold, flush with the finished floor.
-  box(loading, p.zinc, 6, 0.009, 0.085, 0, 0.005, 0.1);
-
-  // Closed amenity doors: only the faces, never hidden rooms behind them.
-  for (const { x, label: text } of WAREHOUSE_UTILITIES) {
-    const door = new Group();
-    door.name = `Closed ${text} doorway`;
-    door.position.set(x, 0, 0.04);
-    north.add(door);
-    for (const dx of [-0.59, 0.59])
-      box(door, p.steel, 0.07, 2.2, 0.11, dx, 1.1, 0.04);
-    box(door, p.steel, 1.25, 0.07, 0.11, 0, 2.22, 0.04);
-    box(door, p.door, 1.1, 2.13, 0.045, 0, 1.07, 0.055);
-    box(door, p.zinc, 1.05, 0.3, 0.012, 0, 0.19, 0.085);
-    box(door, p.zinc, 0.035, 0.18, 0.025, 0.43, 1.02, 0.1);
-    box(door, p.zinc, 0.14, 0.025, 0.04, 0.38, 1.05, 0.12);
-    if (text !== 'BUILDING SERVICES') {
-      box(door, p.dark, 0.18, 0.76, 0.012, -0.22, 1.15, 0.084);
-      box(door, p.zinc, 0.015, 0.78, 0.02, -0.32, 1.15, 0.09);
-    }
-    label(door, text, 1, 0.045, 0, 1.75, 0.086, '#ffffff');
-    if (text === 'FIRST AID')
-      label(door, '+', 0.2, 0.12, 0, 1.48, 0.087, '#ffffff', '#168348');
-    if (text === 'BUILDING SERVICES')
-      label(
-        door,
-        'AUTHORISED PERSONNEL ONLY',
-        0.85,
-        0.025,
-        0,
-        1.48,
-        0.087,
-        '#ffffff',
-      );
-    else label(door, 'KEEP CLOSED', 0.5, 0.02, 0, 0.6, 0.09, '#ffffff');
-  }
+  // The same factory constructs installed fittings and gallery specimens.
+  put('loadingdoor', west, 0, 0, 0);
+  put('escapedoor', west, -13.9, 0, 0.04, { legend: 'ENTRANCE' });
+  put('escapedoor', east, 13.9, 0, 0.04, { legend: 'FIRE EXIT' });
+  for (const { x, label: text } of WAREHOUSE_UTILITIES)
+    put('utilitydoor', north, x, 0, 0.04, { legend: text });
   label(north, 'NEUMANN DYNAMIK', 5, 0.14, 0, 3.7, 0.08, '#3b474a');
   label(
     north,
@@ -316,70 +292,41 @@ export function createWarehouseTrainingRoom(kit: PanelKit) {
 
   // Suspended linear luminaires, replaced inside their industrial housings.
   const lights: { x: number; y: number; z: number }[] = [];
-  const lens = kitGlow(kit, '#e8ede6');
   for (const z of [-10, -2, 6, 12])
     for (const x of [-10, 0, 10]) {
-      for (const dx of [-0.45, 0.45])
+      for (const dx of [-0.6, 0.6])
         box(group, p.zinc, 0.008, 0.55, 0.008, x + dx, 6.38, z);
-      box(group, p.steel, 1.55, 0.11, 0.3, x, 6.05, z);
-      const glow = box(group, lens, 1.43, 0.018, 0.24, x, 5.985, z);
-      glow.castShadow = false;
+      put('luminaire', group, x, 6.05, z);
       lights.push({ x, y: 5.9, z });
     }
   // Cable ladder, rigid conduit and radiant heaters live high on the side walls.
   for (const side of [-1, 1]) {
-    for (const offset of [-0.2, 0.2])
-      box(group, p.zinc, 0.035, 0.08, 29, side * 14.1 + offset, 5.5, 0);
-    for (let z = -14; z <= 14; z += 0.4)
-      box(group, p.zinc, 0.43, 0.025, 0.025, side * 14.1, 5.5, z);
+    for (let z = -12; z <= 12; z += 3)
+      put('ladder', group, side * 14.1, 5.5, z);
     for (const z of [-9, 6, 9]) {
-      for (const dz of [-0.8, 0.8]) {
-        box(group, p.zinc, 0.7, 0.035, 0.035, side * 14.5, 4.4, z + dz);
-        box(group, p.zinc, 0.035, 0.2, 0.035, side * 14.2, 4.3, z + dz);
-      }
-      box(group, p.dark, 0.5, 0.14, 2.2, side * 14.2, 4.1, z);
-      box(group, p.zinc, 0.56, 0.045, 2.25, side * 14.2, 4.2, z);
+      const heater = put('heater', group, side * 14.2, 4.1, z);
+      heater.object.rotation.y = Math.PI / 2;
     }
   }
   for (const x of [-12, 10]) {
-    box(north, p.zinc, 0.025, 4.6, 0.025, x, 2.3, 0.09);
-    box(north, p.zinc, 2, 0.025, 0.025, x + 1, 2.6, 0.09);
-    const socket = createTwinSocket(kit);
-    socket.group.position.set(x, 1.1, 0.08);
-    north.add(socket.group);
+    for (let y = 0; y < 5; y++) put('conduit', north, x, y, 0.09);
+    put('socket', north, x, 1.1, 0.08);
   }
-  const distribution = createDistributionBoard(kit, [
-    'LIGHTING',
-    'SOCKETS',
-    'HEATING',
-    'VENTILATION',
-  ]);
-  distribution.group.position.set(10, 1.6, 0.08);
-  north.add(distribution.group);
-  label(north, 'DB-T2  /  230–400 V', 0.6, 0.025, 10, 2.3, 0.09, '#343d3e');
-  for (const x of [-11, 11]) {
-    box(north, p.steel, 1.2, 0.65, 0.08, x, 5.5, 0.06);
-    for (let i = 0; i < 10; i++)
-      box(north, p.dark, 1.1, 0.022, 0.025, x, 5.23 + i * 0.055, 0.12);
-  }
-  // Existing catalogue-sized UK safety fittings, reused from the fittings room.
+  put('distribution', north, 10, 1.8, 0.08);
+  put('firepanel', north, 8.3, 1.7, 0.08);
+  for (const x of [-11, 11]) put('grille', north, x, 5.5, 0.06);
   for (const side of [-1, 1]) {
     const station = new Group();
     station.position.set(side * 14.8, 0, 12.5);
     station.rotation.y = (-side * Math.PI) / 2;
     group.add(station);
-    const call = createCallPoint(kit);
-    call.group.position.set(0, 1.4, 0);
-    call.set(false);
-    station.add(call.group);
-    const sounder = createSounderBeacon(kit);
-    sounder.group.position.set(0, 2.7, 0);
-    sounder.set(false);
-    station.add(sounder.group);
-    const exit = createExitSign(kit);
-    exit.group.position.set(side * 1.4, 2.6, 0);
-    exit.set(1);
-    station.add(exit.group);
+    put('callpoint', station, 0, 1.4, 0);
+    put('sounder', station, 0, 2.7, 0);
+    put('exit', station, side * 1.4, 2.6, 0);
+    put('emergency', station, 0, 3.2, 0.3);
+    put('water', station, -side, 0, 0);
+    put('co2', station, -side * 1.4, 0, 0);
+    put('switch', station, -side * 0.5, 1.1, 0);
     label(
       station,
       'FIRE ACTION\nRaise the alarm\nLeave by the nearest exit\nReport to the assembly point',
@@ -391,17 +338,21 @@ export function createWarehouseTrainingRoom(kit: PanelKit) {
       '#253b55',
       '#f2f3ea',
     );
-    const emergency = createEmergencyLight(kit);
-    emergency.group.position.set(0, 3.2, 0.3);
-    emergency.set(false, true);
-    station.add(emergency.group);
-    const extinguisher = createExtinguisher(kit, 'water');
-    extinguisher.group.position.set(-side, 0, 0);
-    station.add(extinguisher.group);
-    const co2 = createExtinguisher(kit, 'co2');
-    co2.group.position.set(-side * 1.4, 0, 0);
-    station.add(co2.group);
   }
+  put('valves', north, 12.7, 0, 0.04);
+  put('testvalve', north, 13.2, 1.2, 0.1);
+  put('bell', north, 13.2, 2.9, 0.04);
+  const riser = put('pipe', north, 12.7, 4.15, 0.16, { length: 3.5 });
+  riser.object.name = 'Sprinkler riser above valve set';
+  // Wet-system pipework and pendant heads below the roof girders. No room-wide wiring yet.
+  for (let z = -13.5; z <= 13.5; z += 3) {
+    for (let x = -13.5; x <= 13.5; x += 3) {
+      put('pipe', group, x, 5.85, z).object.rotation.z = Math.PI / 2;
+    }
+    put('pipe', group, 14.2, 5.85, z).object.rotation.x = Math.PI / 2;
+  }
+  for (const { x, z } of WAREHOUSE_HEADS)
+    put('sprinkler', group, x, 5.82, z, { fallDistance: 5.82 });
   label(
     north,
     'NO SMOKING',
@@ -413,15 +364,81 @@ export function createWarehouseTrainingRoom(kit: PanelKit) {
     '#a12825',
     '#f4f4ec',
   );
-  for (const { x, z } of WAREHOUSE_SKYLIGHTS.filter((_, i) => i % 3 === 0)) {
-    const detector = createSmokeDetector(kit);
-    detector.group.position.set(x, 7.08, z + 2.2);
-    group.add(detector.group);
+  for (const { x, z } of WAREHOUSE_SKYLIGHTS.filter((_, i) => i % 3 === 0))
+    put('detector', group, x, 7.08, z + 2.2);
+  if (gallery) {
+    // Accessible eye-level specimens of the small roof and fire-system components.
+    const samples = new Group();
+    samples.position.set(0, 0, 14.8);
+    samples.rotation.y = Math.PI;
+    group.add(samples);
+    label(samples, 'ARCHITECTURAL FITTINGS', 8, 0.15, 0, 3.2, 0.05, '#283f49');
+    const kinds: ArchitecturalKind[] = [
+      'distribution',
+      'socket',
+      'callpoint',
+      'sounder',
+      'detector',
+      'sprinkler',
+      'emergency',
+      'exit',
+      'firepanel',
+      'testvalve',
+      'bell',
+      'switch',
+      'lever',
+      'pull',
+      'panic',
+    ];
+    kinds.forEach((kind, i) => {
+      const x = -10.5 + (i % 8) * 3,
+        y = i < 8 ? 2.15 : 1.1;
+      box(samples, p.band, 2.6, 0.8, 0.035, x, y, 0);
+      put(kind, samples, x, y, 0.04, {
+        testers: kind === 'socket',
+        fallDistance: y,
+      });
+      label(
+        samples,
+        ARCHITECTURAL_FITTINGS[kind].title,
+        2.5,
+        0.045,
+        x,
+        y - 0.32,
+        0.08,
+        '#f2f4e9',
+      );
+    });
   }
-  // Batch the static shell; only the travelling door portals are separate.
-  for (const mesh of mergeStatic(group, 6)) {
+  const gateMark = createKeepClearMarking(kit, 6.4, 2);
+  gateMark.position.set(-13.85, 0.004, 0);
+  gateMark.rotation.z = Math.PI / 2;
+  group.add(gateMark);
+  fitted.add(gateMark);
+  for (const x of [-13.85, 13.85]) {
+    const mark = createKeepClearMarking(kit, 1.8, 1.8);
+    mark.position.set(x, 0.004, 13.9);
+    mark.rotation.z = x < 0 ? Math.PI / 2 : -Math.PI / 2;
+    group.add(mark);
+    fitted.add(mark);
+  }
+  // Batch only the shell; keep architectural components intact for future binding.
+  for (const mesh of mergeStatic(group, 6, fitted)) {
     mesh.castShadow = !(mesh.material instanceof MeshBasicMaterial);
     mesh.receiveShadow = true;
   }
-  return { group, solids, lights };
+  // Compass: the loading gate is SOUTH and the opposing escape is NORTH.
+  group.rotation.y = Math.PI / 2;
+  return {
+    group,
+    parts,
+    fittings: [...fitted],
+    solids: solids.map((s) => ({
+      minX: s.minZ,
+      maxX: s.maxZ,
+      minZ: -s.maxX,
+      maxZ: -s.minX,
+    })),
+    lights: lights.map((l) => ({ x: l.z, y: l.y, z: -l.x })),
+  };
 }

@@ -66,7 +66,22 @@ export function createPortals(
     // Planes face +z; turn each to face into the room.
     frame.rotation.y = Math.atan2(inward.x, inward.z);
     group.add(frame);
-    if (from === 'rhombus' || from === 'dev17') {
+    if (from === 'dev17' || from === 'dev18') {
+      // The shared room owns its physical doors; this invisible use surface only travels.
+      const material = createPs1Material({
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      materials.push(material);
+      const patch = new Mesh(new PlaneGeometry(width, height), material);
+      patch.position.set(0, height / 2, 0.22 * metre);
+      patch.name = `Portal to ${portal.to}`;
+      frame.add(patch);
+      uses.set(patch, () => travel(portal.to));
+      continue;
+    }
+    if (from === 'rhombus') {
       const steel = createPs1Material({
         color: '#777e7d',
         metalness: 0.75,
@@ -112,8 +127,6 @@ export function createPortals(
       part(0.92, 0.065, 0.075, 0, 1.05, 0.18, hardware);
       for (const side of [-1, 1])
         part(0.045, 0.17, 0.12, side * 0.43, 1.05, 0.15, steel);
-      // Dev17 uses the shared UK running-man fitting in its architectural shell.
-      if (from === 'dev17') continue;
       const exitLabel = createLabelTexture('EXIT', {
         ink: '#f8fff0',
         plate: '#0d8147',

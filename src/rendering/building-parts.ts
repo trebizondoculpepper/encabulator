@@ -461,10 +461,11 @@ export function sprinklerHead(
   props: {
     head: Readable<{ burst: boolean; spraying: boolean }>;
     voice?: boolean;
+    fallDistance?: number;
   },
 ): Part {
   const a = beginPart(kit, 'sprinkler head');
-  const view = createSprinklerHead(kit);
+  const view = createSprinklerHead(kit, props.fallDistance);
   a.object.add(view.group);
   const e = emitter();
   a.voice(e, { trip: BULB });
@@ -750,10 +751,12 @@ export function twinSocket(
     left: Binding<boolean>;
     right: Binding<boolean>;
     live: Readable<{ left: boolean; right: boolean }>;
+    metalclad?: boolean;
+    testers?: boolean;
   },
 ): Part {
   const a = beginPart(kit, 'twin socket');
-  const view = createTwinSocket(kit);
+  const view = createTwinSocket(kit, props);
   a.object.add(view.group);
   const e = emitter();
   a.voice(e, { on: ROCKER, off: ROCKER });
@@ -818,6 +821,14 @@ export function distributionBoard(
   a.object.add(view.group);
   const e = emitter();
   a.voice(e, { on: BREAKER, off: BREAKER });
+  let open = false;
+  const toggleCover = () => {
+    open = !open;
+    view.setOpen(open);
+    e.emit(open ? 'on' : 'off');
+  };
+  a.uses.set(view.cover, toggleCover);
+  a.uses.set(view.latch, toggleCover);
   const work = (bound: Binding<boolean>) => () => {
     bound.set(!bound.value);
     e.emit(bound.value ? 'on' : 'off');

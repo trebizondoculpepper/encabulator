@@ -891,7 +891,7 @@ export function createFirePanel(kit: PanelKit) {
 }
 
 /** A pendant sprinkler head, and the spray it gives when discharging. */
-export function createSprinklerHead(kit: PanelKit) {
+export function createSprinklerHead(kit: PanelKit, fallDistance = 3) {
   const t = tools(kit);
   const group = new Group();
   const chrome = t.paint('#d0d3d4', 0.2, 0.9);
@@ -920,7 +920,7 @@ export function createSprinklerHead(kit: PanelKit) {
     return [Math.cos(a) * s, -0.4 - Math.random() * 0.6, Math.sin(a) * s];
   };
   for (let i = 0; i < count; i++) {
-    life[i] = Math.random() * 1.2;
+    life[i] = Math.random() * Math.sqrt((2 * fallDistance) / 9.8);
     const [vx, vy, vz] = seed();
     speeds.set([vx, vy, vz], i * 3);
   }
@@ -955,15 +955,14 @@ export function createSprinklerHead(kit: PanelKit) {
       if (!on) return;
       for (let i = 0; i < count; i++) {
         life[i] += delta;
-        if (life[i] > 1.3) {
+        if (life[i] > Math.sqrt((2 * fallDistance) / 9.8)) {
           life[i] = 0;
           const [vx, vy, vz] = seed();
           speeds.set([vx, vy, vz], i * 3);
         }
         const s = life[i];
         positions[i * 3] = speeds[i * 3] * s;
-        positions[i * 3 + 1] =
-          -0.06 + speeds[i * 3 + 1] * s - 4.9 * s * s * 0.4;
+        positions[i * 3 + 1] = -0.06 + speeds[i * 3 + 1] * s - 4.9 * s * s;
         positions[i * 3 + 2] = speeds[i * 3 + 2] * s;
       }
       geometry.attributes.position.needsUpdate = true;
@@ -1303,20 +1302,58 @@ export function createHeldFireDoor(kit: PanelKit) {
 // ---- Power --------------------------------------------------------------
 
 /** A twin switched socket with a tester plugged into each side. */
-export function createTwinSocket(kit: PanelKit) {
+export function createTwinSocket(
+  kit: PanelKit,
+  { metalclad = false, testers = true } = {},
+) {
   const t = tools(kit);
   const group = new Group();
-  t.box(group, t.paint(PLATE_WHITE, 0.35), 0.146, 0.086, 0.01, 0, 0, 0.005);
+  if (metalclad) {
+    t.box(
+      group,
+      t.paint('#969da0', 0.55, 0.45),
+      0.146,
+      0.086,
+      0.04,
+      0,
+      0,
+      0.02,
+    );
+    for (const x of [-0.06, 0.06])
+      t.cyl(
+        group,
+        t.paint('#c3c6c5', 0.3, 0.7),
+        0.0028,
+        0.002,
+        x,
+        0,
+        0.051,
+        'z',
+      );
+  }
+  const front = new Group();
+  front.position.z = metalclad ? 0.04 : 0;
+  group.add(front);
+  t.box(
+    front,
+    t.paint(metalclad ? '#a9afb0' : PLATE_WHITE, 0.35),
+    0.146,
+    0.086,
+    0.01,
+    0,
+    0,
+    0.005,
+  );
   const sides = [-0.036, 0.036].map((x) => {
     for (const [w, h, dx, dy] of [
       [0.004, 0.009, 0, 0.004],
       [0.008, 0.004, -0.011, -0.012],
       [0.008, 0.004, 0.011, -0.012],
     ] as const)
-      t.box(group, t.paint('#1b1b1b'), w, h, 0.002, x + dx, dy - 0.006, 0.0105);
+      t.box(front, t.paint('#1b1b1b'), w, h, 0.002, x + dx, dy - 0.006, 0.0105);
     const pivot = new Group();
     pivot.position.set(x + 0.026, 0.026, 0.01);
-    group.add(pivot);
+    front.add(pivot);
     const rocker = t.box(
       pivot,
       t.paint('#ecebe4', 0.3),
@@ -1340,7 +1377,8 @@ export function createTwinSocket(kit: PanelKit) {
     // A plug-in socket tester: three LEDs that light when the socket is live.
     const tester = new Group();
     tester.position.set(x, -0.006, 0.01);
-    group.add(tester);
+    tester.visible = testers;
+    front.add(tester);
     t.box(tester, t.paint('#f2d33a', 0.4), 0.044, 0.05, 0.03, 0, 0, 0.015);
     const lamps = [-0.012, 0, 0.012].map((dx) =>
       t.led(tester, '#ffb020', 0.003, dx, 0.012, 0.0305),
@@ -1447,44 +1485,114 @@ export function createFloorBox(kit: PanelKit) {
  * A distribution board: its steel box and door, the main switch and a
  * breaker for each circuit, with their labels.
  */
+/** Hager Invicta JK104B-format 125 A TPN enclosure: 465 W × 500 H × 132.5 D mm. */
 export function createDistributionBoard(kit: PanelKit, circuits: string[]) {
-  const t = tools(kit);
-  const group = new Group();
-  const w = 0.12 + circuits.length * 0.05;
-  t.box(group, t.paint('#e4e4df', 0.4, 0.2), w, 0.32, 0.11, 0, 0, 0.055);
-  t.box(group, t.paint('#2c2f31', 0.5), w - 0.04, 0.1, 0.004, 0, 0.02, 0.111);
-  const handle = (x: number, red = false) => {
+  const t = tools(kit),
+    group = new Group();
+  const shell = t.paint('#d4d8d5', 0.55, 0.2);
+  t.box(group, shell, 0.465, 0.5, 0.006, 0, 0, 0.003);
+  for (const x of [-0.2295, 0.2295])
+    t.box(group, shell, 0.006, 0.5, 0.1265, x, 0, 0.06925);
+  for (const y of [-0.247, 0.247])
+    t.box(group, shell, 0.453, 0.006, 0.1265, 0, y, 0.06925);
+  const inside = new Group();
+  group.add(inside);
+  t.box(inside, t.paint('#929b99', 0.6), 0.427, 0.445, 0.004, 0, 0, 0.055);
+  const handle = (x: number, y: number, red = false) => {
     const pivot = new Group();
-    pivot.position.set(x, 0.02, 0.113);
-    group.add(pivot);
-    t.box(pivot, t.paint('#f2f1ea', 0.4), 0.034, 0.08, 0.02, 0, 0, 0.01);
-    const lever = t.box(
+    pivot.position.set(x, y, 0.075);
+    inside.add(pivot);
+    t.box(
       pivot,
-      t.paint(red ? '#c4231c' : '#2b2b2b', 0.4),
-      0.014,
-      0.026,
+      t.paint('#e8e6db', 0.6),
+      red ? 0.07 : 0.018,
+      0.072,
       0.022,
       0,
       0,
-      0.026,
+      0.011,
+    );
+    const lever = t.box(
+      pivot,
+      t.paint(red ? '#b92d25' : '#24282a'),
+      red ? 0.05 : 0.012,
+      0.019,
+      0.016,
+      0,
+      0,
+      0.033,
     );
     return {
       lever,
       set(on: boolean) {
-        lever.position.y = on ? 0.016 : -0.016;
+        lever.position.y = on ? 0.014 : -0.014;
       },
     };
   };
-  const main = handle(-w / 2 + 0.05, true);
-  t.label(group, 'MAIN\nSWITCH', -w / 2 + 0.05, -0.04, 0.112, 0.006);
+  const main = handle(-0.145, -0.13, true);
+  t.label(inside, 'MAIN 125 A', -0.145, -0.19, 0.105, 0.004);
   const breakers = circuits.map((name, i) => {
-    const x = -w / 2 + 0.11 + i * 0.05;
-    t.label(group, name, x, -0.04, 0.112, 0.0055);
-    return handle(x);
+    const x = -0.12 + (i % 6) * 0.044;
+    const y = 0.12 - Math.floor(i / 6) * 0.13;
+    const breaker = handle(x, y);
+    t.label(inside, name, x, y - 0.055, 0.105, 0.0024);
+    t.label(
+      inside,
+      ['B6', 'B32', 'B16', 'B6'][i % 4],
+      x,
+      y + 0.025,
+      0.122,
+      0.002,
+    );
+    return breaker;
   });
-  t.label(group, 'DISTRIBUTION BOARD  DB1', 0, 0.12, 0.111, 0.009);
-  t.label(group, 'DANGER 230 V', 0, -0.12, 0.111, 0.009, '#c4231c');
-  return { group, main, breakers };
+  for (const y of [-0.02, 0.205])
+    t.box(
+      inside,
+      t.paint('#b0b5b3', 0.4, 0.7),
+      0.39,
+      0.018,
+      0.006,
+      0,
+      y,
+      0.105,
+    );
+  const cover = new Group();
+  cover.position.set(-0.222, 0, 0.1255);
+  group.add(cover);
+  const leaf = t.box(cover, shell, 0.444, 0.476, 0.014, 0.222, 0, 0);
+  const latch = t.box(
+    cover,
+    t.paint('#51595b'),
+    0.018,
+    0.034,
+    0.012,
+    0.412,
+    0,
+    0.014,
+  );
+  t.label(cover, 'VOLTARA', 0.222, 0.17, 0.008, 0.012, '#254659');
+  t.label(cover, 'DB-T2  /  230–400 V', 0.222, 0.12, 0.008, 0.005);
+  t.label(
+    cover,
+    'DANGER  ELECTRICITY',
+    0.222,
+    -0.13,
+    0.008,
+    0.005,
+    '#252925',
+    '#f0c940',
+  );
+  return {
+    group,
+    main,
+    breakers,
+    cover: leaf,
+    latch,
+    setOpen(open: boolean) {
+      cover.rotation.y = open ? -1.85 : 0;
+    },
+  };
 }
 
 // ---- Climate ------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { createArchitecturalElectricalGallery } from './architectural-gallery';
 import { createRenderer, useEnvironment } from './render-style';
 import {
   AmbientLight,
@@ -153,6 +154,14 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     minZ: (cabinetZ - 2.55) * m,
     maxZ: (cabinetZ + 2.55) * m,
   });
+  place(
+    createArchitecturalElectricalGallery(kit),
+    -9.72,
+    1.6,
+    -3.7,
+    Math.PI / 2,
+    { minX: -10 * m, maxX: -9.5 * m, minZ: -5.15 * m, maxZ: -2.25 * m },
+  );
   [...createMachineGallery(kit), ...createEmptyMachinePlinths(kit)].forEach(
     (plinth, i) => {
       const { x, z } = ALL_GALLERY_LAYOUT[i];
@@ -256,6 +265,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
       yaw: Math.PI / 2,
       pitch: -0.1,
     },
+    architecture: { x: -7.5 * m, z: -3.7 * m, yaw: -Math.PI / 2, pitch: 0 },
     empty: { x: 1 * m, z: 8 * m, yaw: 0, pitch: -0.5 },
     capacitor: { x: -5 * m, z: 7 * m, yaw: 0, pitch: -0.9 },
     backplane: { x: 5 * m, z: 4.85 * m, yaw: 0, pitch: -0.3 },

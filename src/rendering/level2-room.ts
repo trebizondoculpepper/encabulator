@@ -1,12 +1,16 @@
+import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
+import { addWarehouseLighting } from './warehouse-lighting';
+import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
 import {
-  AmbientLight,
-  BoxGeometry,
-  DirectionalLight,
+  LEVEL2_MACHINE,
+  LEVEL2_START,
+  LEVEL2_SKIP_SPOTS,
+} from '../game/level2-room-plan';
+import {
   Group,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
-  PointLight,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -45,16 +49,11 @@ import { dressSkip } from '../game/skip-dressing';
 import { createBinTossing } from './bin-tossing';
 import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
-import { createPs1Material, ps1Uniforms } from './ps1-material';
+import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
-/** Module 2's interactive test space; its architectural dressing comes later. */
-/** Where the skip may appear, metres: the far end of the room. */
-const SKIP_SPOTS = [
-  { x: -3.6, z: 16.6 },
-  { x: 0, z: 17.4 },
-  { x: 3.6, z: 16.6 },
-];
+/** Module 2 adds its scenario and apparatus to the shared Guildford warehouse. */
+const SKIP_SPOTS = LEVEL2_SKIP_SPOTS;
 /** The glance down at the first dropped card: seconds turning, holding. */
 const GLANCE = { turn: 0.7, hold: 1.1 };
 
@@ -63,70 +62,27 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const scene = new Scene();
   const renderer = createRenderer(canvas);
   const freeEnvironment = useEnvironment(renderer, scene, 0.3);
-  renderer.setClearColor('#a9aaa4');
-  const camera = new PerspectiveCamera(55, 1, 0.05, 40 * m);
-  scene.add(new AmbientLight('#e8ebe9', 1.35));
-  const key = new DirectionalLight('#f5f4e9', 1.2);
-  key.position.set(1, 5, 4);
-  scene.add(key);
-  const floor = createPs1Material({ color: '#777975' });
-  const wall = createPs1Material({ color: '#c7c8bc' });
-  const ceiling = createPs1Material({ color: '#d4d5cf' });
-  const steel = createPs1Material({ color: '#969a99', metalness: 0.4 });
-  const dark = createPs1Material({ color: '#25292b' });
-  // A long room: the skip, when there is one, stands at the far end,
-  // about ten seconds' walk (20 m) from the machine, time for the narrator
-  // to talk while the player carries each card to it.
-  const ROOM = { minZ: -5, maxZ: 19 };
-  const bounds: Footprint = {
-    minX: -6 * m,
-    maxX: 6 * m,
-    minZ: ROOM.minZ * m,
-    maxZ: ROOM.maxZ * m,
-  };
-  const slab = (
-    w: number,
-    h: number,
-    d: number,
-    x: number,
-    y: number,
-    z: number,
-    material = steel,
-  ) => {
-    const mesh = new Mesh(new BoxGeometry(w * m, h * m, d * m), material);
-    mesh.position.set(x * m, y * m, z * m);
-    scene.add(mesh);
-    return mesh;
-  };
-  const roomDepth = ROOM.maxZ - ROOM.minZ;
-  const roomMiddle = (ROOM.minZ + ROOM.maxZ) / 2;
-  slab(12, 0.1, roomDepth, 0, -0.05, roomMiddle, floor);
-  slab(12, 0.08, roomDepth, 0, 3.34, roomMiddle, ceiling);
-  const walls = devWalls(bounds, m, 3.3 * m);
-  for (const piece of walls) {
-    const mesh = new Mesh(
-      new BoxGeometry(
-        piece.maxX - piece.minX,
-        piece.top - piece.bottom,
-        piece.maxZ - piece.minZ,
-      ),
-      wall,
-    );
-    mesh.position.set(
-      (piece.minX + piece.maxX) / 2,
-      (piece.bottom + piece.top) / 2,
-      (piece.minZ + piece.maxZ) / 2,
-    );
-    scene.add(mesh);
-  }
-  for (const z of [-0.5, 5.5, 11.5, 17])
-    for (const x of [-3, 0, 3]) {
-      slab(1.1, 0.035, 0.25, x, 3.2, z, dark);
-      const lamp = new PointLight('#f0efe3', 8, 6 * m);
-      lamp.position.set(x * m, 3.15 * m, z * m);
-      scene.add(lamp);
-    }
+  renderer.setClearColor('#cbd3d6');
+  renderer.shadowMap.enabled = true;
+  const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   const kit = createPanelKit();
+  const room = createWarehouseTrainingRoom(kit);
+  room.group.scale.setScalar(m);
+  scene.add(room.group);
+  addWarehouseLighting(scene, room.lights, m);
+  const bounds: Footprint = {
+    minX: WAREHOUSE_BOUNDS.minX * m,
+    maxX: WAREHOUSE_BOUNDS.maxX * m,
+    minZ: WAREHOUSE_BOUNDS.minZ * m,
+    maxZ: WAREHOUSE_BOUNDS.maxZ * m,
+  };
+  const walls = devWalls(bounds, m, WAREHOUSE_ROOF * m);
+  const roomSolids = room.solids.map((s) => ({
+    minX: s.minX * m,
+    maxX: s.maxX * m,
+    minZ: s.minZ * m,
+    maxZ: s.maxZ * m,
+  }));
   const oilFeed = signal(false);
   const driveFeed = signal(false);
   const hydroFeed = signal(true);
@@ -148,7 +104,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     },
   });
   mcc.group.scale.setScalar(m);
-  mcc.group.position.set(0, 0, -3.8 * m);
+  mcc.group.position.set(LEVEL2_MACHINE.x * m, 0, LEVEL2_MACHINE.z * m);
   scene.add(mcc.group);
   const device = (id: string) =>
     mcc.components.find((item) => item.object.name === `${id}: breaker`)!
@@ -174,7 +130,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     new MeshBasicMaterial({ color: '#282b2c', transparent: true, opacity: 0 }),
   );
   stain.scale.set(1.7, 0.3, 0.07);
-  stain.position.set(plcX * m, 2.42 * m, -3.76 * m);
+  stain.position.set(plcX * m, 2.42 * m, (LEVEL2_MACHINE.z + 0.04) * m);
   scene.add(stain);
   const smoke = Array.from({ length: 12 }, (_, i) => {
     const puff = new Mesh(
@@ -194,7 +150,11 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       new SphereGeometry(0.009 * m, 10, 8),
       new MeshBasicMaterial({ color: '#344d35' }),
     );
-    lamp.position.set((plcX - 0.07 + i * 0.07) * m, 1.34 * m, -3.78 * m);
+    lamp.position.set(
+      (plcX - 0.07 + i * 0.07) * m,
+      1.34 * m,
+      (LEVEL2_MACHINE.z + 0.02) * m,
+    );
     scene.add(lamp);
     return lamp;
   });
@@ -488,14 +448,17 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObject(mcc.group, true)[0];
+    const hit = raycaster.intersectObjects(
+      [mcc.group, ...room.fittings],
+      true,
+    )[0];
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
       object;
       object = object.parent
     ) {
-      const work = mcc.parts.uses.get(object);
+      const work = mcc.parts.uses.get(object) ?? room.parts.uses.get(object);
       if (!work) continue;
       return () => work(knobDirection(object!, hit.point, camera));
     }
@@ -523,14 +486,14 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     {
       minX: (-MCC_WIDTH / 2 - 0.1) * m,
       maxX: (MCC_WIDTH / 2 + 0.1) * m,
-      minZ: (-3.8 - MCC_DEPTH - 0.08) * m,
-      maxZ: -3.72 * m,
+      minZ: (LEVEL2_MACHINE.z - MCC_DEPTH - 0.08) * m,
+      maxZ: (LEVEL2_MACHINE.z + 0.08) * m,
     },
     {
       minX: (MCC_ISOLATOR_X - ISOLATOR.width / 2 - 0.05) * m,
       maxX: (MCC_ISOLATOR_X + ISOLATOR.width / 2 + 0.05) * m,
-      minZ: (-3.8 + ISOLATOR.back) * m,
-      maxZ: (-3.8 + ISOLATOR.front) * m,
+      minZ: (LEVEL2_MACHINE.z + ISOLATOR.back) * m,
+      maxZ: (LEVEL2_MACHINE.z + ISOLATOR.front) * m,
     },
   ];
   const walk = createFirstPerson({
@@ -539,9 +502,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     metre: m,
     floorY: 0,
     objects: scene,
-    start: { x: 0, z: 1.0 * m, yaw: 0, pitch: 0.05 },
+    start: { ...LEVEL2_START, x: LEVEL2_START.x * m, z: LEVEL2_START.z * m },
     solids: () => [
       ...walls,
+      ...roomSolids,
       ...footprints,
       ...(skip
         ? [
@@ -589,6 +553,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     clock += delta;
     walk.update(delta);
+    room.parts.update(delta);
     glancing(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
@@ -770,7 +735,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       puff.position.set(
         (plcX + Math.sin(i * 13) * 0.09 + age * 0.07) * m,
         (2 + age * 0.65) * m,
-        (-3.74 + age * 0.06) * m,
+        (LEVEL2_MACHINE.z + 0.06 + age * 0.06) * m,
       );
       (puff.material as MeshBasicMaterial).opacity = smokeOn
         ? Math.sin(age * Math.PI) * 0.11
@@ -798,6 +763,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     walk.dispose();
     voice.dispose();
     mcc.parts.dispose();
+    room.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.remove(skipModel.group);
     skipLamps?.dispose();
@@ -805,8 +771,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       root.traverse((object) => {
         if (object instanceof Mesh) object.geometry.dispose();
       });
-    for (const material of [floor, wall, ceiling, steel, dark])
-      material.dispose();
+
     (stain.material as MeshBasicMaterial).dispose();
     for (const puff of smoke) (puff.material as MeshBasicMaterial).dispose();
     for (const lamp of reserveLamps)
@@ -845,10 +810,12 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   return Object.assign(dispose, {
     suspend() {
       mcc.parts.setAudible(false);
+      room.parts.setAudible(false);
       voice.suspend();
     },
     resume() {
       mcc.parts.setAudible(true);
+      room.parts.setAudible(true);
       voice.resume();
     },
   });
