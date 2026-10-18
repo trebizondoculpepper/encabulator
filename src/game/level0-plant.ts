@@ -1342,6 +1342,22 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     },
     'CARDINAL GRAMMETER CALIBRATE',
   );
+  /**
+   * The cheat console's RESET: clear the faults no component holds itself,
+   * the drive's latched fault, the PLC's halt and the grammeter's drift.
+   */
+  const clearFaults = g.action(
+    'cheat.clearFaults',
+    [],
+    [s.vfdFault, s.plcHalt, s.gramZero, s.gramSpan],
+    () => {
+      s.vfdFault.set(null);
+      s.plcHalt.set(null);
+      s.gramZero.set(0);
+      s.gramSpan.set(0);
+    },
+    'CHEATS RESET',
+  );
   const countReset = g.action(
     'semiboloid.reset',
     [e.panMonitor],
@@ -1620,6 +1636,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     gramZero,
     gramCalibrate,
     countReset,
+    clearFaults,
     /** Bridge in what the energised units' control circuits draw. */
     senseControlAmps(amps: number) {
       controlAmps.set(amps);

@@ -13,6 +13,7 @@ import {
 import type { Object3D } from 'three';
 import {
   LEVEL0_CHAIRS,
+  LEVEL0_CHEATS,
   LEVEL0_MACHINE,
   LEVEL0_START,
 } from '../game/level0-room-plan';
@@ -54,6 +55,8 @@ import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createLevel0Machine } from './level0-machine';
+import { createLevel0Cheats } from './level0-cheats';
+import { CHEAT_CONSOLE_HALF, createCheatConsole } from './cheat-console';
 import { addWarehouseLighting } from './warehouse-lighting';
 
 /**
@@ -148,12 +151,20 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // while the player is looking into the cabinet.
   machine.onBoardRemoved(conjureSkip);
 
+  // The cheat console: a locked cabinet on a pole, its key in its lock.
+  const cheats = createLevel0Cheats(machine);
+  const cheatConsole = createCheatConsole(kit, cheats);
+  cheatConsole.group.scale.setScalar(m);
+  cheatConsole.group.position.set(LEVEL0_CHEATS.x * m, 0, LEVEL0_CHEATS.z * m);
+  cheatConsole.group.rotation.y = LEVEL0_CHEATS.yaw;
+  scene.add(cheatConsole.group);
+
   const raycaster = new Raycaster();
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
     const hit = raycaster.intersectObjects(
-      [mcc.group, workstation.group, ...room.fittings],
+      [mcc.group, workstation.group, cheatConsole.group, ...room.fittings],
       true,
     )[0];
     if (!hit || hit.distance > 3.2 * m) return null;
@@ -165,6 +176,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       const work =
         mcc.parts.uses.get(object) ??
         workstation.parts.uses.get(object) ??
+        cheatConsole.parts.uses.get(object) ??
         room.parts.uses.get(object);
       if (work) return () => work(knobDirection(object!, hit.point, camera));
     }
@@ -236,6 +248,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     solids: () => [
       ...walls,
       ...workstation.solids(),
+      {
+        minX: (LEVEL0_CHEATS.x - CHEAT_CONSOLE_HALF) * m,
+        maxX: (LEVEL0_CHEATS.x + CHEAT_CONSOLE_HALF) * m,
+        minZ: (LEVEL0_CHEATS.z - CHEAT_CONSOLE_HALF) * m,
+        maxZ: (LEVEL0_CHEATS.z + CHEAT_CONSOLE_HALF) * m,
+      },
       ...roomSolids,
       ...footprints,
       skip
@@ -291,6 +309,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     room.parts.update(delta);
     lighting.update();
     workstation.parts.update(delta);
+    cheatConsole.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
@@ -307,6 +326,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     room.parts.dispose();
     stopDiagnosticLink();
     workstation.dispose();
+    cheatConsole.dispose();
     skipLamps?.dispose();
     skipGraffiti?.dispose();
     scene.remove(skipModel.group, chairs);
@@ -345,6 +365,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     view: (x: number, z: number, yaw = 0, pitch = 0) =>
       walk.place(x * m, z * m, yaw, pitch),
     conjureSkip,
+    /** The cheat console's actions, and its lock (development only). */
+    cheats,
+    unlockCheats: () => cheatConsole.unlock(),
   };
   return Object.assign(dispose, {
     suspend() {
