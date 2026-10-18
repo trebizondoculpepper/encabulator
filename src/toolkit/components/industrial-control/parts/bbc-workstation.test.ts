@@ -6,7 +6,7 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { Box3, Mesh, TubeGeometry } from 'three';
+import { Box3, Mesh, TubeGeometry, Vector3 } from 'three';
 import { partAudio } from '../../core/audio/part-audio';
 import { createPanelKit, disposeKit } from '../../core/views/eighties-controls';
 import { bbcWorkstation } from './bbc-workstation';
@@ -144,9 +144,22 @@ describe('BBC workstation exhibit', () => {
     expect(
       play.mock.calls.some(
         ([recipe, from]) =>
-          'recording' in recipe && from === exhibit.view.bbc.group,
+          'recording' in recipe &&
+          from ===
+            exhibit.view.group.getObjectByName('BBC internal loudspeaker'),
       ),
     ).toBe(true);
+    const speaker = exhibit.view.group.getObjectByName(
+      'BBC internal loudspeaker',
+    )!;
+    exhibit.object.position.set(6, 0, -4);
+    const before = exhibit.view.bbc.group.getWorldPosition(new Vector3());
+    const parent = exhibit.view.bbc.group.parent!;
+    exhibit.view.bbc.group.removeFromParent();
+    expect(
+      speaker.getWorldPosition(new Vector3()).distanceTo(before),
+    ).toBeLessThan(1e-9);
+    parent.add(exhibit.view.bbc.group);
     use();
     exhibit.update(0);
     expect(stop).toHaveBeenCalled();

@@ -337,6 +337,8 @@ const rod = (
 };
 
 export interface MccView {
+  /** The exact green-tier indication, shared with observers. */
+  steady: Readable<boolean>;
   diagnosticFault: Readable<boolean>;
   diagnosticEndpoint: Readable<boolean>;
   /** Incoming isolator, upstream of the machine main disconnect. */
@@ -504,6 +506,7 @@ export function createRetroEncabulatorMcc(
   group.add(lineup);
   const parts = createPartSet();
   const components: MachineDevice[] = [];
+  const steady = signal(false);
   const world = createGraph();
   // The supply comes in through the isolator to the left of the line-up
   // and lands in MAIN INCOMING, live whenever the isolator is on; the main
@@ -788,6 +791,7 @@ export function createRetroEncabulatorMcc(
           },
           clock,
         );
+        steady.value = tiers[2];
         stack.group.userData.lit = tiers;
         stack.set(tiers);
       });
@@ -1286,6 +1290,7 @@ export function createRetroEncabulatorMcc(
     group,
     parts,
     components,
+    steady,
     diagnosticFault: faults.active,
     diagnosticEndpoint: computed(
       () =>

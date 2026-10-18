@@ -53,6 +53,19 @@ export const PLANT = {
   softStartAmps: 8,
   softRampAmps: 18,
   motorAmps: 24,
+  /**
+   * Lubrication and wear: the pressure at which bearings are fully
+   * lubricated, seconds a leak takes to drain the reservoir, seconds a
+   * dry bearing takes to wear out, and the wear at which it grinds (amber)
+   * and runs hot (red); at 1 it seizes.
+   */
+  oilAdequate: 38,
+  leakSeconds: 60,
+  dryWearSeconds: 90,
+  wearGrinding: 0.3,
+  wearHot: 0.7,
+  /** Extra current a worn bearing draws, amps at full wear. */
+  wornAmps: 12,
   /** Lube oil, psi: running pressure, and the drive's permissive. */
   oilPressure: 45,
   oilOk: 25,
@@ -220,8 +233,13 @@ export interface PlantFault {
  * (hot, unlocked, drifting, a door open) are warnings.
  */
 export function severityOf(code: string): Severity {
-  if (/^(E01|E10|E11|E20|F04|F07)$|-(C1|A1)$/.test(code)) return 'critical';
-  if (/^(E02|E3\d|E4\d|E5\d|E6\d|A01)$|-(Q|F1|F2|KM|K\d|X\d|RU\d)$/.test(code))
+  if (/^(E01|E10|E11|E20|F04|F07|S0\d)$|-(C1|A1)$/.test(code))
+    return 'critical';
+  if (
+    /^(E02|E3\d|E4\d|E5\d|E6\d|A01|A11|A13)$|-(Q|F1|F2|KM|K\d|X\d|RU\d)$/.test(
+      code,
+    )
+  )
     return 'failure';
   return 'warning';
 }
@@ -391,6 +409,16 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const s = {
     clock: g.state('plant.clock', 0),
     oil: g.state('lube.pressure', 0, { note: 'psi' }),
+    /** The lube oil reservoir, full at 1. */
+    oilLevel: g.state('lube.level', 1),
+    /** Faults the simulator can set: a leak, and a stuck pressure switch. */
+    oilLeak: g.state('lube.leak', false),
+    oilSwitchStuck: g.state('lube.switchStuck', false),
+    /** Bearing wear, 0 to 1: the main drive motor's and the drive's motor's. */
+    motorWear: g.state('mainMotor.wear', 0),
+    driveWear: g.state('drive.wear', 0),
+    /** What has seized, if anything: the breakdown. */
+    seized: g.state<'M-101' | 'VFD' | null>('machine.seized', null),
     hydraulic: g.state('hydraulic.pressure', 0, { note: 'psi' }),
     flow: g.state('hydro.flow', 0, { note: 'share of rated flow' }),
     fan: g.state('fan.pressure', 0, { note: 'inWC' }),
@@ -420,7 +448,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   };
 
   // ---- Derived -------------------------------------------------------------
-  const oilOk = g.derive('lube.ok', [s.oil], (p) => p >= PLANT.oilOk);
+  // The low-pressure switch: stuck, it reports healthy pressure whatever
+  // the oil is doing, and nothing downstream knows any better.
+  const oilOk = g.derive(
+    'lube.ok',
+    [s.oil, s.oilSwitchStuck],
+    (p, stuck) => stuck || p >= PLANT.oilOk,
+  );
   const hydraulicOk = g.derive(
     'hydraulic.ok',
     [s.hydraulic],
@@ -500,19 +534,21 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   );
   const driveBlock = g.output(
     'drive.block',
-    [e.vfdControl, e.vfdReady, e.driveIsolator, oilOk, s.vfdFault],
-    (on, ready, isolator, oil, fault): string | null =>
+    [e.vfdControl, e.vfdReady, e.driveIsolator, oilOk, s.vfdFault, s.seized],
+    (on, ready, isolator, oil, fault, seized): string | null =>
       !on
         ? 'NO CONTROL POWER'
         : fault
           ? fault
-          : !ready
-            ? 'POWER STAGE'
-            : !isolator
-              ? 'ISOLATOR OPEN'
-              : !oil
-                ? 'NO LUBE PERMIT'
-                : null,
+          : seized === 'VFD'
+            ? 'MOTOR SEIZED'
+            : !ready
+              ? 'POWER STAGE'
+              : !isolator
+                ? 'ISOLATOR OPEN'
+                : !oil
+                  ? 'NO LUBE PERMIT'
+                  : null,
     { where: 'VFD-601 keypad' },
   );
   // The reference lags the drive more the faster it turns, and the other
@@ -646,6 +682,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       controlAmps,
       s.feedSpeed,
       s.auxMotorSpeed,
+      s.motorWear,
+      s.driveWear,
     ],
     (
       mains,
@@ -665,6 +703,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       control,
       feedSpeed,
       auxMotorSpeed,
+      motorWear,
+      driveWear,
     ) =>
       !mains
         ? 0
@@ -674,12 +714,12 @@ export function createLevel0Plant(g: Graph = createGraph()) {
           (hydraulic ? 9 : 0) +
           (auxDrive ? 1.5 + auxHz * 0.12 : 0) +
           (vent ? 2 : 0) +
-          (mainMotor ? 21 : 0) +
+          (mainMotor ? 21 + motorWear * PLANT.wornAmps : 0) +
           softStartedAmps(feed, feedSpeed) +
           softStartedAmps(auxMotor, auxMotorSpeed) +
           (hydro ? 7 : 0) +
           (fan ? 2 + fanP * 1.4 : 0) +
-          (hz / PLANT.driveMaxHz) * 38,
+          (hz / PLANT.driveMaxHz) * (38 + driveWear * PLANT.wornAmps),
     { where: 'MAIN DISCONNECT power monitor; MAIN INCOMING voltmeters' },
   );
 
@@ -902,6 +942,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       e.liveDoorOpen,
       e.hmi,
       links,
+      s.motorWear,
+      s.driveWear,
+      s.seized,
     ],
     (
       incoming,
@@ -934,6 +977,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       door,
       hmi,
       linkStates,
+      motorWear,
+      driveWear,
+      seized,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -1001,6 +1047,17 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       // pressure, LUBE flashes green instead.
       if (mains && oil < PLANT.oilOk && !lubePump)
         add({ code: 'A01', text: 'LUBE OIL PRESSURE LOW', window: 'LUBE' });
+      for (const [wear, window, name, warn, hot, dead] of [
+        [motorWear, 'M-101', 'M-101 BEARING', 'A10', 'A11', 'S01'],
+        [driveWear, 'VFD', 'DRIVE MOTOR BEARING', 'A12', 'A13', 'S02'],
+      ] as const) {
+        if (seized === window)
+          add({ code: dead, text: `${name} SEIZED`, window });
+        else if (wear >= PLANT.wearHot)
+          add({ code: hot, text: `${name} HOT`, window });
+        else if (wear >= PLANT.wearGrinding)
+          add({ code: warn, text: `${name} WORN`, window });
+      }
       if (vfdOn && hz > 1 && !cooling)
         add({ code: 'A02', text: 'DRIVE COOLING FAN OFF', window: 'COOLING' });
       if (controlOn && !vent && controlTemp > PLANT.controlHot)
@@ -1248,6 +1305,27 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         )) as never,
     },
   );
+  /** How much lube oil has leaked out of the machine, 0 to 1: the spill. */
+  const spilled = g.output('lube.spilled', [s.oilLevel], (level) => 1 - level, {
+    where: 'the oil spill on the floor',
+  });
+  /**
+   * How close the machine is to breaking down, 0 to 1: the worst of each
+   * failure's own approach (for lube starvation, the worst bearing wear).
+   */
+  const strain = g.output(
+    'plant.strain',
+    [s.motorWear, s.driveWear],
+    (motor, drive) => Math.max(motor, drive),
+    { where: 'Level 0 strangeness' },
+  );
+  /** A failure has run its course: the machine has broken down. */
+  const brokenDown = g.output(
+    'plant.brokenDown',
+    [s.seized],
+    (seized) => seized !== null,
+    { where: 'Level 0 strangeness; the seizure' },
+  );
   const healthy = g.output(
     'plant.healthy',
     [faults, e.failedInstalled],
@@ -1349,14 +1427,46 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const clearFaults = g.action(
     'scenario.clearFaults',
     [],
-    [s.vfdFault, s.plcHalt, s.gramZero, s.gramSpan],
+    [
+      s.vfdFault,
+      s.plcHalt,
+      s.gramZero,
+      s.gramSpan,
+      s.oilLevel,
+      s.oilLeak,
+      s.oilSwitchStuck,
+      s.motorWear,
+      s.driveWear,
+      s.seized,
+    ],
     () => {
+      // Refilled, the switch freed, the worn bearings replaced.
+      s.oilLevel.set(1);
+      s.oilLeak.set(false);
+      s.oilSwitchStuck.set(false);
+      s.motorWear.set(0);
+      s.driveWear.set(0);
+      s.seized.set(null);
       s.vfdFault.set(null);
       s.plcHalt.set(null);
       s.gramZero.set(0);
       s.gramSpan.set(0);
     },
     'SCENARIO SIMULATOR RESET',
+  );
+  /**
+   * The simulator's LUBE STARVATION: the reservoir starts to leak and the
+   * low-pressure switch sticks, so the motors run on as the oil runs out.
+   */
+  const lubeStarvation = g.action(
+    'scenario.lubeStarvation',
+    [],
+    [s.oilLeak, s.oilSwitchStuck],
+    () => {
+      s.oilLeak.set(true);
+      s.oilSwitchStuck.set(true);
+    },
+    'SCENARIO SIMULATOR LUBE STARVATION',
   );
   const countReset = g.action(
     'semiboloid.reset',
@@ -1385,10 +1495,17 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       e.hydroLink,
       control.fanMode,
       control.fanBoost,
+      s.oilLevel,
+      s.oilLeak,
     ],
-    [s.oil, s.hydraulic, s.flow, s.fan],
+    [s.oil, s.hydraulic, s.flow, s.fan, s.oilLevel],
     (dt) => {
-      const oilTarget = e.lube.peek() ? PLANT.oilPressure : 0;
+      // A leak drains the reservoir; below half full the pump starves.
+      if (s.oilLeak.peek())
+        s.oilLevel.set(Math.max(0, s.oilLevel.peek() - dt / PLANT.leakSeconds));
+      const oilTarget = e.lube.peek()
+        ? PLANT.oilPressure * Math.min(1, s.oilLevel.peek() / 0.5)
+        : 0;
       s.oil.set(ease(s.oil.peek(), oilTarget, oilTarget ? 1.5 : 4, dt));
       const hydTarget = e.hydraulic.peek() ? PLANT.hydraulicPressure : 0;
       s.hydraulic.set(
@@ -1426,6 +1543,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.jog,
       s.vfdFault,
       s.heatsink,
+      s.seized,
     ],
     [s.driveHz, s.jog, s.vfdFault, s.heatsink, s.driveRun],
     (dt) => {
@@ -1448,7 +1566,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         e.driveIsolator.peek() &&
         oilOk.peek() &&
         !fault &&
+        s.seized.peek() !== 'VFD' &&
         (command || jog > 0);
+      // A seized motor stops dead.
+      if (s.seized.peek() === 'VFD') s.driveHz.set(0);
       const target = !enabled
         ? 0
         : command
@@ -1483,6 +1604,30 @@ export function createLevel0Plant(g: Graph = createGraph()) {
             ? Math.min(1, speed.peek() + dt / PLANT.softStartSeconds)
             : Math.max(0, speed.peek() - dt / PLANT.softStopSeconds),
         );
+    },
+  );
+  // Bearings wear while their motor runs short of oil, faster the drier
+  // they run; worn through, the bearing seizes, and that is the breakdown.
+  g.process(
+    'bearing wear',
+    [e.mainMotor, s.driveHz, s.oil],
+    [s.motorWear, s.driveWear, s.seized],
+    (dt) => {
+      const starved = Math.max(
+        0,
+        Math.min(1, (PLANT.oilAdequate - s.oil.peek()) / PLANT.oilAdequate),
+      );
+      if (starved <= 0 || s.seized.peek()) return;
+      const rate = (dt * starved) / PLANT.dryWearSeconds;
+      if (e.mainMotor.peek()) {
+        s.motorWear.set(Math.min(1, s.motorWear.peek() + rate));
+        if (s.motorWear.peek() >= 1) s.seized.set('M-101');
+      }
+      const load = s.driveHz.peek() / PLANT.driveMaxHz;
+      if (load > 0.02 && !s.seized.peek()) {
+        s.driveWear.set(Math.min(1, s.driveWear.peek() + rate * load));
+        if (s.driveWear.peek() >= 1) s.seized.set('VFD');
+      }
     },
   );
   g.process(
@@ -1637,6 +1782,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     gramCalibrate,
     countReset,
     clearFaults,
+    lubeStarvation,
+    strain,
+    brokenDown,
+    spilled,
     /** Bridge in what the energised units' control circuits draw. */
     senseControlAmps(amps: number) {
       controlAmps.set(amps);

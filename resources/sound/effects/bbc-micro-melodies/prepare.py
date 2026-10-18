@@ -1,19 +1,20 @@
-"""Prepare audition candidates. Run with uv run --no-project --with numpy --with scipy python prepare.py.
+"""Render the selected resynthesized cues with light mono case resonance. Run with uv run --no-project --with numpy --with scipy python prepare.py.
 
 The resynthesis is an approximate transcription, not original BBC register data.
-The first cue is especially uncertain because its opening is much quieter than its ending.
+The fanfare starts at the measured melody onset, excluding its noisy lead-in.
 """
 from pathlib import Path
 import json
 import subprocess
+from tempfile import TemporaryDirectory
 import numpy as np
-from scipy import signal, ndimage
+from scipy import signal
 from scipy.io import wavfile
 
 HERE = Path(__file__).resolve().parent
 SR = 48000
 # Finish at the audible gaps rather than chopping the final notes at rough timestamps.
-CUTS = [('fanfare', 0.0, 4.82), ('beware', 4.82, 7.65), ('discordant', 7.65, 9.85), ('down-and-up', 9.85, 11.03)]
+CUTS = [('fanfare', 3.80, 4.82), ('beware', 4.82, 7.65), ('discordant', 7.65, 9.85), ('down-and-up', 9.85, 11.03)]
 
 
 def write(path, x):
@@ -31,21 +32,21 @@ def level(x, target=0.10):
     return x * min(1000, target / max(rms, 1e-9))
 
 
-def clean(x):
-    # Adaptive narrow-band Wiener subtraction: chip partials survive; broadband dirt falls away.
-    f, t, z = signal.stft(x, SR, nperseg=2048, noverlap=1536)
-    mag = abs(z)
-    floor = ndimage.median_filter(mag, size=(15, 5))
-    gain = np.maximum(0.04, 1 - (1.25 * floor / np.maximum(mag, 1e-10)) ** 2)
-    gain = ndimage.gaussian_filter(gain, sigma=(0.45, 0.65))
-    _, result = signal.istft(z * gain, SR, nperseg=2048, noverlap=1536)
-    result = result[:len(x)]
-    result = signal.sosfilt(signal.butter(2, [90, 5200], btype='bandpass', fs=SR, output='sos'), result)
-    # The source's automatic gain changes dramatically. Smooth local levelling corrects that.
-    rms = np.sqrt(ndimage.uniform_filter1d(result * result, size=9600) + 1e-12)
-    correction = np.minimum(80, (0.04 / np.maximum(rms, 0.00015)) ** 0.8)
-    correction = ndimage.gaussian_filter1d(correction, 2400)
-    return level(result * correction)
+def case_reverb(x):
+    """A mono enclosure approximation, not a measured BBC impulse response."""
+    t = np.arange(round(.16 * SR)) / SR
+    body = np.zeros(len(t))
+    # Damped panel/cavity modes: a small hollow plastic body around the speaker.
+    for hz, decay, weight in [(225, .030, 1), (385, .023, .7), (650, .017, .4), (1120, .011, .18)]:
+        body += weight * np.sin(2 * np.pi * hz * t) * np.exp(-t / decay)
+    body *= .14 / np.sqrt(np.sum(body * body))
+    impulse = body
+    # Short internal reflections; no stereo widening or long room tail.
+    for delay, amount in [(.0027, .09), (.0041, -.06), (.0063, .05), (.0092, .04), (.014, -.03), (.022, .022), (.034, .015), (.052, .008)]:
+        impulse[round(delay * SR)] += amount
+    impulse *= .80  # A little fuller, while below the earlier cleaned-reference effect.
+    impulse[0] += 1
+    return level(signal.fftconvolve(x, impulse))
 
 
 def square(frequencies):
@@ -82,14 +83,8 @@ def synth_notes(events, duration):
 def events():
     # [start, duration, starting Hz, ending Hz, relative level]. Editable approximation.
     fanfare = [
-        [.64, .80, 261, 261, .45], [.64, .80, 330, 330, .45],
-        [1.48, .28, 220, 220, .5], [1.48, .28, 294, 294, .42],
-        [2.10, .30, 147, 147, .4], [2.10, .30, 294, 294, .55],
-        [2.52, .43, 233, 233, .5], [2.52, .43, 294, 294, .4],
-        [3.00, .18, 311, 311, .5], [3.25, .18, 294, 294, .5],
-        [3.42, .34, 831, 831, .5],
-        [3.80, .08, 440, 440, .7], [3.89, .08, 587, 587, .7],
-        [3.98, .08, 762, 762, .7], [4.07, .64, 881, 881, .7],
+        [.02, .07, 445, 445, .7], [.10, .08, 592, 592, .7],
+        [.19, .08, 759, 759, .7], [.28, .64, 880, 880, .7],
     ]
     beware = [[.05, .47, 155.3, 155.3, .7], [.52, .12, 175, 175, .7], [.64, .26, 184.5, 184.5, .7], [.91, .26, 155.1, 155.1, .7]]
     # The latter half is deliberately rough modulation, not hiss to be removed.
@@ -102,33 +97,19 @@ def events():
 
 
 def main():
-    if not (HERE / 'source.wav').exists():
-        subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(HERE / 'source.webm'), '-ac', '1', '-ar', str(SR), str(HERE / 'source.wav')], check=True)
-    sr, source = wavfile.read(HERE / 'source.wav')
-    assert sr == SR
-    source = source.astype(float) / 32768
     scores = events()
     (HERE / 'scores.json').write_text(json.dumps(scores, indent=2) + '\n')
-    comparisons = []
     manifest = []
     for name, start, end in CUTS:
-        original = source[round(start * SR):round(end * SR)].copy()
-        cleaned = clean(original)
-        rebuilt = synth_notes(scores[name], end - start)
-        write(HERE / f'{name}-cleaned.wav', cleaned.copy())
-        write(HERE / f'{name}-resynth.wav', rebuilt.copy())
-        # Three equally levelled versions per cue: original, cleaned, then resynthesized.
-        for version in [level(original), cleaned, rebuilt]:
-            comparisons.extend([version, np.zeros(round(.65 * SR))])
-        manifest.append({'id': name, 'sourceStart': start, 'sourceEnd': end, 'cleanedSeconds': len(cleaned) / SR, 'resynthSeconds': len(rebuilt) / SR, 'transcription': 'approximate; fanfare opening least certain'})
-        for version in ['cleaned', 'resynth']:
-            subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(HERE / f'{name}-{version}.wav'), '-c:a', 'libmp3lame', '-b:a', '160k', str(HERE / f'{name}-{version}.mp3')], check=True)
-        print(name, 'prepared', round(end - start, 2), 'seconds')
-    write(HERE / 'comparison-original-cleaned-resynth.wav', np.concatenate(comparisons))
+        rendered = case_reverb(synth_notes(scores[name], end - start))
+        # Encode through a temporary WAV; retain only the compact MP3 output.
+        with TemporaryDirectory(prefix='bbc-cue-') as temporary:
+            wav = Path(temporary) / f'{name}.wav'
+            write(wav, rendered.copy())
+            subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(wav), '-c:a', 'libmp3lame', '-b:a', '160k', '-ac', '1', str(HERE / f'{name}-resynth.mp3')], check=True)
+        manifest.append({'id': name, 'sourceStart': start, 'sourceEnd': end, 'seconds': len(rendered) / SR, 'channels': 1, 'variant': 'resynthesized with mono case resonance', 'caseResponseSeconds': .16, 'caseWetGain': .80, 'transcription': 'approximate; fanfare begins at measured melody onset'})
+        print(name, f'{len(rendered)/SR:.3f}s', 'resynth + light mono case resonance')
     (HERE / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    for file in HERE.glob('*-cleaned.wav'):
-        _, x = wavfile.read(file)
-        print(file.name, 'peak', np.max(abs(x.astype(float))) / 32768, 'finite', bool(np.isfinite(x).all()))
 
 
 if __name__ == '__main__':

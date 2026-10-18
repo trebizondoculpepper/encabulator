@@ -1,34 +1,46 @@
 [
   {
     "id": "fanfare",
-    "sourceStart": 0.0,
+    "sourceStart": 3.8,
     "sourceEnd": 4.82,
-    "cleanedSeconds": 4.82,
-    "resynthSeconds": 4.87,
-    "transcription": "approximate; fanfare opening least certain"
+    "seconds": 1.2299791666666666,
+    "channels": 1,
+    "variant": "resynthesized with mono case resonance",
+    "caseResponseSeconds": 0.16,
+    "caseWetGain": 0.8,
+    "transcription": "approximate; fanfare begins at measured melody onset"
   },
   {
     "id": "beware",
     "sourceStart": 4.82,
     "sourceEnd": 7.65,
-    "cleanedSeconds": 2.83,
-    "resynthSeconds": 2.88,
-    "transcription": "approximate; fanfare opening least certain"
+    "seconds": 3.0399791666666665,
+    "channels": 1,
+    "variant": "resynthesized with mono case resonance",
+    "caseResponseSeconds": 0.16,
+    "caseWetGain": 0.8,
+    "transcription": "approximate; fanfare begins at measured melody onset"
   },
   {
     "id": "discordant",
     "sourceStart": 7.65,
     "sourceEnd": 9.85,
-    "cleanedSeconds": 2.2,
-    "resynthSeconds": 2.25,
-    "transcription": "approximate; fanfare opening least certain"
+    "seconds": 2.4099791666666666,
+    "channels": 1,
+    "variant": "resynthesized with mono case resonance",
+    "caseResponseSeconds": 0.16,
+    "caseWetGain": 0.8,
+    "transcription": "approximate; fanfare begins at measured melody onset"
   },
   {
     "id": "down-and-up",
     "sourceStart": 9.85,
     "sourceEnd": 11.03,
-    "cleanedSeconds": 1.18,
-    "resynthSeconds": 1.23,
-    "transcription": "approximate; fanfare opening least certain"
+    "seconds": 1.3899791666666668,
+    "channels": 1,
+    "variant": "resynthesized with mono case resonance",
+    "caseResponseSeconds": 0.16,
+    "caseWetGain": 0.8,
+    "transcription": "approximate; fanfare begins at measured melody onset"
   }
 ]

@@ -116,3 +116,51 @@ it('preserves an established session across a silent geometry swap', () => {
   original.dispose();
   replacement.dispose();
 });
+
+describe('BBC steady-state fanfare', () => {
+  it('celebrates each genuine green transition once, only when powered', () => {
+    const steady = signal(false);
+    const bbc = createBbcComputer({
+      online: signal(true),
+      lines: signal([]),
+      steady,
+    });
+    steady.value = true;
+    expect(bbc.fanfare.value).toBe(0);
+    bbc.power.flip();
+    expect(bbc.fanfare.value).toBe(0); // No queued celebration on late power-on.
+    steady.value = false;
+    bbc.step(1);
+    steady.value = true;
+    expect(bbc.fanfare.value).toBe(1);
+    bbc.step(10);
+    expect(bbc.fanfare.value).toBe(1);
+    steady.value = false;
+    bbc.step(0.1);
+    steady.value = true;
+    expect(bbc.fanfare.value).toBe(1); // Ignore a brief readiness flicker.
+    steady.value = false;
+    bbc.step(1);
+    steady.value = true;
+    expect(bbc.fanfare.value).toBe(2);
+    bbc.dispose();
+  });
+
+  it('does not celebrate or re-arm during a silent geometry swap', () => {
+    const steady = signal(false);
+    const link = { online: signal(true), lines: signal([]), steady };
+    const original = createBbcComputer(link);
+    original.power.flip();
+    steady.value = true;
+    expect(original.fanfare.value).toBe(1);
+    const replacement = createBbcComputer(link);
+    replacement.restore(original.snapshot());
+    expect(replacement.fanfare.value).toBe(0);
+    steady.value = false;
+    replacement.step(0.1);
+    steady.value = true;
+    expect(replacement.fanfare.value).toBe(0);
+    original.dispose();
+    replacement.dispose();
+  });
+});

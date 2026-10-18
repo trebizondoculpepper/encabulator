@@ -1,6 +1,6 @@
 import { effect } from '@preact/signals-core';
 import type { BbcDiagnosticLink } from '../logic/bbc-micro';
-import { Vector3 } from 'three';
+import { Group, Vector3 } from 'three';
 import { beginPart } from '../../core/parts/parts';
 import { partAudio, recording, click } from '../../core/audio/part-audio';
 import { createMicroLabel } from '../../core/views/eighties-controls';
@@ -13,6 +13,11 @@ const BOOT = recording(
   0.35,
 );
 
+const FANFARE = recording(
+  new URL('../../sound/audio/assets/bbc-fanfare.mp3', import.meta.url),
+  0.35,
+);
+
 /** Reusable workstation, including its own power control, boot and positional cue. */
 export function bbcWorkstation(
   kit: PanelKit,
@@ -22,6 +27,11 @@ export function bbcWorkstation(
   const a = beginPart(kit, 'BBC Micro Model B');
   const view = createBbcWorkstation(kit, importedConnectors);
   const model = createBbcComputer(link);
+  // This anchor survives swapping the procedural case for the imported mesh.
+  const speaker = new Group();
+  speaker.name = 'BBC internal loudspeaker';
+  speaker.position.copy(view.bbc.group.position);
+  view.group.add(speaker);
   a.object.add(view.group);
   let seat = (_pose: {
     x: number;
@@ -58,8 +68,7 @@ export function bbcWorkstation(
   let audible = true;
   const stopEvent = model.power.onEvent((event) => {
     stopSound();
-    if (event === 'on' && audible)
-      stopSound = partAudio.play(BOOT, view.bbc.group);
+    if (event === 'on' && audible) stopSound = partAudio.play(BOOT, speaker);
   });
   a.voice(
     model.power,
@@ -67,7 +76,7 @@ export function bbcWorkstation(
       on: click({ band: 1200, q: 1, decay: 0.025, level: 0.15 }),
       off: click({ band: 900, q: 1, decay: 0.025, level: 0.15 }),
     },
-    view.bbc.group,
+    speaker,
   );
   // Original synthesis: paired seek steps, with gaps as the head settles.
   const seek = {
@@ -93,6 +102,21 @@ export function bbcWorkstation(
       stopRead = partAudio.play(seek, view.disk.group);
     wasReading = reading;
   });
+  let stopFanfare = () => {};
+  let lastFanfare = model.fanfare.value;
+  const steadySound = effect(() => {
+    const serial = model.fanfare.value;
+    const on = model.power.state.value;
+    const green = link?.steady?.value ?? false;
+    if (!on || !green) stopFanfare();
+    if (serial !== lastFanfare) {
+      lastFanfare = serial;
+      if (on && green && audible) {
+        stopFanfare();
+        stopFanfare = partAudio.play(FANFARE, speaker);
+      }
+    }
+  });
   let clock = 0;
   const update = (delta: number) => {
     clock += delta;
@@ -110,6 +134,8 @@ export function bbcWorkstation(
   a.updates.push(update);
   update(0);
   a.disposers.push(
+    steadySound,
+    () => stopFanfare(),
     sound,
     () => stopRead(),
     stopEvent,
@@ -134,6 +160,7 @@ export function bbcWorkstation(
       if (!on) {
         stopSound();
         stopRead();
+        stopFanfare();
       }
     },
   };

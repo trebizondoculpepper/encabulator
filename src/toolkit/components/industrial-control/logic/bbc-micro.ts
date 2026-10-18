@@ -8,6 +8,8 @@ export const BBC_LOAD_SECONDS = 4.5;
 export interface BbcDiagnosticLink {
   online: Readable<boolean>;
   lines: Readable<readonly ScreenLine[]>;
+  /** The observed machine green tier, independent of the text presentation. */
+  steady?: Readable<boolean>;
 }
 export const BBC_HANDSHAKE_SECONDS = 0.35;
 export const BBC_READ_SECONDS = 1.5;
@@ -16,6 +18,20 @@ export const BBC_READ_SECONDS = 1.5;
 export function createBbcComputer(link?: BbcDiagnosticLink) {
   const power = createSwitch({ initial: false });
   const elapsed = signal(0);
+  const fanfare = signal(0);
+  let wasSteady = link?.steady?.value ?? false;
+  let fanfareArmed = !wasSteady;
+  let unsteadySeconds = 0;
+  const stopSteady = effect(() => {
+    const green = link?.steady?.value ?? false;
+    const on = power.state.value;
+    if (green && !wasSteady && fanfareArmed) {
+      fanfareArmed = false;
+      if (on) fanfare.value = fanfare.peek() + 1;
+    }
+    if (green) unsteadySeconds = 0;
+    wasSteady = green;
+  });
   const sessionElapsed = signal(0);
   const session = computed(() =>
     !link ||
@@ -109,17 +125,24 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
     session,
     diagnosticsAvailable,
     reading,
+    fanfare,
     snapshot: () => ({
       powered: power.state.value,
       elapsed: elapsed.value,
       sessionElapsed: sessionElapsed.value,
+      fanfareArmed,
+      unsteadySeconds,
     }),
     /** A geometry swap must not reboot the computer or replay its disk activity. */
     restore(snapshot: {
       powered: boolean;
       elapsed: number;
       sessionElapsed: number;
+      fanfareArmed?: boolean;
+      unsteadySeconds?: number;
     }) {
+      fanfareArmed = snapshot.fanfareArmed ?? !wasSteady;
+      unsteadySeconds = snapshot.unsteadySeconds ?? 0;
       batch(() => {
         power.set(snapshot.powered);
         elapsed.value = snapshot.elapsed;
@@ -127,8 +150,13 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
       });
     },
     step(delta: number) {
-      if (!power.state.value) return;
       const dt = Math.max(0, delta);
+      if (link?.steady?.value) unsteadySeconds = 0;
+      else {
+        unsteadySeconds = Math.min(1, unsteadySeconds + dt);
+        if (unsteadySeconds >= 1) fanfareArmed = true;
+      }
+      if (!power.state.value) return;
       const remainingBoot = Math.max(0, BBC_LOAD_SECONDS - elapsed.value);
       elapsed.value = Math.min(BBC_LOAD_SECONDS, elapsed.value + dt);
       if (link?.online.value && elapsed.value >= BBC_LOAD_SECONDS)
@@ -138,6 +166,7 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
         );
     },
     dispose() {
+      stopSteady();
       invalidate();
       stop();
       power.dispose();

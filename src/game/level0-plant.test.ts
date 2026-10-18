@@ -452,4 +452,70 @@ describe('Level 0 process model', () => {
         expect(readings[i]).toBeGreaterThan(readings[i - 1]);
     });
   });
+
+  describe('lube starvation', () => {
+    // The oil up first, then the motors started, as the permits require.
+    const running = () => {
+      const p = plant(RUNNING);
+      run(p, 10, 0.5);
+      p.sense({ mainMotor: true });
+      p.control.driveSpeed.set(10);
+      p.driveStart();
+      run(p, 10, 0.5);
+      return p;
+    };
+
+    it('leaks the oil away while the stuck switch keeps reporting healthy pressure', () => {
+      const p = running();
+      expect(p.state.oil.value).toBeCloseTo(PLANT.oilPressure, 0);
+      p.lubeStarvation();
+      // Drained, and the last of the pressure bled away.
+      run(p, PLANT.leakSeconds + 15, 0.5);
+      expect(p.state.oilLevel.value).toBeCloseTo(0, 6);
+      expect(p.spilled.value).toBeCloseTo(1, 6);
+      expect(p.state.oil.value).toBeLessThan(1);
+      // The switch says all is well: the motors run on.
+      expect(p.oilOk.value).toBe(true);
+      expect(p.state.driveHz.value).toBeGreaterThan(50);
+    });
+
+    it('wears the bearings, grinding, hot, then seized: the breakdown', () => {
+      const p = running();
+      p.lubeStarvation();
+      const codes = () => p.faults.value.map((f) => f.code);
+      let worn = false;
+      let hot = false;
+      for (let t = 0; t < 400 && !p.brokenDown.value; t += 0.5) {
+        p.step(0.5);
+        worn ||= codes().includes('A10');
+        hot ||= codes().includes('A11');
+        expect(p.strain.value).toBeLessThanOrEqual(1);
+      }
+      expect(worn && hot).toBe(true);
+      expect(p.brokenDown.value).toBe(true);
+      expect(p.state.seized.value).toBe('M-101');
+      expect(codes()).toContain('S01');
+      expect(p.strain.value).toBe(1);
+      // A worn bearing draws more current.
+      expect(p.loadAmps.value).toBeGreaterThan(PLANT.wornAmps);
+    });
+
+    it('wears nothing while the oil is up', () => {
+      const p = running();
+      run(p, 300, 1);
+      expect(p.strain.value).toBe(0);
+    });
+
+    it('is put right by RESET: refilled, freed and the bearings replaced', () => {
+      const p = running();
+      p.lubeStarvation();
+      run(p, 300, 1);
+      expect(p.brokenDown.value).toBe(true);
+      p.clearFaults();
+      expect(p.state.oilLevel.value).toBe(1);
+      expect(p.state.oilSwitchStuck.value).toBe(false);
+      expect(p.strain.value).toBe(0);
+      expect(p.brokenDown.value).toBe(false);
+    });
+  });
 });

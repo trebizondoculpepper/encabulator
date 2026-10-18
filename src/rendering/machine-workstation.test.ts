@@ -186,3 +186,72 @@ it('flashes the internal controller only after a session, beeps once and loses t
   play.mockRestore();
   disposeKit(kit, boards.object);
 });
+
+it('plays the selected fanfare at the computer on green, and cancels on off/suspend without replay', () => {
+  const kit = createPanelKit();
+  const steady = signal(false);
+  const cancel = vi.fn();
+  const play = vi.spyOn(partAudio, 'play').mockReturnValue(cancel);
+  const part = bbcWorkstation(kit, false, {
+    online: signal(true),
+    lines: signal([]),
+    steady,
+  });
+  const fanfares = () =>
+    play.mock.calls.filter(
+      ([recipe]) =>
+        'recording' in recipe &&
+        recipe.recording.pathname.endsWith('/bbc-fanfare.mp3'),
+    );
+  part.model.power.flip();
+  steady.value = true;
+  expect(fanfares()).toHaveLength(1);
+  expect(fanfares()[0][1]).toBe(
+    part.view.group.getObjectByName('BBC internal loudspeaker'),
+  );
+  part.model.power.flip();
+  expect(cancel).toHaveBeenCalled();
+  part.model.power.flip();
+  expect(fanfares()).toHaveLength(1);
+  part.setAudible(false);
+  steady.value = false;
+  part.update(1);
+  steady.value = true;
+  part.setAudible(true);
+  expect(fanfares()).toHaveLength(1);
+  steady.value = false;
+  part.update(1);
+  steady.value = true;
+  expect(fanfares()).toHaveLength(2);
+  part.dispose();
+  play.mockRestore();
+  disposeKit(kit, part.object);
+});
+
+it('exposes the exact green stack-light indication as the workstation readiness source', () => {
+  const kit = createPanelKit();
+  const state = {
+    powered: false,
+    battery: true,
+    fault: false,
+    restarting: false,
+    booting: false,
+  };
+  const mcc = createRetroEncabulatorMcc(kit, { stackLight: () => state });
+  const lamp = mcc.group.getObjectByName('Machine stack light')!;
+  const check = (expected: boolean) => {
+    mcc.update(0);
+    expect(mcc.steady.value).toBe(expected);
+    expect(mcc.steady.value).toBe((lamp.userData.lit as boolean[])[2]);
+  };
+  check(false);
+  state.powered = true;
+  state.booting = true;
+  check(false);
+  state.booting = false;
+  check(true);
+  state.fault = true;
+  check(false);
+  mcc.parts.dispose();
+  disposeKit(kit, mcc.group);
+});

@@ -132,6 +132,11 @@ export function createLevel0Scenarios(
     fullOn,
     reset,
     slowStart,
+    /**
+     * FAULTS: lube starvation. The reservoir leaks and its low-pressure
+     * switch sticks, so the motors run on as the oil runs out.
+     */
+    lubeStarvation: () => plant.lubeStarvation(),
     /** A brief stumble that recovers by itself. */
     hiccup: () => mcc.fail('hiccup'),
     /** A real component fault: a fuse blows or an overload trips. */

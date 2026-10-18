@@ -56,6 +56,8 @@ import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createLevel0Machine } from './level0-machine';
 import { createLevel0Scenarios } from './level0-scenarios';
+import { createLevel0Failures } from './level0-failures';
+import { createLevel0Strangeness } from './level0-strangeness';
 import { SIMULATOR_HALF, createScenarioSimulator } from './scenario-simulator';
 import { addWarehouseLighting } from './warehouse-lighting';
 
@@ -153,6 +155,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
 
   // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
   const scenarios = createLevel0Scenarios(machine);
+  // What the machine's failures look and sound like: the oil spill, worn
+  // bearings grinding, the seizure.
+  const failures = createLevel0Failures(kit, machine);
   const simulator = createScenarioSimulator(kit, scenarios);
   simulator.group.scale.setScalar(m);
   simulator.group.position.set(
@@ -286,6 +291,33 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     use: (x, y) => usableAt(x, y)?.(),
     aimed: () => Boolean(usableAt(0, 0)),
   });
+  // As the machine nears breakdown the room grows strange (dev1's and
+  // dev2's effects); when it breaks down, normality ensues.
+  const strangeness = createLevel0Strangeness({
+    renderer,
+    scene,
+    camera,
+    metre: m,
+    pose: () => ({
+      x: walk.walker.x / m,
+      z: walk.walker.z / m,
+      yaw: walk.walker.yaw,
+      pitch: walk.walker.pitch,
+    }),
+    // An apparition stands in the warehouse, clear of what stands in it.
+    fits: (x, z) =>
+      x > WAREHOUSE_BOUNDS.minX + 0.5 &&
+      x < WAREHOUSE_BOUNDS.maxX - 0.5 &&
+      z > WAREHOUSE_BOUNDS.minZ + 0.5 &&
+      z < WAREHOUSE_BOUNDS.maxZ - 0.5 &&
+      ![...roomSolids, ...footprints].some(
+        (s) =>
+          x * m > s.minX - 0.4 * m &&
+          x * m < s.maxX + 0.4 * m &&
+          z * m > s.minZ - 0.4 * m &&
+          z * m < s.maxZ + 0.4 * m,
+      ),
+  });
   workstation.onSit(({ x, z, yaw, pitch, y }) =>
     walk.place(x, z, yaw, pitch, y),
   );
@@ -317,15 +349,23 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
+    failures.update(delta);
+    strangeness.update(
+      delta,
+      machine.plant.strain.value,
+      machine.plant.brokenDown.value,
+    );
     partAudio.listen(camera, m);
     machineSides.update(camera);
-    renderer.render(scene, camera);
+    strangeness.render();
   });
   const dispose = () => {
     renderer.setAnimationLoop(null);
     observer.disconnect();
     walk.dispose();
     machine.dispose();
+    failures.dispose();
+    strangeness.dispose();
     mcc.parts.dispose();
     room.parts.dispose();
     stopDiagnosticLink();
@@ -375,6 +415,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   };
   return Object.assign(dispose, {
     suspend() {
+      // Leaving, the shared materials go back to normal for other rooms.
+      strangeness.normal();
       mcc.parts.setAudible(false);
       room.parts.setAudible(false);
       workstation.setAudible(false);

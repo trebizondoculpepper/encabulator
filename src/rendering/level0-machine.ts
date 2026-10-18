@@ -65,7 +65,10 @@ export function createLevel0Machine(
   /** Each starter's coil circuit: its X2, and any permissive in series. */
   const permits: Record<string, Readable<boolean>> = {
     // No lube oil pressure, no main drive motor.
-    [UNITS.mainMotor]: plant.oilOk,
+    // A seized motor will not turn at all.
+    [UNITS.mainMotor]: computed(
+      () => plant.oilOk.value && plant.state.seized.value !== 'M-101',
+    ),
     // LOCAL on its key, or REMOTE when Automation Control runs it.
     [UNITS.hydraulic]: plant.hydraulicPermit,
   };
@@ -330,19 +333,22 @@ export function createLevel0Machine(
 
   return {
     mcc,
-    diagnostics: level0Diagnostics(
-      plant,
-      mcc.diagnosticEndpoint,
-      Object.fromEntries(
-        [...mcc.circuits].map(([id, circuit]) => [
-          MODULE_OF[id],
-          circuit.powered,
-        ]),
+    diagnostics: {
+      steady: mcc.steady,
+      ...level0Diagnostics(
+        plant,
+        mcc.diagnosticEndpoint,
+        Object.fromEntries(
+          [...mcc.circuits].map(([id, circuit]) => [
+            MODULE_OF[id],
+            circuit.powered,
+          ]),
+        ),
+        Object.fromEntries(
+          Object.entries(UNIT_NAMES).map(([id, name]) => [MODULE_OF[id], name]),
+        ),
       ),
-      Object.fromEntries(
-        Object.entries(UNIT_NAMES).map(([id, name]) => [MODULE_OF[id], name]),
-      ),
-    ),
+    },
     plant,
     automation,
     driveBreaker,

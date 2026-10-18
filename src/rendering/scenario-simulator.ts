@@ -52,6 +52,21 @@ const BUTTONS: readonly {
   { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
 ];
 
+/** The FAULTS row: one failure a switch, as each is modelled. */
+const FAULTS: readonly {
+  legend: string;
+  cap: StudioCapColour;
+  led: StudioLedColour;
+  act: 'lubeStarvation';
+}[] = [
+  {
+    legend: 'LUBE\nSTARVATION',
+    cap: 'black',
+    led: 'amber',
+    act: 'lubeStarvation',
+  },
+];
+
 /**
  * The Hyperplasc Scenario Simulator, by Neumann Dynamik: a modern 42U
  * rack cabinet, built as the dev3 gallery's are, behind a smoked perspex
@@ -202,7 +217,36 @@ export function createScenarioSimulator(
     );
     button.object.position.set(
       (i - (BUTTONS.length - 1) / 2) * pitch,
-      -0.01,
+      0.028,
+      0.002,
+    );
+    controls.add(button.object);
+  });
+  // A second row: FAULTS, each setting one of the machine's failures going
+  // (see `doc/plans/level0-failures.md`); more as they are modelled.
+  const faultsCaption = createMicroLabel(kit, 'FAULTS', {
+    height: 0.0055,
+    ink: '#c9ced3',
+  });
+  faultsCaption.position.set(
+    -((BUTTONS.length - 1) / 2) * pitch,
+    -0.015,
+    0.002,
+  );
+  panel.face.add(faultsCaption);
+  FAULTS.forEach((spec, i) => {
+    const button = parts.add(
+      studioSwitch(kit, {
+        name: `${spec.legend.replace('\n', ' ')} fault switch`,
+        legend: spec.legend,
+        led: spec.led,
+        cap: spec.cap,
+        action: () => scenarios[spec.act](),
+      }),
+    );
+    button.object.position.set(
+      (i - (BUTTONS.length - 1) / 2) * pitch,
+      -0.045,
       0.002,
     );
     controls.add(button.object);

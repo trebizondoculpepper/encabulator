@@ -20,6 +20,8 @@ import {
   createLevel0Scenarios,
 } from './level0-scenarios';
 import { createLevel0Machine } from './level0-machine';
+import { createLevel0Failures } from './level0-failures';
+import { NORMAL, strangeness } from '../game/level0-strangeness';
 
 beforeEach(() => {
   // Label and screen canvases are made, but nothing is drawn.
@@ -221,6 +223,55 @@ describe('the Hyperplasc Scenario Simulator', () => {
     run(1);
     expect(machine.plant.plcStatus.value).toBe('halted');
     expect(machine.hazard().arcing).toBe(true);
+    dispose();
+  });
+
+  it('starves the machine of lube from its FAULTS row, to a seizure and normality', () => {
+    const { machine, panel, dispose } = sandbox();
+    const failures = createLevel0Failures(createPanelKit(), machine);
+    const step = (seconds: number) => {
+      for (let t = 0; t < seconds; t += 0.5) {
+        panel.update(0.5);
+        machine.update(0.5);
+        failures.update(0.5);
+      }
+    };
+    useOf(panel, 'FULL ON scenario switch')();
+    step(40);
+    // Started all at once, the motor took a trace of wear as the oil came up.
+    expect(machine.plant.strain.value).toBeLessThan(0.01);
+    useOf(panel, 'LUBE STARVATION fault switch')();
+    step(30);
+    // Oil on the floor, spreading.
+    expect(failures.spill.visible).toBe(true);
+    const early = failures.spill.scale.x;
+    let strange = 0;
+    for (let t = 0; t < 400 && !machine.plant.brokenDown.value; t += 5) {
+      step(5);
+      strange = Math.max(
+        strange,
+        strangeness(machine.plant.strain.value, false).patterns,
+      );
+    }
+    expect(failures.spill.scale.x).toBeGreaterThan(early);
+    expect(strange).toBeGreaterThan(0.3);
+    // The breakdown: seized, its overload and the main breaker tripped.
+    expect(machine.plant.brokenDown.value).toBe(true);
+    expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
+    expect(
+      machine.mcc.circuits
+        .get('section2.bucket1')!
+        .devices.find((d) => d.kind === 'overload')!.faulted.value,
+    ).toBe(true);
+    expect(
+      strangeness(machine.plant.strain.value, machine.plant.brokenDown.value),
+    ).toEqual(NORMAL);
+    // RESET: refilled, mopped up, the motor's bearings replaced.
+    useOf(panel, 'RESET scenario switch')();
+    step(1);
+    expect(machine.plant.brokenDown.value).toBe(false);
+    expect(failures.spill.visible).toBe(false);
+    failures.dispose();
     dispose();
   });
 });
