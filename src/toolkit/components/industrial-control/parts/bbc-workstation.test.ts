@@ -81,7 +81,16 @@ describe('BBC workstation exhibit', () => {
     const play = vi.spyOn(partAudio, 'play').mockReturnValue(stop);
     const kit = createPanelKit();
     const exhibit = bbcWorkstation(kit);
-    const use = exhibit.uses.get(exhibit.view.bbc.powerSwitch)!;
+    const use = exhibit.uses.get(exhibit.view.bbc.group)!;
+    expect(
+      exhibit.object.getObjectByName('Floor-bolted workstation power box'),
+    ).toBeDefined();
+    expect(
+      exhibit.object.getObjectByName('BBC mains flex to floor power box'),
+    ).toBeDefined();
+    expect(
+      exhibit.object.getObjectByName('Cub monitor mains flex'),
+    ).toBeDefined();
     use();
     exhibit.update(0.5);
     expect(exhibit.view.cub.screen.visible).toBe(true);

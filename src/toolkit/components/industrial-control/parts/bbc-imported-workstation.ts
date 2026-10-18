@@ -1,4 +1,9 @@
-import { Mesh, MeshBasicMaterial, MeshStandardMaterial } from 'three';
+import {
+  BoxGeometry,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+} from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import { createCrtSurface } from '../views/crt-surface';
@@ -93,6 +98,17 @@ export async function bbcImportedWorkstation(kit: PanelKit) {
       ...(keyboard ? [keyboard] : []),
     ]),
   );
+  // The imported shell and monitor share merged meshes. A close-fitting
+  // computer-only hit volume keeps the monitor and desk from switching it.
+  const powerTarget = new Mesh(
+    new BoxGeometry(0.41, 0.1, 0.345),
+    new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+  );
+  powerTarget.name = 'BBC computer power use target';
+  powerTarget.position.copy(model.position).add({ x: 0, y: 0.05, z: 0 });
+  part.object.add(powerTarget);
+  part.uses.set(powerTarget, part.model.power.flip);
+  if (keyboard) part.uses.set(keyboard, part.model.power.flip);
   const update = part.update;
   const dispose = part.dispose;
   return {
@@ -104,6 +120,8 @@ export async function bbcImportedWorkstation(kit: PanelKit) {
         : black;
     },
     dispose() {
+      powerTarget.geometry.dispose();
+      powerTarget.material.dispose();
       const textures = new Set<import('three').Texture>();
       const allMaterials = new Set<import('three').Material>();
       model.traverse((object) => {

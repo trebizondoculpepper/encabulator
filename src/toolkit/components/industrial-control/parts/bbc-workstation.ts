@@ -39,6 +39,7 @@ export function bbcWorkstation(kit: PanelKit) {
     });
   });
   a.uses.set(view.bbc.powerSwitch, model.power.flip);
+  a.uses.set(view.bbc.group, model.power.flip);
   const label = createMicroLabel(kit, 'POWER  I / O', {
     height: 0.0025,
     ink: '#292b28',
