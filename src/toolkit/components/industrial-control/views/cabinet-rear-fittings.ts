@@ -152,6 +152,12 @@ export function createCabinetEntryPlate(
       new CylinderGeometry(0.01, 0.01, 0.004, 12),
       cabinetRearPaint(kit, '#424943'),
     );
+    blank.name =
+      x === 0
+        ? 'Centre entry blank'
+        : x > 0
+          ? 'Right entry blank'
+          : 'Left entry blank';
     blank.rotation.x = Math.PI / 2;
     blank.position.set(x, 0.006, 0.003);
     group.add(blank);

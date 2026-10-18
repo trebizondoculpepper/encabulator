@@ -1,5 +1,6 @@
 import {
   BoxGeometry,
+  CylinderGeometry,
   Group,
   Mesh,
   Vector3,
@@ -55,6 +56,8 @@ export function createEncabulatorRear(
     interior: Group;
   }[] = [];
   const routes: RearRoute[] = [];
+  const dataPort = new Group();
+  dataPort.name = 'Section 1 low rear data entry';
   const keep = new Set<Object3D>();
   const plate = cabinetRearPaint(kit, '#b9bfb6');
   const dark = cabinetRearPaint(kit, '#333e3a');
@@ -121,13 +124,39 @@ export function createEncabulatorRear(
       kit,
       Math.min(w - 0.08, 0.32),
       section === 1
-        ? 'INCOMING / BASE TRUNKING'
+        ? 'CONTROL / DATA ENTRY'
         : section === 3
           ? 'PUMPS / SPARE BLANKED'
           : `SECTION ${section} CABLE ENTRY`,
     );
     entry.position.z = 0.004;
     lower.add(entry);
+    if (section === 1) {
+      entry.getObjectByName('Right entry blank')?.removeFromParent();
+      dataPort.position.set(Math.min(w - 0.08, 0.32) * 0.3, 0.006, 0.003);
+      const collar = new Mesh(
+        new CylinderGeometry(0.011, 0.011, 0.012, 16),
+        cabinetRearPaint(kit, '#969f98'),
+      );
+      collar.rotation.x = Math.PI / 2;
+      dataPort.add(collar);
+      const throat = new Mesh(
+        new CylinderGeometry(0.0055, 0.0055, 0.013, 12),
+        dark,
+      );
+      throat.rotation.x = Math.PI / 2;
+      dataPort.add(throat);
+      const dataLabel = createMicroLabel(kit, 'DATA', {
+        height: 0.0035,
+        ink: '#202a28',
+        maxWidth: 0.04,
+      });
+      dataLabel.position.set(0, 0.021, 0.008);
+      dataPort.add(dataLabel);
+      entry.add(dataPort);
+      keep.add(dataPort);
+    }
+
     const label = createMicroLabel(
       kit,
       `NEUMANN DYNAMIK\nSECTION ${section} / REAR`,
@@ -258,6 +287,7 @@ export function createEncabulatorRear(
   mergeStatic(group, Infinity, keep);
   return {
     group,
+    dataPort,
     doors,
     routes,
     /** A bucket is rendered for either genuine access, including door motion. */

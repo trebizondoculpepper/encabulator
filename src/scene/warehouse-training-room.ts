@@ -416,6 +416,7 @@ export function createWarehouseTrainingRoom(
       'lever',
       'pull',
       'panic',
+      'cableprotector',
     ];
     kinds.forEach((kind, i) => {
       const x = -10.5 + (i % 8) * 3,
@@ -424,6 +425,7 @@ export function createWarehouseTrainingRoom(
       put(kind, samples, x, y, 0.04, {
         testers: kind === 'socket',
         fallDistance: y,
+        length: kind === 'cableprotector' ? 1.8 : undefined,
       });
       label(
         samples,

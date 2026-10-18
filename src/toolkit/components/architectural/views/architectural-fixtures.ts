@@ -1,5 +1,13 @@
+import { createFloorCableProtector } from './floor-cable-protector';
 import { installDoorHardware } from './door-hardware';
-import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
+import {
+  BoxGeometry,
+  CylinderGeometry,
+  Group,
+  Mesh,
+  LineCurve3,
+  Vector3,
+} from 'three';
 import type { Material, Object3D } from 'three';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import {
@@ -54,7 +62,17 @@ export function createArchitecturalFixture(
   let lens: Mesh | undefined;
   let lensOn: Material | undefined;
   let lensOff: Material | undefined;
-  if (kind === 'lever' || kind === 'pull' || kind === 'panic') {
+  if (kind === 'cableprotector') {
+    group.add(
+      createFloorCableProtector(
+        kit,
+        new LineCurve3(
+          new Vector3(-length / 2, 0, 0),
+          new Vector3(length / 2, 0, 0),
+        ),
+      ),
+    );
+  } else if (kind === 'lever' || kind === 'pull' || kind === 'panic') {
     installDoorHardware(kit, group, kind, 0, 0, 0);
   } else if (kind === 'pipe') {
     const tube = new Mesh(

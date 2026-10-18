@@ -141,6 +141,11 @@ export const ARCHITECTURAL_FITTINGS = {
     reference: 'Briton 378M rim latch and site-cut tubular push bar',
     source: 'https://briton.co.uk/en/products/briton-378.html',
   },
+  cableprotector: {
+    title: 'Rubber floor cable protector',
+    reference: 'D-Line FC83 profile, 83 × 14 mm, 30 × 10 mm channel',
+    source: 'https://www.d-line-it.com/cable-protectors/',
+  },
   conduit: {
     title: 'Steel electrical conduit',
     reference: '20 mm galvanised steel conduit and saddles',

@@ -174,8 +174,19 @@ export function createBbcWorkstation(
     ],
     0.0035,
   );
+  const dataSocket = new Group();
+  dataSocket.name = 'BBC rear RS423 data socket';
+  dataSocket.position
+    .copy(bbc.group.position)
+    .add(
+      importedConnectors
+        ? new Vector3(0.081, 0.018, -0.17)
+        : new Vector3(-0.025, 0.045, -0.174),
+    );
+  dataSocket.rotation.y = Math.PI;
+  group.add(dataSocket);
   const powerBox = createWorkstationPowerBox(kit);
   powerBox.position.set(bx - 0.02, 0, -0.46);
   group.add(powerBox);
-  return { group, bbc, cub, disk, chair, width, depth, top };
+  return { group, bbc, cub, disk, chair, dataSocket, width, depth, top };
 }

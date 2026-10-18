@@ -129,7 +129,12 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL2_MACHINE.x * m, 0, LEVEL2_MACHINE.z * m);
   scene.add(mcc.group);
-  const workstation = addMachineWorkstation(kit, LEVEL2_MACHINE, m);
+  const workstation = addMachineWorkstation(
+    kit,
+    LEVEL2_MACHINE,
+    m,
+    mcc.rear.dataPort,
+  );
   scene.add(workstation.group);
   const device = (id: string) =>
     mcc.components.find((item) => item.object.name === `${id}: breaker`)!

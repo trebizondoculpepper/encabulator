@@ -95,7 +95,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
   scene.add(mcc.group);
-  const workstation = addMachineWorkstation(kit, LEVEL0_MACHINE, m);
+  const workstation = addMachineWorkstation(
+    kit,
+    LEVEL0_MACHINE,
+    m,
+    mcc.rear.dataPort,
+  );
   scene.add(workstation.group);
 
   // ---- The skip that was always there --------------------------------------
@@ -196,7 +201,15 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     metre: m,
     floorY: 0,
     objects: scene,
-    start: { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
+    start:
+      new URLSearchParams(location.search).get('view') === 'data-cable'
+        ? {
+            x: (LEVEL0_MACHINE.x - 4.6) * m,
+            z: (LEVEL0_MACHINE.z - 2.4) * m,
+            yaw: 2.45,
+            pitch: -0.58,
+          }
+        : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
     solids: () => [
       ...walls,
       ...workstation.solids(),

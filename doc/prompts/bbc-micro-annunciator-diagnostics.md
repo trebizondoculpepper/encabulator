@@ -1,4 +1,4 @@
-# BBC Micro: annunciator diagnostic link and startup guidance
+# BBC Micro: Neumann Link™ diagnostics and startup guidance
 
 Planning prompt, 18 October 2026. Do not implement this feature merely because this prompt exists: the owner wants to discuss the behaviour first. This develops the [original terminal prompt](bbc-micro-diagnostic-terminal.md) now that the workstation and [cabinet backs](../reports/encabulator-cabinet-backs.md) exist. The intended experience is a useful period diagnostic computer that helps a player work out how to bring the Encabulator to a steady state by operating its real controls.
 
@@ -8,19 +8,19 @@ The BBC Micro receives diagnostic information through the annunciator. Its purpo
 
 Keep BBC power independent of machine power. Both BBC and Cub retain their existing continuous power leads to the floor-bolted power box. Clicking the BBC case/keyboard operates the existing power component, with the same startup beep, black OFF screen and curved Mode 7 display. The shared chair and C/V standing-height behaviour remain. Do not add typing, extra keys, HTML diagnostic panels or a new control scheme.
 
-The owner explicitly deferred the physical BBC-to-machine data cable until the cabinet backs were modelled. They are now modelled, but choosing and rendering that cable/interface remains a separate design decision: this prompt does not authorize a speculative cable to a front annunciator socket. Bind a logical diagnostic link first when implementation is authorized; record the final physical destination and route if subsequently agreed. The Cub-to-BBC video cable stays.
+The physical machine data cable has now been explicitly authorized and implemented: BBC rear RS423 connector, down behind the desk, under a rubber floor cable protector, and through the labelled low round DATA entry at the back of section 1. The protector is raised 1 mm above the floor to avoid flicker. Reuse this route and its actual socket/entry anchors; do not add another cable or a speculative front annunciator socket. The Cub-to-BBC video and both mains leads remain separate. The physical dressing does not itself implement the diagnostic session; this prompt still defines that future behaviour.
 
 ## Terminal and link states
 
-| BBC                   | Annunciator       | Screen and activity                                                                                                                                                  |
-| --------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Off                   | Either state      | Black screen; drive idle; no diagnostic sound                                                                                                                        |
-| Booting               | Either state      | Existing BBC ROM startup and beep, then `>CHAIN "DIAG"`; no invented remote readings during startup                                                                  |
-| On, program ready     | Off / unavailable | Clearly show `NOT CONNECTED`, identifying the annunciator as the unavailable link. Do not display stale readings as live or claim that the machine is healthy        |
-| On, program ready     | Comes online      | A bounded handshake and one short disk-read sequence: drive activity/LED and a mechanical drive sound, followed by the diagnostic page and lit DIAGNOSTIC LINK pilot |
-| On, connected         | Remains online    | Live fault/status information and the next useful startup action; no repeated loading sound for every meter update                                                   |
-| On, connected/loading | Loses power/link  | Cancel any pending read/sound, show `NOT CONNECTED`; do not keep a success indication or spin the drive indefinitely                                                 |
-| On, disconnected      | Link restored     | Read again once, then return to current diagnostics without replaying the BBC power-on beep                                                                          |
+| BBC                   | Annunciator       | Screen and activity                                                                                                                                                |
+| --------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Off                   | Either state      | Black screen; drive idle; no diagnostic sound                                                                                                                      |
+| Booting               | Either state      | Existing BBC ROM startup and beep, then `>CHAIN "DIAG"`; no invented remote readings during startup                                                                |
+| On, program ready     | Off / unavailable | Clearly show `NOT CONNECTED`, identifying the annunciator as the unavailable link. Do not display stale readings as live or claim that the machine is healthy      |
+| On, program ready     | Comes online      | A bounded handshake and one short disk-read sequence: drive activity/LED and a mechanical drive sound, followed by the diagnostic page and lit NEUMANN LINK™ pilot |
+| On, connected         | Remains online    | Live fault/status information and the next useful startup action; no repeated loading sound for every meter update                                                 |
+| On, connected/loading | Loses power/link  | Cancel any pending read/sound, show `NOT CONNECTED`; do not keep a success indication or spin the drive indefinitely                                               |
+| On, disconnected      | Link restored     | Read again once, then return to current diagnostics without replaying the BBC power-on beep                                                                        |
 
 If the annunciator is already online when the BBC starts, finish the normal computer boot before the initial diagnostic read; avoid a double read/beep. Powering the BBC off cancels every pending boot/read activity, and another power-on starts cleanly. Hiding/suspending a room must not leave sounds playing or replay an old read on resume. Define a bounded, consistent read duration rather than random loading delays.
 
@@ -51,9 +51,11 @@ These are examples of the desired reasoning, not a new wiring specification. Wri
 
 The Level2 workstation shares equipment but its narrative and scripted failures must remain authoritative. Do not alter its events to satisfy the diagnostic computer. Define an explicit scene adapter and agreed hint coverage there; unavailable observations must remain unavailable. Dev19 should retain a clearly labelled standalone/demo state or a deterministic gallery harness, not import the game's plant into the reusable component.
 
-## Annunciator “Diagnostic Link” pilot
+## Annunciator “Neumann Link™” pilot
 
-Add a clearly labelled, non-pressable pilot light called `DIAGNOSTIC LINK`, using the same true-size family as adjacent devices. The owner describes it as a fourth light: inspect the actual panel before placing it, and keep TEST, ACK and RESET functional controls rather than treating their button lenses as passive lamps. Do not replace an alarm window or overlap labels/fasteners to fit the new pilot. Its label never takes a click.
+In-world, **Neumann Link™** is Neumann Dynamik’s exciting proprietary monitoring technology introduced in the 1980s: a period serial diagnostic link, presented with the company’s earnest confidence in its own invention. Keep that flavour in the diagnostic program’s header and an appropriately small panel legend, without suggesting a modern network or changing the underlying behaviour.
+
+Add a clearly labelled, non-pressable pilot light called `NEUMANN LINK™`, using the same true-size family as adjacent devices. The owner describes it as a fourth light: inspect the actual panel before placing it, and keep TEST, ACK and RESET functional controls rather than treating their button lenses as passive lamps. Do not replace an alarm window or overlap labels/fasteners to fit the new pilot. Its label never takes a click.
 
 The owner clarified the meaning after discussion: this is a **diagnostics available** indication, analogous to a completed serial handshake, rather than a copy of the BBC power switch. It lights only when the BBC is powered, the diagnostic application is ready, the annunciator endpoint is online and a working diagnostic session has been established. It is steady once the first valid diagnostic response is available on the BBC screen. Power alone, an unfinished boot or a successful lamp test is insufficient.
 
@@ -71,4 +73,4 @@ Cover the pilot staying dark during boot/handshake/read, lighting only after a s
 
 ## Return path
 
-Leave implementation/review notes in `doc/reports/bbc-micro-annunciator-diagnostics.md` for the owner and the next reviewing agent. Create the file if missing; preserve existing feedback and append dated entries. Include the confirmed handshake/availability rule, exact link-power source, state/transition timings, diagnostic coverage and dependency table, actual scene coverage, sound provenance, gallery changes, verification results, screenshots/viewing instructions, physical-cable decision and unresolved limits. Link this prompt, the original terminal prompt and the cabinet-back report. A final chat response alone is not the return path.
+Leave implementation/review notes in `doc/reports/bbc-micro-annunciator-diagnostics.md` for the owner and the next reviewing agent. Create the file if missing; preserve existing feedback and append dated entries. Include the confirmed handshake/availability rule, exact link-power source, state/transition timings, diagnostic coverage and dependency table, actual scene coverage, sound provenance, gallery changes, verification results, screenshots/viewing instructions, physical-route integration and unresolved limits. Link this prompt, the original terminal prompt and the cabinet-back report. A final chat response alone is not the return path.

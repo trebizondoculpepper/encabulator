@@ -1,4 +1,15 @@
-import { Box3, Group, Vector3 } from 'three';
+import {
+  Box3,
+  Group,
+  Vector3,
+  Mesh,
+  CylinderGeometry,
+  CatmullRomCurve3,
+  TubeGeometry,
+} from 'three';
+import { createFloorCableProtector } from '../toolkit/components/architectural/views/floor-cable-protector';
+import { kitPaint } from '../toolkit/components/core/views/eighties-controls';
+import type { Object3D } from 'three';
 import { bbcWorkstation } from '../toolkit/components/industrial-control/parts/bbc-workstation';
 import { bbcImportedWorkstation } from '../toolkit/components/industrial-control/parts/bbc-imported-workstation';
 import { createPartSet } from '../toolkit/components/core/parts/parts';
@@ -11,6 +22,7 @@ export function addMachineWorkstation(
   kit: PanelKit,
   machine: { x: number; z: number },
   metre: number,
+  dataPort: Object3D,
 ) {
   const group = new Group();
   group.name = 'Encabulator diagnostic workstation';
@@ -26,6 +38,88 @@ export function addMachineWorkstation(
   group.add(station.object);
   let sit: Parameters<typeof station.onSit>[0] = () => {};
   station.onSit((pose) => sit(pose));
+  const connection = new Group();
+  connection.name = 'BBC to cabinet protected data lead';
+  group.add(connection);
+  const black = kitPaint(kit, '#242a26');
+  const toLocal = (point: Vector3) => group.worldToLocal(point);
+  const addWire = (points: Vector3[], name: string) => {
+    const mesh = new Mesh(
+      new TubeGeometry(new CatmullRomCurve3(points), 48, 0.0035, 6, false),
+      black,
+    );
+    mesh.name = name;
+    connection.add(mesh);
+  };
+  const connectData = () => {
+    connection.traverse((o) => {
+      if (o instanceof Mesh) o.geometry.dispose();
+    });
+    connection.clear();
+    group.updateWorldMatrix(true, true);
+    dataPort.updateWorldMatrix(true, true);
+    const start = toLocal(
+      station.view.dataSocket.getWorldPosition(new Vector3()),
+    );
+    const end = toLocal(dataPort.getWorldPosition(new Vector3()));
+    const outward = new Vector3(0, 0, 1).transformDirection(
+      dataPort.matrixWorld,
+    );
+    const floorStart = new Vector3(start.x, 0, -0.64);
+    const portWorld = dataPort.getWorldPosition(new Vector3());
+    const floorEnd = toLocal(
+      new Vector3(portWorld.x, 0, (machine.z - 0.85) * metre),
+    );
+    const bend = toLocal(
+      new Vector3((machine.x - 3.25) * metre, 0, (machine.z - 0.85) * metre),
+    );
+    const approach = toLocal(
+      new Vector3((machine.x - 3.5) * metre, 0, (machine.z - 0.78) * metre),
+    );
+    const floorPath = new CatmullRomCurve3([
+      floorStart,
+      approach,
+      bend,
+      floorEnd,
+    ]);
+    const cableFloor = floorPath
+      .getPoints(100)
+      .map((p) => p.add(new Vector3(0, 0.0045, 0)));
+    addWire(cableFloor, 'Data cable beneath rubber channel');
+    connection.add(createFloorCableProtector(kit, floorPath));
+    const plug = new Mesh(
+      new CylinderGeometry(0.0065, 0.0065, 0.028, 12),
+      black,
+    );
+    plug.name = 'BBC RS423 plug';
+    plug.position.copy(start).add(new Vector3(0, 0, -0.014));
+    plug.rotation.x = Math.PI / 2;
+    connection.add(plug);
+    addWire(
+      [
+        start.clone().add(new Vector3(0, 0, -0.025)),
+        new Vector3(start.x, start.y, -0.44),
+        new Vector3(start.x, station.view.top - 0.06, -0.52),
+        new Vector3(start.x, 0.08, -0.64),
+        floorStart.clone().add(new Vector3(0, 0.0045, 0)),
+      ],
+      'BBC rear data cable to floor',
+    );
+    const reliefWorld = dataPort
+      .getWorldPosition(new Vector3())
+      .addScaledVector(outward, 0.035 * metre);
+    const relief = toLocal(reliefWorld);
+    addWire(
+      [
+        floorEnd.clone().add(new Vector3(0, 0.0045, 0)),
+        relief.clone().setY(0.06),
+        relief,
+        end,
+      ],
+      'Data cable into first cabinet low round port',
+    );
+  };
+  connectData();
   let disposed = false;
   let audible = true;
   void bbcImportedWorkstation(kit)
@@ -45,6 +139,7 @@ export function addMachineWorkstation(
       station.onSit((pose) => sit(pose));
       station.setAudible(audible);
       group.add(station.object);
+      connectData();
     })
     .catch((error: unknown) =>
       console.error(
@@ -81,6 +176,9 @@ export function addMachineWorkstation(
     dispose() {
       disposed = true;
       parts.dispose();
+      connection.traverse((o) => {
+        if (o instanceof Mesh) o.geometry.dispose();
+      });
     },
     setAudible(on: boolean) {
       audible = on;

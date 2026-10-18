@@ -1232,3 +1232,23 @@ it('provides a genuine grommeted opening through each rear service wireway parti
   }
   dispose();
 });
+
+it('places the first low round data entry on its real rear plate, independent of scene scale', () => {
+  const { mcc, dispose } = fixture();
+  const port = mcc.rear.dataPort;
+  mcc.group.updateMatrixWorld(true);
+  const metrePosition = port.getWorldPosition(new Vector3());
+  expect(metrePosition.x).toBeCloseTo(-1.8105);
+  expect(metrePosition.y).toBeCloseTo(0.1822);
+  expect(metrePosition.z).toBeCloseTo(-0.516);
+  mcc.group.scale.setScalar(3);
+  mcc.group.position.set(6, 0, 12);
+  mcc.group.updateMatrixWorld(true);
+  expect(
+    port
+      .getWorldPosition(new Vector3())
+      .distanceTo(metrePosition.multiplyScalar(3).add(new Vector3(6, 0, 12))),
+  ).toBeLessThan(0.000001);
+  expect(port.parent!.getObjectByName('Right entry blank')).toBeUndefined();
+  dispose();
+});
