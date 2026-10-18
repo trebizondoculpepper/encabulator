@@ -201,7 +201,7 @@ describe('Level 0 machine wiring', () => {
     dispose();
   });
 
-  it('isolates, removes and replaces a failed card, and recovers on re-energising', () => {
+  it('isolates and removes a failed card, which stays failed when put back', () => {
     const { machine, room, breaker, powerUp, run, dispose } = sandbox();
     powerUp();
     const removed: MachineDevice[] = [];
@@ -223,6 +223,7 @@ describe('Level 0 machine wiring', () => {
     ).toBe(false);
     breaker(UNITS.automation).operate();
     run(0.2);
+    // Isolated, it stops arcing at once; its smoke drifts away slowly.
     expect(machine.hazard().arcing).toBe(false);
     const smoke = machine.hazard().smoke;
     run(3);
@@ -231,31 +232,106 @@ describe('Level 0 machine wiring', () => {
     pull(power, room);
     run(0.2);
     expect(removed).toEqual([power]);
-    // Put back, it is still failed.
+    // A live cabinet refuses it.
+    breaker(UNITS.automation).operate();
+    expect(machine.reseat(power)).toBe(false);
+    breaker(UNITS.automation).operate();
     expect(machine.reseat(power)).toBe(true);
     breaker(UNITS.automation).operate();
     run(PLANT.plcBoot + 1);
     expect(machine.plant.plcStatus.value).toBe('halted');
     expect(machine.hazard().arcing).toBe(true);
-    breaker(UNITS.automation).operate();
-    run(0.2);
-    pull(power, room);
-    const spare = machine.spare('plc-power');
-    room.add(spare.object);
-    pull(spare, room);
-    // A live cabinet refuses it.
-    breaker(UNITS.automation).operate();
-    expect(machine.reseat(spare)).toBe(false);
-    breaker(UNITS.automation).operate();
-    expect(machine.reseat(spare)).toBe(true);
-    spare.update(0);
-    breaker(UNITS.automation).operate();
-    run(PLANT.plcBoot + 1);
-    expect(machine.plant.plcStatus.value).toBe('run');
-    expect(machine.plant.healthy.value).toBe(true);
-    // A fresh wait for the next failure.
-    expect(machine.scheduler.incident).toBeNull();
-    expect(machine.scheduler.remaining).toBeGreaterThan(170);
+    dispose();
+  });
+
+  it('blows a control fuse, losing its unit, until the fuse is replaced', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    machine.plant.driveStart();
+    run(10);
+    expect(machine.plant.state.driveHz.value).toBeGreaterThan(30);
+    machine.inflict(`fuse:${UNITS.lube}`);
+    run(10);
+    const codes = machine.plant.faults.value.map((f) => f.code);
+    expect(codes).toContain('U31-F1');
+    // No lube oil: the main drive motor drops out and the drive stops.
+    expect(machine.plant.oilOk.value).toBe(false);
+    expect(machine.mcc.circuits.get(UNITS.mainMotor)!.running.value).toBe(
+      false,
+    );
+    expect(machine.plant.state.driveHz.value).toBe(0);
+    expect(machine.plant.healthy.value).toBe(false);
+    const fuse = machine.mcc.circuits
+      .get(UNITS.lube)!
+      .devices.find((d) => d.kind === 'fuse')!;
+    // Its own part replaces it, worked inside the open bucket.
+    [...fuse.uses.values()][0]();
+    run(10);
+    expect(machine.plant.oilOk.value).toBe(true);
+    expect(machine.plant.faults.value.map((f) => f.code)).not.toContain(
+      'U31-F1',
+    );
+    dispose();
+  });
+
+  it("carries each unit's run, indication and PLC signal on its own terminals", () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    const open = (id: string, n: number) => {
+      const terminal = machine.mcc.circuits
+        .get(id)!
+        .devices.filter((d) => d.kind === 'terminal')[n - 1];
+      [...terminal.uses.values()][0]();
+    };
+    const codes = () => machine.plant.faults.value.map((f) => f.code);
+    // X2 is the cooling fan's run circuit: its contactor drops out.
+    open(UNITS.cooling, 2);
+    run(1);
+    expect(machine.mcc.circuits.get(UNITS.cooling)!.running.value).toBe(false);
+    expect(codes()).toContain('U32-X2');
+    open(UNITS.cooling, 2);
+    run(1);
+    expect(machine.mcc.circuits.get(UNITS.cooling)!.running.value).toBe(true);
+    // X4 is the hydrocoptic pump's signal from the PLC: its flow loses
+    // regulation and the PLC reports the lost signal.
+    machine.mcc.circuits.get(UNITS.hydro)!.breaker!.breaker!.operate();
+    run(15);
+    expect(machine.plant.flowOk.value).toBe(true);
+    open(UNITS.hydro, 4);
+    run(15);
+    expect(machine.plant.flowOk.value).toBe(false);
+    expect(codes()).toContain('U72-X4');
+    // A spare terminal carries nothing.
+    open(UNITS.hydro, 6);
+    run(1);
+    expect(codes().filter((c) => c.startsWith('U72'))).toEqual(['U72-X4']);
+    // X2 and K1 enable a control unit: without it, no dimension at all.
+    run(20);
+    expect(machine.plant.achieved.value).toBeGreaterThan(0);
+    open(UNITS.control, 2);
+    run(1);
+    expect(machine.plant.achieved.value).toBe(0);
+    dispose();
+  });
+
+  it('carries the PLC outputs to the field through the remote I/O adapter', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    machine.plant.control.feedHoa.set(2);
+    run(2);
+    expect(machine.plant.feedDemand.value).toBe(true);
+    const adapter = machine.mcc.circuits
+      .get(UNITS.automation)!
+      .devices.filter((d) => d.kind === 'rack-unit')[1];
+    adapter.test();
+    run(1);
+    expect(machine.plant.feedDemand.value).toBe(false);
+    expect(machine.plant.faults.value.map((f) => f.code)).toEqual(
+      expect.arrayContaining(['U51-RU2', 'E61']),
+    );
+    adapter.repair();
+    run(1);
+    expect(machine.plant.feedDemand.value).toBe(true);
     dispose();
   });
 
@@ -277,9 +353,10 @@ describe('Level 0 machine wiring', () => {
     const { machine, powerUp, run, dispose } = sandbox();
     powerUp();
     run(200, 0.5);
-    // With an injected random source of 0: the first eligible card.
-    expect(machine.scheduler.incident).toBe('card:plc-power');
-    expect(machine.plant.plcStatus.value).toBe('halted');
+    // With an injected random source of 0: the first eligible part, the
+    // MAIN INCOMING unit's control fuse.
+    expect(machine.scheduler.incident).toBe(`fuse:${UNITS.incoming}`);
+    expect(machine.plant.faults.value.map((f) => f.code)).toContain('U11-F1');
     dispose();
   });
 });

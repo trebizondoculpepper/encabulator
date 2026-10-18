@@ -65,7 +65,10 @@ import {
   createMotorView,
   createOverloadRelayView,
 } from '../../industrial-control/views/industrial-devices';
-import { createKeySwitch } from '../../industrial-control/views/panel-switchgear';
+import {
+  createKeySwitch,
+  createRocker,
+} from '../../industrial-control/views/panel-switchgear';
 import { createRackUnit } from '../../industrial-control/views/rack-equipment';
 import type {
   RackUnitOptions,
@@ -624,7 +627,8 @@ export function disconnectHandle(
   kit: PanelKit,
   props: Common & {
     colour?: 'black' | 'red';
-    style?: 'flange' | 'heavy-throw' | 'rotary';
+    /** A small illuminated I/O rocker works a little bucket's breaker. */
+    style?: 'flange' | 'heavy-throw' | 'rotary' | 'rocker';
     sound?: 'standard' | 'soft-click';
     /** Reuse an internal breaker's one mechanism and event stream. */
     shared?: ReturnType<typeof createOperatingHandle>;
@@ -638,8 +642,18 @@ export function disconnectHandle(
   trip(): void;
 } {
   const a = beginPart(kit, props.name ?? 'disconnect handle');
-  const view =
-    props.style === 'heavy-throw'
+  const rocker =
+    props.style === 'rocker'
+      ? createRocker(kit, (props.initial ?? 'on') === 'on')
+      : null;
+  const view = rocker
+    ? {
+        group: rocker.group,
+        lever: rocker.rocker,
+        set: rocker.set,
+        update: rocker.update,
+      }
+    : props.style === 'heavy-throw'
       ? createHeavyDutyThrowHandle(kit, {
           on: (props.initial ?? 'on') === 'on',
         })

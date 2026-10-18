@@ -1,9 +1,15 @@
 import { computed, effect, signal } from '@preact/signals-core';
+import type { Readable } from '../toolkit/components/core/logic/world/components';
 import type { Object3D, Quaternion } from 'three';
 import { createIncidentScheduler } from '../game/level0-incidents';
 import { CARD_KINDS, createLevel0Plant } from '../game/level0-plant';
 import type { CardKind } from '../game/level0-plant';
 import { createLevel0Dresser, level0Tones, UNITS } from '../scene/level0-faces';
+import {
+  UNIT_ROLES,
+  componentReports,
+  createUnitWiring,
+} from './level0-wiring';
 import { createRetroEncabulatorMcc } from '../scene/retro-encabulator-mcc';
 import type { MccView } from '../scene/retro-encabulator-mcc';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
@@ -24,8 +30,8 @@ const reducedMotion = () =>
 /**
  * Level 0's machine: the shared line-up, wired unit by unit to its own
  * process model (`src/game/level0-plant.ts`) through the line-up's hooks,
- * with one random failure at a time and the repair loop's parts: spares,
- * isolation and reseating. Its wiring is described in
+ * with one random failure at a time and the repair loop's parts:
+ * isolation, removal and reseating. Its wiring is described in
  * `doc/design/level0-wiring.md`.
  */
 export function createLevel0Machine(
@@ -41,15 +47,27 @@ export function createLevel0Machine(
       (ref.value?.supply.value ?? false) &&
       (ref.value?.mainBreaker.closed.value ?? false),
   );
+  const wires = createUnitWiring(ref);
+  const { wiring } = wires;
+  /** Each starter's coil circuit: its X2, and any permissive in series. */
+  const permits: Record<string, Readable<boolean>> = {
+    // No lube oil pressure, no main drive motor.
+    [UNITS.mainMotor]: plant.oilOk,
+    // LOCAL on its key, or REMOTE when Automation Control runs it.
+    [UNITS.hydraulic]: plant.hydraulicPermit,
+  };
+  const interlock = Object.fromEntries(
+    Object.entries(UNIT_ROLES)
+      .filter(([, role]) => role === 'starter')
+      .map(([id]) => [
+        id,
+        computed(() => wiring(id).run.value && (permits[id]?.value ?? true)),
+      ]),
+  );
   const mcc = createRetroEncabulatorMcc(kit, {
     incomingOn: false,
-    dress: createLevel0Dresser(plant, ref),
-    interlock: {
-      // No lube oil pressure, no main drive motor.
-      [UNITS.mainMotor]: plant.oilOk,
-      // LOCAL on its key, or REMOTE when Automation Control runs it.
-      [UNITS.hydraulic]: plant.hydraulicPermit,
-    },
+    dress: createLevel0Dresser(plant, ref, wiring),
+    interlock,
     breakerLatch: {
       // The Kirk key: turned out, the main disconnect will not close.
       [UNITS.main]: computed(
@@ -89,10 +107,11 @@ export function createLevel0Machine(
     position: capacitors.object.position.clone(),
     quaternion: capacitors.object.quaternion.clone() as Quaternion,
   };
-  const overload = circuit(UNITS.mainMotor).devices.find(
-    (d) => d.kind === 'overload',
-  )!;
   const devices = [...mcc.circuits.values()].flatMap((c) => c.devices);
+
+  // FIELD TERMINATIONS' interposing relays: K2 outputs, K3 inputs.
+  const outputRelay = wires.relay(UNITS.field, 2);
+  const inputRelay = wires.relay(UNITS.field, 3);
 
   // ---- Electrical components into the model --------------------------------
   const unbridge = effect(() => {
@@ -109,21 +128,32 @@ export function createLevel0Machine(
       auxMotor: circuit(UNITS.auxMotor).running.value,
       hydro: circuit(UNITS.hydro).running.value,
       fan: circuit(UNITS.fan).running.value,
-      control: circuit(UNITS.control).powered.value,
-      phase: circuit(UNITS.phase).powered.value,
-      panMonitor: circuit(UNITS.panMonitor).powered.value,
-      dingle: circuit(UNITS.dingle).powered.value,
-      grammeter: circuit(UNITS.grammeter).powered.value,
+      control: wiring(UNITS.control).run.value,
+      phase: wiring(UNITS.phase).run.value,
+      panMonitor: wiring(UNITS.panMonitor).run.value,
+      dingle: circuit(UNITS.dingle).running.value,
+      grammeter: circuit(UNITS.grammeter).running.value,
       plcCabinet: circuit(UNITS.automation).powered.value,
       backplane: assembly.service!.running.value,
-      field: circuit(UNITS.field).powered.value,
+      // FIELD TERMINATIONS: K1 the supply contactor, K2 and K3 interposing.
+      field: wiring(UNITS.field).run.value,
+      hmi: wiring(UNITS.automation).run.value,
+      outputLink:
+        wires.remoteIo.value &&
+        outputRelay.value &&
+        wiring(UNITS.field).link.value,
+      inputLink: inputRelay.value,
+      feedLink: wiring(UNITS.feed).link.value,
+      hydraulicLink: wiring(UNITS.hydraulic).link.value,
+      driveLink: wiring(UNITS.vfd).link.value,
+      hydroLink: wiring(UNITS.hydro).link.value,
+      dingleLink: wiring(UNITS.dingle).link.value,
+      phaseLink: wiring(UNITS.phase).link.value,
       vfdControl: circuit(UNITS.vfd).powered.value,
-      vfdReady: circuit(UNITS.vfd).running.value,
-      driveIsolator: circuit(UNITS.driveIsolator).powered.value,
-      tripped: devices.some(
-        (d) =>
-          (d.kind === 'breaker' || d.kind === 'overload') && d.faulted.value,
-      ),
+      // Its power stage and DC bus sound, and its enable circuit made.
+      vfdReady: circuit(UNITS.vfd).running.value && wiring(UNITS.vfd).run.value,
+      // The isolator closed, and its output filter board sound.
+      driveIsolator: wiring(UNITS.driveIsolator).run.value,
       liveDoorOpen: [...mcc.doors].some(
         ([id, open]) => open.value && circuit(id).powered.value,
       ),
@@ -139,6 +169,7 @@ export function createLevel0Machine(
             (d.kind === 'terminal' && d.service!.failed.value),
         ),
     });
+    plant.report(componentReports(mcc));
     assembly.slots!.forEach((slot, i) => {
       const card = slot.occupant.value;
       plant.senseCard(
@@ -184,21 +215,35 @@ export function createLevel0Machine(
 
   // ---- One random failure at a time ----------------------------------------
   const scheduler = createIncidentScheduler({ random });
-  const eligible = () => [
-    ...assembly
-      .slots!.filter(
-        (slot) =>
-          slot.occupant.value?.active.value &&
-          !slot.occupant.value.service!.failed.value,
-      )
-      .map((slot) => `card:${slot.kind}`),
-    ...(circuit(UNITS.mainMotor).running.value ? ['overload:main motor'] : []),
-  ];
+  /**
+   * What may fail, each with a repair the player can make: a powered
+   * unit's control fuse blows (the fuse is replaced by working it inside
+   * the open bucket), or a running starter's overload trips (reset on the
+   * relay inside, or MAIN DRIVE MOTOR's O/L RESET, once it has cooled).
+   * Cards are kept out of the pool while there are no spares to fit.
+   */
+  const eligible = () =>
+    [...mcc.circuits].flatMap(([id, unit]) =>
+      unit.devices.flatMap((device) =>
+        device.kind === 'fuse' && unit.powered.value && !device.faulted.value
+          ? [`fuse:${id}`]
+          : device.kind === 'overload' &&
+              unit.running.value &&
+              !device.faulted.value
+            ? [`overload:${id}`]
+            : [],
+      ),
+    );
   const inflict = (id: string) => {
-    if (id.startsWith('card:')) {
-      const kind = id.slice(5) as CardKind;
+    const [what, where] = id.split(':');
+    if (what === 'card') {
+      const kind = where as CardKind;
       assembly.slots![CARD_KINDS.indexOf(kind)].occupant.value?.test();
-    } else if (id === 'overload:main motor') overload.test();
+      return;
+    }
+    circuit(where)
+      ?.devices.find((device) => device.kind === what)
+      ?.test();
   };
 
   // ---- Boards: isolation, removal and reseating ----------------------------

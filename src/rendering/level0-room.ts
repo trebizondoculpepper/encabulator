@@ -1,8 +1,5 @@
 import {
-  BoxGeometry,
-  Frustum,
   Group,
-  Matrix4,
   Mesh,
   PerspectiveCamera,
   Raycaster,
@@ -13,10 +10,8 @@ import type { Object3D } from 'three';
 import {
   LEVEL0_CHAIRS,
   LEVEL0_MACHINE,
-  LEVEL0_SPARES,
   LEVEL0_START,
 } from '../game/level0-room-plan';
-import { CARD_KINDS } from '../game/level0-plant';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
 import { ejectCabinetDrop } from '../game/cabinet-drop';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
@@ -28,19 +23,16 @@ import {
 import { METRE } from '../toolkit/components/core/logic/units';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
-  createMicroLabel,
   createPanelKit,
   disposeKit,
   kitPaint,
 } from '../toolkit/components/core/views/eighties-controls';
-import { createPartSet } from '../toolkit/components/core/parts/parts';
 import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
 import {
   createRenderer,
   useEnvironment,
 } from '../toolkit/components/core/parts/render-style';
 import { ISOLATOR } from '../toolkit/components/industrial-control/views/incoming-isolator';
-import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
 import {
   CHAIR_STACK_HALF,
   createChairStack,
@@ -55,7 +47,6 @@ import { createBinTossing } from '../toolkit/components/site-dressing/parts/bin-
 import type { TossBin } from '../toolkit/components/site-dressing/parts/bin-tossing';
 import { createFirstPerson } from '../toolkit/controls/input/first-person';
 import { knobDirection } from '../toolkit/controls/input/knob-turning';
-import type { PortableObject } from '../toolkit/controls/input/object-handling';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createLevel0Machine } from './level0-machine';
@@ -63,9 +54,9 @@ import { addWarehouseLighting } from './warehouse-lighting';
 
 /**
  * Level 0, the machine sandbox: Level 2's setting and machine with no
- * scenario, wired unit by unit to its own process model, with a spares
- * bench, one random failure at a time and the skip that takes the chairs'
- * place the first time a board comes out of the machine.
+ * scenario, wired unit by unit to its own process model, with one random
+ * failure at a time and the skip that takes the chairs' place the first
+ * time a board comes out of the machine.
  */
 export function startLevel0Room(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -98,103 +89,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
   scene.add(mcc.group);
-
-  // ---- The spares bench ----------------------------------------------------
-  const spareParts = createPartSet();
-  const bench = new Group();
-  bench.name = 'Spares bench';
-  bench.scale.setScalar(m);
-  bench.position.set(LEVEL0_SPARES.x * m, 0, LEVEL0_SPARES.z * m);
-  scene.add(bench);
-  const steel = kitPaint(kit, '#5d6468', 0.4);
-  const { width, depth, height } = LEVEL0_SPARES;
-  const top = new Mesh(new BoxGeometry(width, 0.03, depth), steel);
-  top.position.y = height - 0.015;
-  top.userData.boardSupport = true;
-  bench.add(top);
-  for (const x of [-1, 1])
-    for (const z of [-1, 1]) {
-      const leg = new Mesh(new BoxGeometry(0.04, height - 0.03, 0.04), steel);
-      leg.position.set(
-        (x * (width - 0.06)) / 2,
-        (height - 0.03) / 2,
-        (z * (depth - 0.06)) / 2,
-      );
-      bench.add(leg);
-    }
-  const shelf = new Mesh(
-    new BoxGeometry(width - 0.06, 0.02, depth - 0.06),
-    steel,
-  );
-  shelf.position.y = 0.18;
-  bench.add(shelf);
-  const sign = createMicroLabel(
-    kit,
-    'SPARE PLC MODULES\nHEALTHY REPLACEMENTS · ISOLATE AUTOMATION CONTROL BEFORE FITTING',
-    { height: 0.018, ink: '#f4f1e6', plate: '#1d4f8c' },
-  );
-  sign.position.set(0, height - 0.06, depth / 2 + 0.002);
-  bench.add(sign);
-  /** Where each kind's spare lies on the bench, left to right. */
-  const benchSpot = (i: number) => ({
-    x: -width / 2 + 0.14 + i * ((width - 0.28) / (CARD_KINDS.length - 1)),
-    z: 0,
-  });
-  const onBench = new Map<string, MachineDevice | null>();
-  CARD_KINDS.forEach((kind, i) => {
-    const label = createMicroLabel(kit, `${i + 1}`, {
-      height: 0.02,
-      ink: '#f4f1e6',
-      plate: '#1d1f22',
-    });
-    const spot = benchSpot(i);
-    label.position.set(spot.x, height + 0.001, depth / 2 - 0.04);
-    label.rotation.x = -Math.PI / 2;
-    bench.add(label);
-    onBench.set(kind, null);
-  });
-  /** Every spare ever stocked, wherever it is now. */
-  const spareCards = new Set<MachineDevice>();
-  const stock = (kind: (typeof CARD_KINDS)[number]) => {
-    const card = machine.spare(kind);
-    spareParts.add(card);
-    spareCards.add(card);
-    const spot = benchSpot(CARD_KINDS.indexOf(kind));
-    // Lying on its side on the bench, as a card is carried.
-    card.object.rotation.set(0, 0, Math.PI / 2);
-    card.object.position.set(spot.x + 0.1, height + 0.012, spot.z);
-    bench.add(card.object);
-    onBench.set(kind, card);
-  };
-  for (const kind of CARD_KINDS) stock(kind);
-  const frustum = new Frustum();
-  const projection = new Matrix4();
-  const benchSphere = () => {
-    const centre = bench.position.clone();
-    centre.y += height * m * 0.5;
-    return { centre, radius: 1 * m };
-  };
-  /** Restock the bench where a spare has been taken, out of sight. */
-  const restock = () => {
-    const taken = CARD_KINDS.filter((kind) => {
-      const card = onBench.get(kind);
-      return (
-        !card ||
-        card.object.parent !== bench ||
-        (card.object.userData.portable as PortableObject).component.phase
-          .value !== 'installed'
-      );
-    });
-    if (!taken.length) return;
-    projection.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse,
-    );
-    frustum.setFromProjectionMatrix(projection);
-    const { centre, radius } = benchSphere();
-    if (frustum.intersectsSphere({ center: centre, radius } as never)) return;
-    for (const kind of taken) stock(kind);
-  };
 
   // ---- The skip that was always there --------------------------------------
   const tossing = createBinTossing({ camera, metre: m });
@@ -261,11 +155,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
    * otherwise it drops, or goes in the skip, as anything does.
    */
   const reseat = (object: Object3D) => {
-    const device = [
-      ...machine.assembly.cards!,
-      ...spareCards,
-      machine.capacitors,
-    ].find((board) => board.object === object);
+    const device = [...machine.assembly.cards!, machine.capacitors].find(
+      (board) => board.object === object,
+    );
     if (!device) return false;
     const home =
       device === machine.capacitors
@@ -285,12 +177,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       maxX: (LEVEL0_MACHINE.x + MCC_ISOLATOR_X + ISOLATOR.width / 2 + 0.05) * m,
       minZ: (LEVEL0_MACHINE.z + ISOLATOR.back) * m,
       maxZ: (LEVEL0_MACHINE.z + ISOLATOR.front) * m,
-    },
-    {
-      minX: (LEVEL0_SPARES.x - width / 2 - 0.05) * m,
-      maxX: (LEVEL0_SPARES.x + width / 2 + 0.05) * m,
-      minZ: (LEVEL0_SPARES.z - depth / 2 - 0.05) * m,
-      maxZ: (LEVEL0_SPARES.z + depth / 2 + 0.05) * m,
     },
   ];
   const walk = createFirstPerson({
@@ -352,11 +238,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     room.parts.update(delta);
-    spareParts.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
-    restock();
     partAudio.listen(camera, m);
     renderer.render(scene, camera);
   });
@@ -366,7 +250,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     walk.dispose();
     machine.dispose();
     mcc.parts.dispose();
-    spareParts.dispose();
     room.parts.dispose();
     skipLamps?.dispose();
     skipGraffiti?.dispose();
@@ -410,12 +293,10 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   return Object.assign(dispose, {
     suspend() {
       mcc.parts.setAudible(false);
-      spareParts.setAudible(false);
       room.parts.setAudible(false);
     },
     resume() {
       mcc.parts.setAudible(true);
-      spareParts.setAudible(true);
       room.parts.setAudible(true);
     },
   });

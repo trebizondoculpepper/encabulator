@@ -21,6 +21,15 @@ const RUNNING: Partial<Electrical> = {
   vfdControl: true,
   vfdReady: true,
   driveIsolator: true,
+  hmi: true,
+  outputLink: true,
+  inputLink: true,
+  feedLink: true,
+  hydraulicLink: true,
+  driveLink: true,
+  hydroLink: true,
+  dingleLink: true,
+  phaseLink: true,
 };
 
 function plant(electrical: Partial<Electrical> = RUNNING) {
@@ -227,13 +236,37 @@ describe('Level 0 process model', () => {
     p.step(0.1);
     const lit = () => WINDOWS.filter((_, i) => p.alarms.value[i]);
     expect(lit()).toEqual(['LUBE LOW']);
-    p.sense({ lube: true, tripped: true, liveDoorOpen: true });
+    p.sense({ lube: true, liveDoorOpen: true });
+    p.report([
+      { code: 'U31-F1', text: 'CONTROL FUSE BLOWN', window: 'BREAKER TRIP' },
+    ]);
     run(p, 5);
     expect(lit()).toEqual(['BREAKER TRIP', 'DOOR OPEN']);
     // An open door is shown but is not a fault.
-    p.sense({ tripped: false });
+    p.report([]);
     p.step(0.1);
     expect(p.healthy.value).toBe(true);
+  });
+
+  it('loses a PLC-linked function, with its own diagnostic, when its signal wiring is open', () => {
+    const p = plant({ ...RUNNING, hydro: true });
+    p.control.feedHoa.set(2);
+    run(p, PLANT.plcBoot + 1);
+    expect(p.feedDemand.value).toBe(true);
+    p.sense({ feedLink: false, hydroLink: false });
+    run(p, 10);
+    expect(p.feedDemand.value).toBe(false);
+    expect(p.state.flow.value).toBeLessThan(0.5);
+    // The remote I/O adapter carries every output to the field.
+    p.sense({ feedLink: true, hydroLink: true, outputLink: false });
+    run(p, 1);
+    expect(p.feedDemand.value).toBe(false);
+    expect(codes(p)).toContain('E61');
+    expect(p.alarms.value[WINDOWS.indexOf('CONTROL CCT')]).toBe(true);
+    // Without its interface chassis the PanelView loses the PLC.
+    p.sense({ hmi: false });
+    p.step(0.1);
+    expect(codes(p)).toContain('E02');
   });
 
   it('drifts the grammeter out of calibration, and ZERO and CALIBRATE correct it', () => {

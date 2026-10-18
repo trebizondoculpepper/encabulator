@@ -12,6 +12,7 @@ import type { MachineDevice } from '../toolkit/components/industrial-control/par
 import { postBeep } from '../toolkit/components/sound/audio/boot-beep';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
+  disconnectHandle,
   driveKeypad,
   keySwitch,
   ledPushbutton,
@@ -105,6 +106,11 @@ const fixed = (n: number, digits = 1) => n.toFixed(digits);
 export function createLevel0Dresser(
   plant: Level0Plant,
   machine: ReadonlySignal<MccView | null>,
+  /** Each unit's internal circuits: its door's indication supply (X3). */
+  wiring: (bucket: string) => {
+    indication: Readable<boolean>;
+    run: Readable<boolean>;
+  },
 ) {
   const p = plant;
   /** The PLC backplane assembly, once the line-up is built. */
@@ -114,7 +120,13 @@ export function createLevel0Dresser(
         .get(UNITS.automation)
         ?.devices.find((device) => device.kind === 'backplane') ?? null,
   );
-  return (face: Face, bucket: string, door: DoorKit): boolean => {
+  return (face: Face, bucket: string, given: DoorKit): boolean => {
+    // The door's lamps and displays are fed through the unit's X3.
+    const indication = wiring(bucket).indication;
+    const door: DoorKit = {
+      ...given,
+      lit: computed(() => given.lit.value && indication.value),
+    };
     const {
       kit,
       cx,
@@ -157,7 +169,20 @@ export function createLevel0Dresser(
         0.9,
       );
     const latchSide = width - 0.042;
-    const smallHandle = () => handle('black', 0.55, latchSide - 0.03, -0.02);
+    // A small bucket's breaker is worked by an illuminated rocker on its
+    // door, lit while the breaker is closed.
+    const smallHandle = () => {
+      place(
+        disconnectHandle(kit, {
+          style: 'rocker',
+          shared: circuit.breaker!.handle,
+          name: `${bucket} power rocker`,
+        }),
+        latchSide - 0.03,
+        -0.03,
+      );
+      caption('POWER\nI / O', latchSide - 0.03, 0.01);
+    };
 
     switch (face) {
       case 'meters': {
@@ -170,9 +195,7 @@ export function createLevel0Dresser(
           put(view.group, cx - 0.16 + k * 0.09, -0.02);
           every((delta) => {
             view.set(
-              circuit.powered.value
-                ? (480 - p.loadAmps.value * 0.06 - k * 0.8) / 600
-                : 0,
+              lit.value ? (480 - p.loadAmps.value * 0.06 - k * 0.8) / 600 : 0,
             );
             view.update(delta);
           });
@@ -321,18 +344,19 @@ export function createLevel0Dresser(
           0.04,
         );
         handle('black', 0.9, undefined, 0.04);
-        lamp('green', cx + 0.08, 0.13, circuit.running, 'RUN');
+        // A row of lamps under the station, clear of the handle.
+        lamp('green', cx - 0.12, -0.13, circuit.running, 'RUN');
         lamp(
           'amber',
-          cx + 0.08,
-          0.04,
+          cx - 0.06,
+          -0.13,
           computed(() => !p.oilOk.value),
           'NO LUBE',
         );
         lamp(
           'red',
-          cx + 0.08,
-          -0.05,
+          cx,
+          -0.13,
           computed(() => overload?.faulted.value ?? false),
           'O/L TRIP',
         );
@@ -419,7 +443,6 @@ export function createLevel0Dresser(
           lamp('amber', cx + 0.03, -0.05, p.oilOk, 'OIL PRESS');
         }
         smallHandle();
-        caption('ON / OFF', latchSide - 0.03, 0.04);
         return true;
       }
       case 'small-station': {
@@ -453,7 +476,7 @@ export function createLevel0Dresser(
         caption('REMOTE: RUNS FOR ARM', cx - 0.11, -0.08);
         lamp('amber', cx - 0.02, -0.05, circuit.running, 'RUN');
         lamp('green', cx + 0.05, -0.05, p.hydraulicOk, 'PRESSURE');
-        handle('red', 0.55, latchSide - 0.03, -0.02);
+        smallHandle();
         return true;
       }
       case 'small-lcd': {
@@ -597,7 +620,7 @@ export function createLevel0Dresser(
           -0.165,
         );
         every((delta) => {
-          if (!circuit.powered.value || p.control.chartRun.value === 0) return;
+          if (!lit.value || p.control.chartRun.value === 0) return;
           chart.set([
             p.state.dimension.value / 6,
             p.state.oil.value / 60,
@@ -618,7 +641,7 @@ export function createLevel0Dresser(
           caption(k === 1 ? 'LUBE OIL' : 'VFD HEATSINK', cx + 0.105, y - 0.048);
           every((delta) => {
             gauge.set(
-              circuit.powered.value
+              lit.value
                 ? k === 1
                   ? p.state.oil.value / 150
                   : ((p.state.heatsink.value * 9) / 5 + 32) / 300
@@ -694,9 +717,16 @@ export function createLevel0Dresser(
       case 'terminations': {
         door.louvres(0.42, 0.18, cx, -0.12);
         caption('WARNING\nMULTIPLE SOURCES OF SUPPLY', cx - 0.08, 0.1, 0.008);
-        handle('black', 0.8, latchSide - 0.04, 0.08);
-        caption('FIELD SUPPLY\nON / OFF', latchSide - 0.04, 0.17);
-        lamp('green', cx + 0.1, 0.08, circuit.powered, '24 VDC ON', 0.8, 0.06);
+        // Its supply is switched by the isolator inside.
+        lamp(
+          'green',
+          cx + 0.1,
+          0.08,
+          wiring(bucket).run,
+          '24 VDC ON',
+          0.8,
+          0.06,
+        );
         return true;
       }
       case 'drive':
@@ -713,7 +743,7 @@ export function createLevel0Dresser(
         caption('DRIVE MOTOR CURRENT', cx - 0.1, 0.005);
         every((delta) => {
           meter.set(
-            circuit.powered.value
+            lit.value
               ? ((p.state.driveHz.value / PLANT.driveMaxHz) * 76) / 200
               : 0,
           );
@@ -749,7 +779,7 @@ export function createLevel0Dresser(
         });
         lamp('blue', cx - 0.1, -0.1, circuit.running, 'RUN');
         lamp('white', cx - 0.03, -0.1, p.flowOk, 'FLOW OK');
-        handle('black', 0.75, undefined, -0.02);
+        // Switched by the isolator inside: no handle on the door.
         return true;
       }
       case 'fan': {
@@ -762,7 +792,7 @@ export function createLevel0Dresser(
         put(gauge.group, cx - 0.08, 0.0);
         caption('FAN PRESSURE', cx - 0.08, -0.065);
         every((delta) => {
-          gauge.set(circuit.powered.value ? p.state.fan.value / 10 : 0);
+          gauge.set(lit.value ? p.state.fan.value / 10 : 0);
           gauge.update(delta);
         });
         const hours = createHourMeterView(kit);
@@ -887,6 +917,20 @@ function dressAutomation(
       );
       return;
     }
+    if (!p.electrical.hmi.value) {
+      // Its interface chassis (RU1) out, or its X2 open: no data.
+      terminal.draw((c, w) => {
+        c.font = '12px "Courier New", monospace';
+        c.fillStyle = '#e6eef4';
+        c.fillRect(0, 0, w, 16);
+        c.fillStyle = '#26476e';
+        c.fillText('COMMUNICATION LOST', 4, 12);
+        c.fillStyle = '#e6eef4';
+        c.fillText('NO RESPONSE FROM PLC', 4, 40);
+        c.fillText('CHECK INTERFACE CHASSIS RU1', 4, 58);
+      });
+      return;
+    }
     const page = p.control.terminalPage.value;
     terminal.draw((c, w) => {
       c.font = '12px "Courier New", monospace';
@@ -927,7 +971,7 @@ function dressAutomation(
     text: string,
   ) => {
     place(
-      pilotLight(kit, { colour, drive: on, power: circuit.powered }),
+      pilotLight(kit, { colour, drive: on, power: lit }),
       cx + 0.24,
       y,
       0.8,

@@ -111,8 +111,22 @@ export interface Electrical {
   vfdControl: boolean;
   vfdReady: boolean;
   driveIsolator: boolean;
-  /** Any breaker or overload tripped. */
-  tripped: boolean;
+  /** The PanelView's interface chassis (RU1) in and its supply terminal. */
+  hmi: boolean;
+  /**
+   * The PLC's outputs reach the field through the remote I/O adapter (RU2)
+   * and FIELD TERMINATIONS' output interposing relay; its inputs through
+   * the input interposing relay.
+   */
+  outputLink: boolean;
+  inputLink: boolean;
+  /** Each PLC-linked unit's signal wiring (its X4 terminal, its K2 relay). */
+  feedLink: boolean;
+  hydraulicLink: boolean;
+  driveLink: boolean;
+  hydroLink: boolean;
+  dingleLink: boolean;
+  phaseLink: boolean;
   /** A door open on a live unit. */
   liveDoorOpen: boolean;
   /** A failed part still installed, powered or not. */
@@ -144,7 +158,15 @@ export const ELECTRICAL_OFF: Electrical = {
   vfdControl: false,
   vfdReady: false,
   driveIsolator: false,
-  tripped: false,
+  hmi: false,
+  outputLink: false,
+  inputLink: false,
+  feedLink: false,
+  hydraulicLink: false,
+  driveLink: false,
+  hydroLink: false,
+  dingleLink: false,
+  phaseLink: false,
   liveDoorOpen: false,
   failedInstalled: false,
 };
@@ -174,7 +196,7 @@ export const WINDOWS = [
   'FAN FAIL',
   'GRAM-METER',
   'DOOR OPEN',
-  'SPARE',
+  'CONTROL CCT',
 ] as const;
 
 /** Approach `target` with time constant `tau`, the same at any frame rate. */
@@ -197,6 +219,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       g.input(`electrical.${key}`, initial, { where: 'electrical circuit' }),
     ]),
   ) as { [K in keyof Electrical]: Writable<boolean> };
+  /**
+   * Faults the components report themselves: a blown fuse, a tripped
+   * breaker or overload, welded contacts, an open terminal, a withdrawn
+   * chassis, a failed capacitor bank.
+   */
+  const components = g.input<readonly PlantFault[]>('components.faults', [], {
+    where: 'component diagnostics',
+    equals: ((a: readonly PlantFault[], b: readonly PlantFault[]) =>
+      sameList(
+        a.map((f) => f.code),
+        b.map((f) => f.code),
+      )) as never,
+  });
   const card = Object.fromEntries(
     CARD_KINDS.map((kind) => [
       kind,
@@ -317,13 +352,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const plcRun = g.derive('plc.run', [plcStatus], (st) => st === 'run');
   const plcInputs = g.derive(
     'plc.inputs',
-    [plcRun, card['plc-input'], e.field],
-    (run, input, field) => run && input === 'ok' && field,
+    [plcRun, card['plc-input'], e.field, e.inputLink],
+    (run, input, field, link) => run && input === 'ok' && field && link,
   );
+  /** The output card's outputs, reaching the field through their links. */
   const plcOutputs = g.derive(
     'plc.outputs',
-    [plcRun, card['plc-output']],
-    (run, output) => run && output === 'ok',
+    [plcRun, card['plc-output'], e.field, e.outputLink],
+    (run, output, field, link) => run && output === 'ok' && field && link,
   );
   const plcAnalog = g.derive(
     'plc.analog',
@@ -333,8 +369,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   /** The PLC's program: the feed's AUTO cycle and its remote commands. */
   const feedAuto = g.derive(
     'plc.feedRun',
-    [plcOutputs, plcInputs, s.plcScan],
-    (out, inp, scan) => out && inp && scan % PLANT.feedCycle < PLANT.feedOn,
+    [plcOutputs, plcInputs, e.feedLink, s.plcScan],
+    (out, inp, link, scan) =>
+      out && inp && link && scan % PLANT.feedCycle < PLANT.feedOn,
   );
   const feedDemand = g.output(
     'feed.demand',
@@ -344,14 +381,21 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   );
   const hydraulicPermit = g.output(
     'hydraulic.permit',
-    [control.hydraulicKey, plcOutputs, plcInputs, control.dingleEnable],
-    (key, out, inp, arm) => key === 0 || (out && inp && arm === 1),
+    [
+      control.hydraulicKey,
+      plcOutputs,
+      plcInputs,
+      e.hydraulicLink,
+      control.dingleEnable,
+    ],
+    (key, out, inp, link, arm) =>
+      key === 0 || (out && inp && link && arm === 1),
     { where: 'HYDRAULIC PUMP starter' },
   );
   const driveRemote = g.derive(
     'plc.driveRun',
-    [plcOutputs, plcInputs, oilOk],
-    (out, inp, oil) => out && inp && oil,
+    [plcOutputs, plcInputs, e.driveLink, oilOk],
+    (out, inp, link, oil) => out && inp && link && oil,
   );
   const driveCommand = g.derive(
     'drive.command',
@@ -406,8 +450,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   });
   const stroking = g.derive(
     'dingle.stroking',
-    [e.dingle, control.dingleEnable, hydraulicOk, plcOutputs],
-    (on, arm, pressure, out) => on && arm === 1 && pressure && out,
+    [e.dingle, control.dingleEnable, hydraulicOk, plcOutputs, e.dingleLink],
+    (on, arm, pressure, out, link) =>
+      on && arm === 1 && pressure && out && link,
   );
   const conditions = g.derive(
     'dimension.conditions',
@@ -419,6 +464,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       oilOk,
       phaseLocked,
       plcAnalog,
+      e.phaseLink,
       s.controlTemp,
       flowOk,
       s.fan,
@@ -432,6 +478,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       oil,
       locked,
       analog,
+      phaseLink,
       temperature,
       flow,
       fan,
@@ -440,7 +487,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       control: unit && booted,
       automation: run,
       drive: hz >= PLANT.driveMaxHz * 0.4 && oil,
-      phase: locked && analog && temperature < PLANT.controlDerate,
+      phase: locked && analog && phaseLink && temperature < PLANT.controlDerate,
       flow: flow && fan >= PLANT.fanFlowOk,
       arm,
     }),
@@ -621,6 +668,24 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         Object.keys(a).every((k) => a[k] === b[k])) as never,
     },
   );
+  /**
+   * The PLC's own remote I/O paths, and the diagnostic each one's loss
+   * raises. A unit's own signal terminal reports itself (its X4), and only
+   * while the unit is supplied, as an isolated unit's silence is normal.
+   */
+  const links = g.derive(
+    'plc.links',
+    [e.outputLink, e.inputLink],
+    (out, inp) =>
+      [
+        ['E61', 'REMOTE I/O OUTPUT', out],
+        ['E62', 'REMOTE I/O INPUT', inp],
+      ] as [string, string, boolean][],
+    {
+      equals: ((a: [string, string, boolean][], b: typeof a) =>
+        a.every((link, i) => link[2] === b[i][2])) as never,
+    },
+  );
   const faults = g.output(
     'faults',
     [
@@ -649,8 +714,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       e.grammeter,
       s.gramZero,
       s.gramSpan,
-      e.tripped,
+      components,
       e.liveDoorOpen,
+      e.hmi,
+      links,
     ],
     (
       incoming,
@@ -678,8 +745,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       gramOn,
       zero,
       span,
-      tripped,
+      reported,
       door,
+      hmi,
+      linkStates,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -781,12 +850,17 @@ export function createLevel0Plant(g: Graph = createGraph()) {
           text: 'GRAMMETER OUT OF CALIBRATION',
           window: 'GRAM-METER',
         });
-      if (tripped)
+      for (const fault of reported) add(fault);
+      if (cabinet && status !== 'off' && !hmi)
         add({
-          code: 'A08',
-          text: 'BREAKER OR OVERLOAD TRIPPED',
-          window: 'BREAKER TRIP',
+          code: 'E02',
+          text: 'PANELVIEW INTERFACE LOST',
+          window: 'CONTROL CCT',
         });
+      if (cards.run)
+        for (const [code, name, ok] of linkStates)
+          if (!ok)
+            add({ code, text: `${name} SIGNAL LOST`, window: 'CONTROL CCT' });
       if (door)
         add({
           code: 'D01',
@@ -932,6 +1006,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       e.hydro,
       e.fan,
       plcOutputs,
+      e.hydroLink,
       control.fanMode,
       control.fanBoost,
     ],
@@ -945,7 +1020,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       );
       // The Hydrocoptic Phase Regulator (the output card) opens the loop;
       // without it the pump only recirculates.
-      const flowTarget = e.hydro.peek() ? (plcOutputs.peek() ? 1 : 0.3) : 0;
+      const regulated = plcOutputs.peek() && e.hydroLink.peek();
+      const flowTarget = e.hydro.peek() ? (regulated ? 1 : 0.3) : 0;
       s.flow.set(ease(s.flow.peek(), flowTarget, 3, dt));
       const mode = control.fanMode.peek();
       const fanTarget =
@@ -1165,6 +1241,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     gramZero,
     gramCalibrate,
     countReset,
+    /** Bridge the components' own fault reports in. */
+    report(list: readonly PlantFault[]) {
+      components.set(list);
+    },
     /** Bridge the electrical components' states in. */
     sense(values: Partial<Electrical>) {
       for (const [key, value] of Object.entries(values))
