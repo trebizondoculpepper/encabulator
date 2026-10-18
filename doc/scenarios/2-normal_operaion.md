@@ -26,6 +26,8 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **MUSIC:** An optimistic training-film melody or jingle plays. The caption fades away.
 
+**REMINDER PACING:** Give the player at least twenty seconds of quiet after narration finishes before the first sarcastic reminder or any further unsolicited reminder. Time spent speaking or waiting for queued dialogue does not count. Action-triggered reactions remain immediate. Floor reminders wait until their due time and this quiet interval are both satisfied.
+
 ## Introduction
 
 **TRIGGER:** As the caption fades, before the player does anything. If the player turns on the incoming isolator during it, it is cut off and the narration moves to the main-power instruction.
@@ -60,25 +62,15 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **MACHINE:** The power-indicator gauge flickers, then moves to its nominal position. Status indicators blink through their start-up sequence. The machine is coming to life.
 
-**NARRATOR:** Excellent. The delta readout on the main bus controller now shows zero point seven two, which means we're ready to prime the oil pumps.
+**TIMING:** Wait about seven seconds after main power is switched on before the next line, letting the machine run up. Count only while the incoming isolator and main power are both on.
 
-**PLAYER ACTION:** Turn the LUBE OIL PUMP M-201 operating handle to ON.
+**NARRATOR:** Excellent. The delta readout on the main bus controller now shows zero point seven two. Normal operation. Now, as we practised yesterday, reboot the betaform amplifier.
 
-**MACHINE:** Nothing happens. No new lights. No pump noise. Instead the whole machine hiccups: it sags for a moment, some of its sounds trip out, the lamps blink, and then it carries on as if nothing had happened. Mildly alarming, nothing more: foreshadowing of what is to come (the HICCUP failure). Allow a short, conspicuous silence over the machine's hum.
-
-**NARRATOR:** Hmm. That's the right switch. Give it another go?
-
-**PLAYER ACTION:** Turn the LUBE OIL PUMP handle OFF, then ON again.
-
-**MACHINE:** The oil panel lights up.
-
-**SOUND:** A new, distinctly liquid “blub, blub, blub” joins the hum. The oil pump is working.
-
-**NARRATOR:** Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.
+## Establish normal operation
 
 **PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, three of the ten operations below are drawn at random; the player may do them in any order. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday.
 
-**TRIGGER:** If the player has not finished all three about six seconds after the line above, the narrator lists them: the introduction, the three drawn operations, then the sign-off.
+**TRIGGER:** If the player has not finished all three after at least twenty seconds of quiet following the line above, the narrator lists them: the introduction, the three drawn operations, then the sign-off.
 
 **NARRATOR (wearily):** Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.
 
@@ -94,11 +86,11 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **NARRATOR:** Look at you. Just like yesterday.
 
-**TRIGGER:** Every fifteen seconds without progress, the narrator picks one operation still undone and talks the player through it precisely, sarcastically, with that operation's reminder line.
+**TRIGGER:** After at least twenty seconds of quiet without progress, the narrator picks one operation still undone and talks the player through it precisely, sarcastically, with that operation's reminder line.
 
 **TRIGGER:** When all three are done:
 
-**NARRATOR:** Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.
+**NARRATOR:** Lovely. Just as we rehearsed. Now, prime the oil pump. Turn the LUBE OIL PUMP handle to ON.
 
 ### The ten operations
 
@@ -164,7 +156,35 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 **NARRATOR (reminder):** The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.
 
-**MACHINE / SOUND:** The response is unmistakable. A bank of indicators changes state, the main machine note shifts pitch, and a new industrial rhythm locks into the existing hum and oil-pump burble. Let the change establish itself before the next action.
+**MACHINE / SOUND:** The response is unmistakable. The indicators show a steady normal state, the main machine note shifts pitch, and a new industrial rhythm locks into the existing hum. Let this sound and appearance establish what normal operation looks like. There has been no fault yet; the oil pump has not been primed.
+
+## Prime the oil pump — first fault
+
+**PLAYER ACTION:** Turn the LUBE OIL PUMP M-201 operating handle to ON, after completing all three normal-operation adjustments.
+
+**MACHINE / SOUND:** The machine conks out. Its mechanisms falter and stop, the hum dies away, and it remains stalled. This first fault produces no smoke or burnt components. It does not recover on its own.
+
+**TRIGGER:** Once the machine has stopped:
+
+**NARRATOR:** Hmm. That's the right switch. Try switching the oil pump off, and then on again. The LUBE OIL PUMP handle. Off first. Then on.
+
+**PLAYER ACTION:** Switch the LUBE OIL PUMP handle OFF. Then switch it ON again. Both operations are required; waiting, or leaving it on, does not restart the machine.
+
+**MACHINE / SOUND:** The machine reboots: lamps flicker and its mechanisms cough, catch and run up again. The oil panel lights and a distinctly liquid “blub, blub, blub” joins the hum. Wait until the restart finishes before the reliability speech.
+
+**NARRATOR:** There. Back to normal. Neumann Dynamik equipment is designed for absolute reliability. Occasionally it simply needs reminding. That is why we have a procedure. Follow the procedure, and you can rely on the machine.
+
+## One more routine adjustment
+
+**TRIGGER:** After the reliability speech finishes. Draw one further operation from the ten above, excluding the three already used; ask for that single operation, not another list of three. Only an action performed for this newly assigned task completes it.
+
+**NARRATOR:** Just one final adjustment before we prime the hydrocoptic pump.
+
+**NARRATOR:** [The instruction line for the additional operation.]
+
+**PLAYER ACTION:** Complete that one operation. If a selector is already at its target after experimentation, move it away and return it; a previous press of TEST does not count for this new instruction. Any sarcastic reminder waits for at least twenty seconds of quiet after the instruction finishes.
+
+**NARRATOR (once complete):** Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.
 
 **PLAYER ACTION — HYDROCOPTIC PUMP:** Turn the HYDROCOPTIC PUMP operating handle to ON. Its FLOW PULSE display surges into life.
 
@@ -174,7 +194,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 **MACHINE:** Smoke starts to escape around the door of the cabinet containing the main board. A dark smoke stain gradually develops on the machine's front, immediately above that cabinet.
 
-**NARRATOR:** No, that's not supposed to happen. Could you have a look?
+**NARRATOR:** No, that's not supposed to happen. Could you have a look inside the Automation cabinet?
 
 ## Open the smoking cabinet
 
@@ -530,7 +550,7 @@ For nothing now can ever come to any good.
 
 **TRIGGER:** After the Pepperdyne reveal, while the disposal task is unfinished, the player is idle or holding a removed board. These lines are a pool of optional reactions, not a continuous speech or a fixed sequence.
 
-**DELIVERY:** Play one line or passage at a time, with space between them. Each entry can be used once during the sequence. Story narration and specific action reactions take priority; do not queue a backlog of idle lines. Stop scheduling these prompts once all the Pepperdyne boards are in the skip.
+**DELIVERY:** Play one line or passage at a time, leaving at least twenty seconds of quiet after narration finishes before another unsolicited reminder. Each entry can be used once during the sequence. Story narration and specific action reactions take priority; do not queue a backlog of idle lines. Stop scheduling these prompts once all the Pepperdyne boards are in the skip.
 
 **NARRATOR:** You think all this is a bit unhinged? Think I'm overreacting? I've seen good men go to their death. I've seen legions mown down. I've seen the killing fields of applied industrial engineering. So before you go telling me that I'm overreacting, tell that to the wives and widows of the men who lost everything… who gave everything.
 
@@ -572,11 +592,11 @@ For nothing now can ever come to any good.
 
 ## Timed prompts — board left on the floor
 
-**TRIGGER — 30 SECONDS:** Thirty seconds after the board lands on the floor, it is still there.
+**TRIGGER — 30 SECONDS:** At least thirty seconds after the board lands on the floor, it is still there, and there have been at least twenty seconds of quiet since narration finished.
 
 **NARRATOR:** Pick it up, you slob, and put it in the skip.
 
-**TRIGGER — 10 SECONDS LATER:** Ten seconds after the preceding prompt, the board is still on the floor.
+**TRIGGER — AT LEAST 20 SECONDS LATER:** At least twenty seconds after the preceding prompt finishes, the board is still on the floor.
 
 **NARRATOR:** Yes, the skip, you dolt. Pick it up and put it in there.
 

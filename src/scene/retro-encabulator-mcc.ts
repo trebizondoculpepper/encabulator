@@ -1806,10 +1806,15 @@ function dressDoor(
         label: 'IN WC',
         scaleMax: 10,
       });
+      gauge.group.name = 'Panendermic fan pressure gauge';
       put(gauge.group, cx - 0.08, 0.0);
       updates.push((delta, clock) => {
         gauge.set(
-          circuit.powered.value ? 0.45 + wander(clock * 2, seed) * 0.2 : 0,
+          circuit.powered.value
+            ? boost.state.value
+              ? 0.94 + Math.sin(clock * 2) * 0.01
+              : 0.45 + wander(clock * 2, seed) * 0.2
+            : 0,
         );
         gauge.update(delta);
       });
@@ -1818,7 +1823,7 @@ function dressDoor(
       updates.push(() => hours.show(8812.2 + operatingHours));
       register('fan.mode', selector(3, cx + 0.06, -0.1, 0.85, 1));
       legend('LOW OFF HIGH', cx + 0.06, -0.07, 0.065);
-      // Wired to nothing yet: it toggles its own light all the same.
+      // BOOST raises the pressure gauge into its red band.
       const boost = place(
         ledPushbutton(kit, { colour: 'blue', legend: 'BOOST', power: lit }),
         cx - 0.08,
@@ -1942,6 +1947,21 @@ function populateInterior(
       power: feed,
     },
   );
+  if (prefix === 'section5.bucket1') {
+    // Auxiliary indication stays fed when this cabinet's own isolator opens.
+    const status = parts.add(
+      pilotLight(kit, {
+        name: 'Automation cabinet isolator status',
+        colour: 'green',
+        offColour: 'red',
+        drive: breaker.breaker!.closed,
+        power: feed,
+        pushToTest: false,
+      }),
+    );
+    status.object.position.set(x + w / 2 - 0.13, y + h * 0.13, -0.255);
+    bay.add(status.object);
+  }
   const controlFuse = put('fuse', -w * 0.25, h / 2 - 0.075, -0.27, {
     power: breaker.active,
     current: world.fixed(`${prefix}.controlCurrent`, 0.25),

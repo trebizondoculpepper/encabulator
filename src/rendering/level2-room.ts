@@ -1,3 +1,8 @@
+import {
+  createLevel2NormalOperations,
+  drawNormalOperations,
+} from '../game/level2-normal-operations';
+import { createNarrationPause } from '../game/narration-pause';
 import { createLevel2Startup } from '../game/level2-startup';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
 import { addWarehouseLighting } from './warehouse-lighting';
@@ -30,6 +35,7 @@ import {
   LEVEL2_RESET,
   LEVEL2_SKIP,
   LEVEL2_STARTUP,
+  LEVEL2_NORMAL,
 } from '../game/level2-cues';
 import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../game/units';
@@ -168,6 +174,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const binned = new Set<number>();
   const removed = new Set<number>();
   const floorTime = new Map<number, number>();
+  const floorReminders = new Map<number, number>();
   // There is no bin. The first card the player drops on the floor has the
   // narrator scold them and point out the skip "over there", which only
   // then appears, behind them, where they were not looking: it was never
@@ -319,10 +326,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let griefCountdown = -1;
   let restarting = false;
   let revived = false;
-  let resetNag = 0;
+  const reminderPause = createNarrationPause();
   let smokeOn = false;
-  let priorOil = false;
-  // Rebooting the betaform amplifier: three operations drawn at random
+  const lesson = createLevel2NormalOperations();
+  // Establish normal operation: three operations drawn at random
   // from ten, each a real control round the machine, set in any order and
   // latched once done (`LEVEL2_BETAFORM`). No two playthroughs agree on
   // what routine operation is.
@@ -335,34 +342,57 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       return started && then();
     };
   };
-  const checks: Record<BetaformId, () => boolean> = {
-    isolator: cycle(
-      () => !drive.closed.value,
-      () => drive.closed.value,
-    ),
-    speed: () => control('drive.speed').value >= 10,
-    fan: () => control('fan.mode').value === 2,
-    key: () => control('hydraulic.key').value === 0,
-    boost: () => control('fan.boost').value === 1,
-    phase: () => control('incoming.phase').value === 0,
-    kirk: () => control('main.kirk').value === 0,
-    hoa: () => control('feed.hoa').value === 0,
-    test: () => control('annunciator.tests').value > 0,
-    stop: cycle(
-      () => control('auxiliary.stop').value === 1,
-      () => control('auxiliary.stop').value === 0,
-    ),
+  // A target already set when assigned must be left and reached again;
+  // an earlier exploratory click cannot complete a newly issued operation.
+  const reach = (read: () => number, target: number) => {
+    let away = read() !== target;
+    return () => {
+      if (read() !== target) away = true;
+      return away && read() === target;
+    };
   };
-  const drawn = (Object.keys(checks) as BetaformId[])
-    .map((id) => ({ id, order: Math.random() }))
-    .sort((a, b) => a.order - b.order)
-    .slice(0, 3)
-    .map(({ id }) => id);
+  const makeCheck = (id: BetaformId): (() => boolean) => {
+    switch (id) {
+      case 'isolator':
+        return cycle(
+          () => !drive.closed.value,
+          () => drive.closed.value,
+        );
+      case 'stop':
+        return cycle(
+          () => control('auxiliary.stop').value === 1,
+          () => control('auxiliary.stop').value === 0,
+        );
+      case 'test': {
+        const before = control('annunciator.tests').value;
+        return () => control('annunciator.tests').value > before;
+      }
+      case 'speed':
+        return reach(() => control('drive.speed').value, 10);
+      case 'fan':
+        return reach(() => control('fan.mode').value, 2);
+      case 'key':
+        return reach(() => control('hydraulic.key').value, 0);
+      case 'boost':
+        return reach(() => control('fan.boost').value, 1);
+      case 'phase':
+        return reach(() => control('incoming.phase').value, 0);
+      case 'kirk':
+        return reach(() => control('main.kirk').value, 0);
+      case 'hoa':
+        return reach(() => control('feed.hoa').value, 0);
+    }
+  };
+  const { initial: drawn, extra: extraOperation } = drawNormalOperations(
+    Object.keys(LEVEL2_BETAFORM.operations) as BetaformId[],
+  );
+  const checks = new Map(drawn.map((id) => [id, makeCheck(id)]));
   const betaform = new Set<BetaformId>();
   let listed = false;
   let nagTime = 0;
   let nagged = 0;
-  let priorHydro = false;
+  let extraComplete = false;
+  let extraCheck = () => false;
   let idle = 0;
   let optional = 97;
   let lastRemoved = -1;
@@ -563,6 +593,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     mcc.update(delta);
     partAudio.listen(camera, m);
     phaseTime += delta;
+    reminderPause.step(delta, voice.busy);
     if (started) titleTime += delta;
     if (phase < 13 && titleTime > 5) caption.hidden = true;
     if (endingCountdown >= 0) {
@@ -589,9 +620,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         revived = true;
         voice.interrupt(85, 86, 87, 88, 89, 90, 91);
       } else if (!revived && !restarting && !voice.busy) {
-        resetNag += delta;
-        if (resetNag > 14) {
-          resetNag = 0;
+        if (reminderPause.take()) {
           voice.say(LEVEL2_RESET.remind);
         }
       }
@@ -608,64 +637,112 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       const instruction = startup.step(mcc.supply.value, main.closed.value);
       if (instruction) {
         window.clearTimeout(introTimer);
-        if (instruction === 'ready') advance(1, 2);
-        else {
+        if (instruction === 'ready') {
+          voice.interrupt();
+          advance(1);
+        } else {
           voice.interrupt();
           voice.say(LEVEL2_STARTUP[instruction]);
         }
       }
-    } else if (phase === 1 && oil.closed.value) {
-      priorOil = true;
-      // The sticky switch: a hiccup, as a warning of what is to come.
-      mcc.fail('hiccup');
-      advance(2);
-    } else if (phase === 2 && phaseTime > 2.5) {
-      advance(3, 3);
-    } else if (phase === 3 && priorOil && !oil.closed.value) advance(4);
-    else if (phase === 4 && oil.closed.value) {
-      oilFeed.value = true;
-      oilTone.value = true;
-      advance(5, 4);
-    } else if (phase === 5) {
-      for (const id of drawn)
-        if (!betaform.has(id) && checks[id]()) {
+    } else if (phase === 1) {
+      if (lesson.stage === 'normal') {
+        for (const id of drawn) {
+          if (betaform.has(id) || !checks.get(id)!()) continue;
           betaform.add(id);
           nagTime = 0;
-          if (betaform.size === drawn.length) {
-            driveFeed.value = true;
-            driveTone.value = true;
-            // The main machine note shifts up as the amplifier comes in.
-            mcc.pitch.value = 1.08;
-            advance(7);
-            voice.interrupt();
-            voice.say(LEVEL2_BETAFORM.done);
-          } else if (!voice.busy)
+          if (betaform.size < drawn.length && !voice.busy)
             voice.say(LEVEL2_BETAFORM.acks[(betaform.size - 1) % 3]);
         }
-      // Before anything, the whole list; after it, one remaining operation
-      // at a time, precisely, until it is done.
-      nagTime += delta;
-      const remaining = drawn.filter((id) => !betaform.has(id));
-      if (phase === 5 && !voice.busy && remaining.length) {
-        if (!listed && nagTime > 6) {
-          listed = true;
+      } else if (lesson.stage === 'extra' && !extraComplete) {
+        extraComplete = extraCheck();
+      }
+      const event = lesson.step({
+        delta,
+        powered: mcc.supply.value && main.closed.value,
+        oil: oil.closed.value,
+        hydro: hydro.closed.value,
+        normalComplete: betaform.size === drawn.length,
+        extraComplete,
+        stalled: mcc.stalled,
+        restarted: mcc.failure === null,
+        speaking: voice.busy,
+      });
+      switch (event) {
+        case 'normal':
+          voice.interrupt(2);
+          break;
+        case 'prime-oil':
+          driveFeed.value = true;
+          driveTone.value = true;
+          mcc.pitch.value = 1.08;
+          voice.interrupt();
+          voice.say(LEVEL2_BETAFORM.done);
+          break;
+        case 'stall':
+          // First fault: actually stop and wait for the oil-pump OFF/ON.
+          mcc.fail('sputter');
+          voice.interrupt();
+          break;
+        case 'cycle-oil':
+          voice.interrupt(3);
+          break;
+        case 'reboot':
+          oilFeed.value = true;
+          oilTone.value = true;
+          mcc.restart();
+          voice.interrupt();
+          break;
+        case 'reliability':
+          voice.interrupt(4);
+          break;
+        case 'extra':
+          extraCheck = makeCheck(extraOperation);
           nagTime = 0;
+          voice.say(LEVEL2_NORMAL.extra);
+          voice.say(LEVEL2_BETAFORM.operations[extraOperation].say);
+          break;
+        case 'prime-hydro':
+          voice.interrupt();
+          voice.say(LEVEL2_NORMAL.done);
+          break;
+        case 'failure':
+          hydroTone.value = true;
+          mcc.fail('sputter');
+          advance(8);
+          break;
+      }
+      // Sarcastic prompts follow a full quiet interval, never the speech.
+      nagTime = voice.busy ? 0 : nagTime + delta;
+      const remaining = drawn.filter((id) => !betaform.has(id));
+      if (
+        lesson.stage === 'normal' &&
+        !voice.busy &&
+        remaining.length &&
+        nagTime >= 20 &&
+        reminderPause.take()
+      ) {
+        nagTime = 0;
+        if (!listed) {
+          listed = true;
           voice.say(LEVEL2_BETAFORM.intro);
           for (const id of remaining)
             voice.say(LEVEL2_BETAFORM.operations[id].say);
           voice.say(LEVEL2_BETAFORM.outro);
-        } else if (listed && nagTime > 15) {
-          nagTime = 0;
+        } else {
           const id = remaining[nagged++ % remaining.length];
           voice.say(LEVEL2_BETAFORM.operations[id].remind);
         }
+      } else if (
+        lesson.stage === 'extra' &&
+        !voice.busy &&
+        !extraComplete &&
+        nagTime >= 20 &&
+        reminderPause.take()
+      ) {
+        nagTime = 0;
+        voice.say(LEVEL2_BETAFORM.operations[extraOperation].remind);
       }
-    } else if (phase === 7 && hydro.closed.value && !priorHydro) {
-      priorHydro = true;
-      hydroTone.value = true;
-      // A surge, then the machine sputters to a standstill.
-      mcc.fail('sputter');
-      advance(8);
     } else if (phase === 8 && phaseTime > 4 && !smokeOn) {
       smokeOn = true;
       // Fail a real board in the same component model used by dev6. Its
@@ -708,6 +785,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         if (state !== 'installed' && !removed.has(index)) onRemoved(index);
         if (binned.has(index) || state === 'installed' || state === 'held') {
           floorTime.delete(index);
+          floorReminders.delete(index);
           continue;
         }
         if (state === 'settled') {
@@ -721,12 +799,26 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
             voice.interrupt();
             voice.say(LEVEL2_SKIP.appears);
           } else if (previous === undefined) voice.interrupt(104, 105);
-          else if (age >= 30 && age - delta < 30) voice.interrupt(106);
-          else if (age >= 40 && age - delta < 40) voice.interrupt(107);
+          else if (!voice.busy) {
+            const reminders = floorReminders.get(index) ?? 0;
+            if (
+              reminders < 2 &&
+              age >= (reminders === 0 ? 30 : 50) &&
+              reminderPause.take()
+            ) {
+              floorReminders.set(index, reminders + 1);
+              voice.queue(reminders === 0 ? 106 : 107);
+            }
+          }
         }
       }
-      idle += delta;
-      if (idle > 25 && !voice.busy && removed.size < 5) {
+      idle = voice.busy ? 0 : idle + delta;
+      if (
+        idle > 25 &&
+        !voice.busy &&
+        removed.size < 5 &&
+        reminderPause.take()
+      ) {
         const firstHeld =
           removed.size === 1 &&
           binned.size === 0 &&

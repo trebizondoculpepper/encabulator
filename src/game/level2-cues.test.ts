@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vite-plus/test';
 import lines from '../audio/assets/narration/level2/lines.json';
-import { LEVEL2_BETAFORM, LEVEL2_RESET, LEVEL2_STARTUP } from './level2-cues';
+import {
+  LEVEL2_BETAFORM,
+  LEVEL2_RESET,
+  LEVEL2_STARTUP,
+  LEVEL2_NORMAL,
+  LEVEL2_CUES,
+} from './level2-cues';
 
 const recorded = new Set(Object.values(lines));
 
@@ -10,6 +16,7 @@ describe('the Level 2 narration', () => {
   it('has a recording for every line it plays by its text', () => {
     const all = [
       ...Object.values(LEVEL2_STARTUP),
+      ...Object.values(LEVEL2_NORMAL),
       LEVEL2_BETAFORM.intro,
       LEVEL2_BETAFORM.outro,
       LEVEL2_BETAFORM.done,
@@ -21,6 +28,11 @@ describe('the Level 2 narration', () => {
         o.remind,
       ]),
     ];
+    // The revised opening cues must match their newly rendered takes.
+    for (let i = 0; i < 6; i++) {
+      const key = `cue_${String(i + 1).padStart(3, '0')}`;
+      expect((lines as Record<string, string>)[key]).toBe(LEVEL2_CUES[i].text);
+    }
     expect(Object.keys(LEVEL2_BETAFORM.operations)).toHaveLength(10);
     for (const text of all) expect(recorded.has(text)).toBe(true);
   });

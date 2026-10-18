@@ -4,11 +4,11 @@
   "intro_3": "Today, an Encabulator stands quietly behind almost everything you rely on. The railways. The shipping forecast. The tides, quite possibly. You will never see one, which is how you know they're working.",
   "intro_4": "On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.",
   "cue_001": "So. Let's begin. Turn on the incoming isolator. That's the switch in the metal box to the left of the machine.",
-  "cue_002": "Excellent. The delta readout on the main bus controller now shows zero point seven two, which means we're ready to prime the oil pumps.",
-  "cue_003": "Hmm. That's the right switch. Give it another go?",
-  "cue_004": "Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.",
+  "cue_002": "Excellent. The delta readout on the main bus controller now shows zero point seven two. Normal operation. Now, as we practised yesterday, reboot the betaform amplifier.",
+  "cue_003": "Hmm. That's the right switch. Try switching the oil pump off, and then on again. The LUBE OIL PUMP handle. Off first. Then on.",
+  "cue_004": "There. Back to normal. Neumann Dynamik equipment is designed for absolute reliability. Occasionally it simply needs reminding. That is why we have a procedure. Follow the procedure, and you can rely on the machine.",
   "cue_005": "Oh. That's not good, is it?",
-  "cue_006": "No, that's not supposed to happen. Could you have a look?",
+  "cue_006": "No, that's not supposed to happen. Could you have a look inside the Automation cabinet?",
   "cue_007": "Are you suicidal? Those boards are live. We covered this yesterday. Switch off the isolator in that cabinet first.",
   "cue_008": "Really not good. Would you mind having a poke around in there? Have a look at what might have blown.",
   "cue_009": "I thought I smelled something awful. Those are Pepperdyne modial-interaction boards in our hydrocoptic phase-control backplane... pull one out. I literally can't believe it.",
@@ -141,7 +141,7 @@
   "remaining_b_3": "Like a sick, wounded child. Please, you're the doctor. We have to operate. There are 3 more Pepperdyne modial-interaction boards in my baby's heart.",
   "betaform_intro": "Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.",
   "betaform_outro": "There. That's all it is. That's all it ever was.",
-  "betaform_done": "Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.",
+  "betaform_done": "Lovely. Just as we rehearsed. Now, prime the oil pump. Turn the LUBE OIL PUMP handle to ON.",
   "betaform_ack_1": "Yes. Well done.",
   "betaform_ack_2": "There. Was that so hard?",
   "betaform_ack_3": "Look at you. Just like yesterday.",
@@ -169,5 +169,7 @@
   "reset_remind": "The blue button. Automation control. Reset. Please. For all of us.",
   "skip_appears": "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.",
   "startup_main": "Good. Now turn on the machine's main power. Turn the red handle marked MAIN DISCONNECT to ON.",
-  "startup_main_reset": "The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second."
+  "startup_main_reset": "The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second.",
+  "normal_extra": "Just one final adjustment before we prime the hydrocoptic pump.",
+  "normal_done": "Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump."
 }

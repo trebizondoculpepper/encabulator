@@ -2,10 +2,10 @@
  * How the machine gives up, and comes back: like the Millennium Falcon's
  * hyperdrive in *The Empire Strikes Back*, the pathetic, sad noise of an
  * engine that will not catch, conking out and losing its power. Level 2
- * uses them in turn, each worse than the last: a hiccup at the sticky
- * switch (foreshadowing, mildly alarming), a sputter to a standstill when
- * the Pepperdyne boards fry its circuits, a restart from the Automation
- * Control RESET button, and at the end the final, gut-wrenching kaput.
+ * now uses a sputter to stop on the first oil-pump attempt, a restart
+ * after cycling that pump, a second sputter when the Pepperdyne boards
+ * fail, a restart from the Automation Control RESET button, and finally
+ * the gut-wrenching kaput. HICCUP remains available in development.
  *
  * Each is a timeline of the machine's running speed, as a share of normal
  * (every running sound follows it, pitch and pace together), whether its

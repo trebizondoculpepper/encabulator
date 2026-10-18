@@ -843,3 +843,59 @@ it('brings up fewer faults in the lighter failures', () => {
   expect(sputter).toBe(3);
   dispose();
 });
+
+it('drives the gauge above BOOST into the red band and returns when released', () => {
+  const { mcc, dispose } = fixture();
+  isolate(mcc);
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  main.breaker!.operate();
+  mcc.update(0);
+  mcc.update(4);
+  const gauge = mcc.group.getObjectByName('Panendermic fan pressure gauge')!;
+  const pivot = gauge.children.find((child) => child.type === 'Group')!;
+  const reading = () => (Math.PI * 0.75 - pivot.rotation.z) / (Math.PI * 1.5);
+  const boost = mcc.group.getObjectByName('BOOST LED pushbutton')!;
+  let cap: Object3D | undefined;
+  boost.traverse((object) => {
+    if (mcc.parts.uses.has(object)) cap = object;
+  });
+  expect(reading()).toBeLessThan(0.8);
+  expect(work(mcc, cap!)).toBe(true);
+  mcc.update(1);
+  expect(reading()).toBeGreaterThan(0.8);
+  expect(work(mcc, cap!)).toBe(true);
+  mcc.update(1);
+  expect(reading()).toBeLessThan(0.8);
+  main.breaker!.operate();
+  mcc.update(1);
+  expect(reading()).toBeCloseTo(0);
+  dispose();
+});
+
+it('shows the Automation isolator green on, red off, and dark without upstream power', () => {
+  const { mcc, dispose } = fixture();
+  const status = mcc.group.getObjectByName(
+    'Automation cabinet isolator status',
+  )!;
+  expect(status.userData.indication).toBe('dark');
+  status.traverse((object) => expect(mcc.parts.uses.has(object)).toBe(false));
+  isolate(mcc);
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  const automation = mcc.components.find(
+    (d) => d.object.name === 'section5.bucket1: breaker',
+  )!;
+  main.breaker!.operate();
+  mcc.update(1);
+  expect(status.userData.indication).toBe('green');
+  automation.breaker!.operate();
+  mcc.update(1);
+  expect(status.userData.indication).toBe('red');
+  main.breaker!.operate();
+  mcc.update(1);
+  expect(status.userData.indication).toBe('dark');
+  dispose();
+});

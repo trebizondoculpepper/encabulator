@@ -43,3 +43,5 @@ The pre-rendered green PCB textures in `src/assets/pcb/` are generated from that
 The Encabulator drive-train hum (`src/audio/machine-hum.ts`) is original project synthesis, written with OpenAI Codex: three speed-controlled sine partials, with no third-party recording or sample; distributed under the project's licence. [Source](src/audio/machine-hum.ts).
 
 The Level 2 incoming-isolator instruction (`cue_001`) and additional main-power instructions (`startup_main`, `startup_main_reset`) are also rendered from [Hexgrad's Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), `bm_george`, under Apache-2.0. Edits: 0.92 speaking speed, 75 Hz high-pass, -18 LUFS normalisation and mono 24 kHz / 64 kb/s MP3 encoding, matching the existing narrator placeholders.
+
+The revised normal-operation lesson's `cue_002`, `cue_003`, `cue_004`, `betaform_done`, `normal_extra` and `normal_done` use the same [Hexgrad Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) `bm_george` British voice, Apache-2.0, rendered at 0.92 speed, high-pass filtered at 75 Hz, normalised to -18 LUFS and encoded as mono 24 kHz / 64 kb/s MP3.

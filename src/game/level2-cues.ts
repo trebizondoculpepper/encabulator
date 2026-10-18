@@ -16,17 +16,17 @@ export const LEVEL2_CUES = [
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "Excellent. The delta readout on the main bus controller now shows zero point seven two, which means we're ready to prime the oil pumps.",
+    text: 'Excellent. The delta readout on the main bus controller now shows zero point seven two. Normal operation. Now, as we practised yesterday, reboot the betaform amplifier.',
   },
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "Hmm. That's the right switch. Give it another go?",
+    text: "Hmm. That's the right switch. Try switching the oil pump off, and then on again. The LUBE OIL PUMP handle. Off first. Then on.",
   },
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.",
+    text: 'There. Back to normal. Neumann Dynamik equipment is designed for absolute reliability. Occasionally it simply needs reminding. That is why we have a procedure. Follow the procedure, and you can rely on the machine.',
   },
   {
     section:
@@ -36,7 +36,7 @@ export const LEVEL2_CUES = [
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "No, that's not supposed to happen. Could you have a look?",
+    text: "No, that's not supposed to happen. Could you have a look inside the Automation cabinet?",
   },
   {
     section: 'Conditional interruption — cabinet still live',
@@ -524,6 +524,12 @@ export const LEVEL2_BETAFORM = {
     'There. Was that so hard?',
     'Look at you. Just like yesterday.',
   ],
+  done: 'Lovely. Just as we rehearsed. Now, prime the oil pump. Turn the LUBE OIL PUMP handle to ON.',
+} as const;
+
+/** One fresh adjustment after the oil-pump restart and reliability speech. */
+export const LEVEL2_NORMAL = {
+  extra: 'Just one final adjustment before we prime the hydrocoptic pump.',
   done: 'Lovely. Just as we rehearsed. Now, prime the hydrocoptic pump.',
 } as const;
 

@@ -422,6 +422,8 @@ export function pilotLight(
   kit: PanelKit,
   props: Common & {
     colour: OperatorColour;
+    /** A second colour for a powered, logically off status indication. */
+    offColour?: OperatorColour;
     drive?: Readable<boolean>;
     power?: Readable<boolean>;
     series?: DeviceSeries;
@@ -437,7 +439,13 @@ export function pilotLight(
     props.series === 'xb4'
       ? createXB4PilotLight(kit, props.colour)
       : createPilotLamp(kit, props.colour);
+  const offView = props.offColour
+    ? props.series === 'xb4'
+      ? createXB4PilotLight(kit, props.offColour)
+      : createPilotLamp(kit, props.offColour)
+    : undefined;
   a.object.add(view.group);
+  if (offView) a.object.add(offView.group);
   a.legend(props.legend, 0.03);
   const lamp = createPilotLight({ drive: props.drive, power: props.power });
   if (props.pushToTest !== false) {
@@ -446,11 +454,28 @@ export function pilotLight(
       view.press();
       lamp.press();
     });
+    if (offView)
+      a.uses.set(offView.lens, () => {
+        offView.press();
+        lamp.press();
+      });
   }
   a.updates.push((delta) => {
     lamp.step(delta);
     view.set(lamp.lit.value);
     view.update(delta);
+    if (offView) {
+      const off = !lamp.lit.value;
+      view.group.visible = !off;
+      offView.group.visible = off;
+      offView.set(off && (props.power?.value ?? true));
+      offView.update(delta);
+      a.object.userData.indication = !(props.power?.value ?? true)
+        ? 'dark'
+        : off
+          ? props.offColour
+          : props.colour;
+    }
   });
   a.disposers.push(lamp.dispose);
   return { ...a.part(), lit: lamp.lit };
