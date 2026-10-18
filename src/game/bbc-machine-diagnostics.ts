@@ -208,7 +208,7 @@ export function level0Diagnostics(
           .slice(0, 2)
           .map((f) => `${f.window}: ${f.code} ${f.text}`),
       );
-    if (p.healthy.value && p.operating.value)
+    if (p.steady.value)
       return page(
         'STEADY / NOMINAL',
         'Machine healthy; automation operating.',

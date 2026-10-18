@@ -5,6 +5,7 @@ import type {
 } from '../toolkit/components/core/logic/world/graph';
 import { CONTROLLER_BOOT } from '../toolkit/components/industrial-control/logic/screen-boot';
 import {
+  MAX_DIMENSION,
   achievedDimension,
   allowedDimension,
   stepDimension,
@@ -1412,6 +1413,18 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     { where: 'random failure scheduler' },
   );
 
+  /** Fully built, healthy operation, rather than a settled partial startup. */
+  const steady = g.output(
+    'plant.steady',
+    [healthy, operating, allowed, achieved],
+    (healthy, operating, allowed, achieved) =>
+      healthy &&
+      operating &&
+      allowed === MAX_DIMENSION &&
+      achieved === MAX_DIMENSION,
+    { where: 'machine stack light; BBC diagnostics and readiness fanfare' },
+  );
+
   // ---- Actions -------------------------------------------------------------
   /** Automation Control's RESET: restart the PLC's boot, whatever it was doing. */
   const plcReset = g.action(
@@ -1870,6 +1883,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     windowStates,
     healthy,
     operating,
+    steady,
     plcReset,
     driveStart,
     driveStop,

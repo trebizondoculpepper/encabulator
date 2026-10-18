@@ -101,9 +101,7 @@ export function createLevel0Machine(
       fault: !plant.healthy.value,
       restarting: false,
       booting:
-        booting ||
-        plant.plcStatus.value === 'booting' ||
-        plant.state.dimension.value < plant.allowed.value,
+        booting || plant.plcStatus.value === 'booting' || !plant.steady.value,
     }),
   });
   ref.value = mcc;
@@ -334,7 +332,7 @@ export function createLevel0Machine(
   return {
     mcc,
     diagnostics: {
-      steady: mcc.steady,
+      steady: computed(() => plant.steady.value && mcc.steady.value),
       ...level0Diagnostics(
         plant,
         mcc.diagnosticEndpoint,

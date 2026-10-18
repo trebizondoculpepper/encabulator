@@ -1,4 +1,6 @@
-import { Group } from 'three';
+import { createBbcComputer } from '../toolkit/components/industrial-control/logic/bbc-micro';
+import { createLevel0Scenarios } from './level0-scenarios';
+import { Box3, Group, PerspectiveCamera, Raycaster, Vector3 } from 'three';
 import type { Object3D } from 'three';
 import {
   afterEach,
@@ -721,3 +723,44 @@ function interlockLampLit(machine: ReturnType<typeof createLevel0Machine>) {
   return machine.mcc.group.getObjectByName('Power interlock locked lamp')!
     .userData.lit as boolean;
 }
+
+it('announces readiness only after full operation, never at a settled partial startup', () => {
+  const { machine, powerUp, run, dispose } = sandbox();
+  const bbc = createBbcComputer(machine.diagnostics);
+  bbc.power.flip();
+  powerUp();
+  run(40);
+  expect(machine.plant.achieved.value).toBeLessThan(6);
+  expect(machine.diagnostics.steady!.value).toBe(false);
+  expect(machine.mcc.steady.value).toBe(false);
+  expect(bbc.fanfare.value).toBe(0);
+  const scenarios = createLevel0Scenarios(machine);
+  scenarios.fullOn();
+  run(60);
+  expect(machine.plant.achieved.value).toBe(6);
+  expect(machine.plant.steady.value).toBe(true);
+  expect(machine.mcc.steady.value).toBe(true);
+  expect(bbc.fanfare.value).toBe(1);
+  run(10);
+  expect(bbc.fanfare.value).toBe(1);
+  bbc.dispose();
+  dispose();
+});
+
+
+it('lets a front click reach every VFD keypad key and its speed knob', () => {
+  const { machine, dispose } = sandbox();
+  machine.mcc.group.updateMatrixWorld(true);
+  const targets = inputsOn(machine, 'MAIN ENCABULATOR');
+  expect(targets.length).toBeGreaterThan(8);
+  for (const target of targets) {
+    const centre = new Box3().setFromObject(target).getCenter(new Vector3());
+    const ray = new Raycaster(centre.clone().add(new Vector3(0, 0, 1)), new Vector3(0, 0, -1));
+    ray.camera = new PerspectiveCamera();
+    const hit = ray.intersectObject(machine.mcc.group, true)[0];
+    let reached: Object3D | null = hit?.object ?? null;
+    while (reached && reached !== target) reached = reached.parent;
+    expect(reached, `target ${target.name}; hit ${hit?.object.name}; parent ${hit?.object.parent?.name}`).toBe(target);
+  }
+  dispose();
+});

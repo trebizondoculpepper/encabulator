@@ -71,7 +71,7 @@ describe('read-only machine diagnostics', () => {
     expect(plant.state.oil.value).toBe(0);
   });
 
-  it('reports nominal from the existing healthy/operating outputs without requiring maximum knobs', () => {
+  it('does not report steady for healthy but incomplete startup', () => {
     const { plant, text } = fixture();
     plant.sense(
       Object.fromEntries(Object.keys(ELECTRICAL_OFF).map((key) => [key, true])),
@@ -89,7 +89,8 @@ describe('read-only machine diagnostics', () => {
     plant.control.fanMode.set(2);
     expect(plant.healthy.value).toBe(true);
     expect(plant.operating.value).toBe(true);
-    expect(text()).toContain('STEADY / NOMINAL');
+    expect(plant.steady.value).toBe(false);
+    expect(text()).toContain('STARTUP IN PROGRESS');
     expect(plant.control.driveSpeed.value).toBe(0);
   });
 
