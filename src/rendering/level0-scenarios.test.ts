@@ -66,7 +66,7 @@ function sandbox() {
   return { machine, cheats, panel, run, dispose };
 }
 
-/** The use of whatever is inside the part named `name` on the console. */
+/** The use of whatever is inside the part named `name` on the simulator. */
 function useOf(
   panel: ReturnType<typeof createScenarioSimulator>,
   name: string,
@@ -78,7 +78,7 @@ function useOf(
 }
 
 describe('the Hyperplasc Scenario Simulator', () => {
-  it('is locked with its key in it, and its controls work only with the door open', () => {
+  it('opens by its handle, and its controls work only with the door open', () => {
     const { panel, run, dispose } = sandbox();
     const controls = panel.group.getObjectByName('Testing scenario controls')!;
     // Returning false is how a hidden part stops the raycaster.
@@ -87,33 +87,28 @@ describe('the Hyperplasc Scenario Simulator', () => {
         new Raycaster(),
         [],
       ) !== false;
+    const handle = () =>
+      panel.parts.uses.get(
+        panel.group.getObjectByName('Cabinet door handle')!,
+      )!();
+    expect(panel.group.getObjectByName('Cabinet door lock')!.visible).toBe(
+      false,
+    );
     expect(takesClicks()).toBe(false);
-    // Locked: the handle refuses.
-    panel.parts.uses.get(
-      panel.group.getObjectByName('Cabinet door handle')!,
-    )!();
-    run(1);
-    expect(panel.open).toBe(false);
-    // Turn the key, then the handle opens it.
-    useOf(panel, 'Scenario simulator lock')();
-    panel.parts.uses.get(
-      panel.group.getObjectByName('Cabinet door handle')!,
-    )!();
+    handle();
     run(0.1);
     expect(panel.open).toBe(true);
     expect(takesClicks()).toBe(true);
     // Shut again, its controls take no clicks once it has swung to.
-    panel.parts.uses.get(
-      panel.group.getObjectByName('Cabinet door handle')!,
-    )!();
+    handle();
     run(3);
+    expect(panel.open).toBe(false);
     expect(takesClicks()).toBe(false);
     dispose();
   });
 
   it('brings the machine fully on, and fully off again, with its buttons', () => {
     const { machine, panel, run, dispose } = sandbox();
-    panel.unlock();
     panel.parts.uses.get(
       panel.group.getObjectByName('Cabinet door handle')!,
     )!();

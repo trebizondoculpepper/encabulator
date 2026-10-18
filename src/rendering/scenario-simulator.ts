@@ -1,4 +1,4 @@
-import { computed, signal } from '@preact/signals-core';
+import { signal } from '@preact/signals-core';
 import { Group } from 'three';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import {
@@ -8,7 +8,6 @@ import {
 import {
   createPartSet,
   doorLatch,
-  keySwitch,
   pushButton,
 } from '../toolkit/components/core/parts/parts';
 import type { OperatorColour } from '../toolkit/components/industrial-control/views/industrial-controls';
@@ -51,8 +50,8 @@ const BUTTONS: readonly {
 /**
  * The Hyperplasc Scenario Simulator, by Neumann Dynamik: a modern 42U
  * rack cabinet, built as the dev3 gallery's are, behind a smoked perspex
- * door marked AUTHORISED PERSONNEL ONLY and locked with its key left in
- * the lock. Inside, at eye level, a 4U panel of TESTING SCENARIOS push
+ * door marked AUTHORISED PERSONNEL ONLY, opened by its swing handle.
+ * Inside, at eye level, a 4U panel of TESTING SCENARIOS push
  * buttons sets the machine's state (`src/rendering/level0-scenarios.ts`);
  * the rest of the rack is the simulator's own equipment. Its controls
  * can be seen through the door but worked only with it open. Front faces
@@ -138,7 +137,7 @@ export function createScenarioSimulator(
     controls.add(button.object);
   });
 
-  // The door: smoked perspex, its swing handle, and its key in its lock.
+  // The door: smoked perspex and its swing handle.
   const door = cabinet.door!;
   const sign = (
     text: string,
@@ -165,30 +164,13 @@ export function createScenarioSimulator(
     '#f2c418',
     door.middle - 0.2,
   );
-  const unlocked = signal(false);
-  const key = parts.add(
-    keySwitch(kit, {
-      name: 'Scenario simulator lock',
-      bound: {
-        get value() {
-          return unlocked.value;
-        },
-        set: (value: boolean) => (unlocked.value = value),
-      },
-    }),
-  );
+  // A plain door: no lock, just its swing handle.
   door.lock.visible = false;
-  key.object.position.copy(door.lock.position);
-  key.object.position.z = 0.012;
-  key.object.scale.setScalar(0.8);
-  door.hinge.add(key.object);
   const open = signal(false);
-  // The door's latch works through its swing handle; locked, a shut door
-  // refuses it; an open one always shuts.
+  // The door's latch works through its swing handle.
   const latch = doorLatch(kit, {
     name: 'Scenario simulator door',
     material: kitPaint(kit, '#18191a'),
-    latch: computed(() => !unlocked.value && !open.value),
     bound: {
       get value() {
         return open.value;
@@ -211,9 +193,6 @@ export function createScenarioSimulator(
     /** Whether its door is open. */
     get open() {
       return open.value;
-    },
-    unlock(on = true) {
-      unlocked.value = on;
     },
     update(delta: number) {
       parts.update(delta);

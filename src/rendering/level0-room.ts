@@ -151,7 +151,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // while the player is looking into the cabinet.
   machine.onBoardRemoved(conjureSkip);
 
-  // The Hyperplasc Scenario Simulator: a locked rack of testing scenarios.
+  // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
   const scenarios = createLevel0Scenarios(machine);
   const simulator = createScenarioSimulator(kit, scenarios);
   simulator.group.scale.setScalar(m);
@@ -369,9 +369,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     view: (x: number, z: number, yaw = 0, pitch = 0) =>
       walk.place(x * m, z * m, yaw, pitch),
     conjureSkip,
-    /** The scenario simulator's actions, and its lock (development only). */
+    /** The scenario simulator's actions (development only). */
     scenarios,
-    unlockScenarios: () => simulator.unlock(),
     simulator,
   };
   return Object.assign(dispose, {
