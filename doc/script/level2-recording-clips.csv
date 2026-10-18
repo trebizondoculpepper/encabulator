@@ -104,11 +104,11 @@ clip,asset_key,section,text
 103,cue_095,Recovery and the ending,It's really gone this time.
 104,cue_096,Recovery and the ending,"Stop all the clocks, cut off the telephone, Prevent the dog from barking with a juicy bone, Silence the pianos and with muffled drum Bring out the coffin, let the mourners come. Let aeroplanes circle moaning overhead Scribbling on the sky the message 'It is Dead'. Put crepe bows round the white necks of the public doves, Let the traffic policemen wear black cotton gloves. It was my North, my South, my East and West, My working week and my Sunday rest, My noon, my midnight, my talk, my song; I thought that love would last forever: I was wrong. The stars are not wanted now; put out every one, Pack up the moon and dismantle the sun, Pour away the ocean and sweep up the wood; For nothing now can ever come to any good."
 105,startup_main_reset,Conditional: a premature main-power switch,"The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second."
-106,betaform_intro,Conditional: the three normal-operation reminders,"Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like."
-107,betaform_outro,Conditional: the three normal-operation reminders,There. That's all it is. That's all it ever was.
-108,betaform_ack_1,Conditional: the three normal-operation reminders,Yes. Well done.
-109,betaform_ack_2,Conditional: the three normal-operation reminders,There. Was that so hard?
-110,betaform_ack_3,Conditional: the three normal-operation reminders,Look at you. Just like yesterday.
+106,betaform_intro,Conditional: the two normal-operation reminders,"Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot."
+107,betaform_outro,Conditional: the two normal-operation reminders,There. That's all it is. That's all it ever was.
+108,betaform_ack_1,Conditional: the two normal-operation reminders,Yes. Well done.
+109,betaform_ack_2,Conditional: the two normal-operation reminders,There. Was that so hard?
+110,betaform_ack_3,Conditional: the two normal-operation reminders,Look at you. Just like yesterday.
 111,betaform_isolator_say,Random operations: instructions and reminders,"Cycle the drive isolator. Off, and on again."
 112,betaform_isolator_remind,Random operations: instructions and reminders,"The drive isolator. Under the drive, second section from the right. The red handle. Off. And then, and this is the part people forget, on again."
 113,betaform_speed_say,Random operations: instructions and reminders,Turn the speed knob on the drive all the way up.

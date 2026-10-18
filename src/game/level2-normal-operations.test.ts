@@ -29,7 +29,7 @@ describe('the normal-operation lesson', () => {
     const { lesson, step } = fixture();
     expect(step({ delta: 6 })).toBeNull();
     expect(step({ delta: 1 })).toBe('normal');
-    // Early pump operation cannot bypass the three normal adjustments.
+    // Early pump operation cannot bypass the two normal adjustments.
     expect(step({ delta: 0, oil: true, hydro: true })).toBeNull();
     expect(lesson.stage).toBe('normal');
     expect(step({ normalComplete: true })).toBe('prime-oil');
@@ -70,12 +70,12 @@ describe('the normal-operation lesson', () => {
     expect(step({ delta: 1 })).toBe('normal');
   });
 
-  it('draws three distinct operations and a different additional instruction', () => {
+  it('draws two distinct operations and a different additional instruction', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
     for (const random of [() => 0, () => 0.5, () => 0.999]) {
       const { initial, extra } = drawNormalOperations(ids, random);
-      expect(initial).toHaveLength(3);
-      expect(new Set([...initial, extra]).size).toBe(4);
+      expect(initial).toHaveLength(2);
+      expect(new Set([...initial, extra]).size).toBe(3);
       for (const id of [...initial, extra]) expect(ids).toContain(id);
     }
   });

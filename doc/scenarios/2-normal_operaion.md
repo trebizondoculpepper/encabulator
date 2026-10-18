@@ -68,17 +68,17 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 ## Establish normal operation
 
-**PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, three of the ten operations below are drawn at random; the player may do them in any order. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday.
+**PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, two of the ten operations below are drawn at random; the player may do them in any order. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday.
 
-**TRIGGER:** If the player has not finished all three after at least twenty seconds of quiet following the line above, the narrator lists them: the introduction, the three drawn operations, then the sign-off.
+**TRIGGER:** If the player has not finished both after at least twenty seconds of quiet following the line above, the narrator lists them: the introduction, the two drawn operations, then the sign-off.
 
-**NARRATOR (wearily):** Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.
+**NARRATOR (wearily):** Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot.
 
-**NARRATOR:** [The instruction line of each of the three drawn operations, in turn.]
+**NARRATOR:** [The instruction line of each of the two drawn operations, in turn.]
 
 **NARRATOR:** There. That's all it is. That's all it ever was.
 
-**TRIGGER:** Each time the player completes one of the three, the narrator grudgingly acknowledges it, the first, second and third in turn (the last is replaced by the line below when it finishes the set).
+**TRIGGER:** Each time the player completes one of the two, the narrator grudgingly acknowledges it, the first and second in turn (the last is replaced by the line below when it finishes the set).
 
 **NARRATOR:** Yes. Well done.
 
@@ -88,7 +88,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **TRIGGER:** After at least twenty seconds of quiet without progress, the narrator picks one operation still undone and talks the player through it precisely, sarcastically, with that operation's reminder line.
 
-**TRIGGER:** When all three are done:
+**TRIGGER:** When both are done:
 
 **NARRATOR:** Lovely. Just as we rehearsed. Now, prime the oil pump. Turn the LUBE OIL PUMP handle to ON.
 
@@ -160,7 +160,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 ## Prime the oil pump — first fault
 
-**PLAYER ACTION:** Turn the LUBE OIL PUMP M-201 operating handle to ON, after completing all three normal-operation adjustments.
+**PLAYER ACTION:** Turn the LUBE OIL PUMP M-201 operating handle to ON, after completing both normal-operation adjustments.
 
 **MACHINE / SOUND:** The machine conks out. Its mechanisms falter and stop, the hum dies away, and it remains stalled. This first fault produces no smoke or burnt components. It does not recover on its own.
 
@@ -176,7 +176,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 ## One more routine adjustment
 
-**TRIGGER:** After the reliability speech finishes. Draw one further operation from the ten above, excluding the three already used; ask for that single operation, not another list of three. Only an action performed for this newly assigned task completes it.
+**TRIGGER:** After the reliability speech finishes. Draw one further operation from the ten above, excluding the two already used; ask for that single operation, not another list of two. Only an action performed for this newly assigned task completes it.
 
 **NARRATOR:** Just one final adjustment before we prime the hydrocoptic pump.
 

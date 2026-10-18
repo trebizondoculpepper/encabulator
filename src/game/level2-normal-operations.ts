@@ -95,12 +95,12 @@ export function drawNormalOperations<T>(
   ids: readonly T[],
   random = Math.random,
 ) {
-  if (ids.length < 4)
-    throw new Error('The lesson needs four distinct operations');
+  if (ids.length < 3)
+    throw new Error('The lesson needs three distinct operations');
   const shuffled = [...ids];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  return { initial: shuffled.slice(0, 3), extra: shuffled[3] };
+  return { initial: shuffled.slice(0, 2), extra: shuffled[2] };
 }

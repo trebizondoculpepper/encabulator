@@ -329,7 +329,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const reminderPause = createNarrationPause();
   let smokeOn = false;
   const lesson = createLevel2NormalOperations();
-  // Establish normal operation: three operations drawn at random
+  // Establish normal operation: two operations drawn at random
   // from ten, each a real control round the machine, set in any order and
   // latched once done (`LEVEL2_BETAFORM`). No two playthroughs agree on
   // what routine operation is.

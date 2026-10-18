@@ -492,13 +492,13 @@ The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again.
 
 ---
 
-## Conditional: the three normal-operation reminders
+## Conditional: the two normal-operation reminders
 
 _Weariness and precise sarcasm. Each clip is a separate response to inaction._
 
 ### Clip 106 · betaform_intro
 
-Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.
+Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot.
 
 ### Clip 107 · betaform_outro
 
@@ -520,7 +520,7 @@ Look at you. Just like yesterday.
 
 ## Random operations: instructions and reminders
 
-_For each control: a plain instruction first, then a separate sarcastic reminder. Record all ten; the game chooses three, then one different operation later._
+_For each control: a plain instruction first, then a separate sarcastic reminder. Record all ten; the game chooses two, then one different operation later._
 
 ### Clip 111 · betaform_isolator_say
 

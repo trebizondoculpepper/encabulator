@@ -458,14 +458,14 @@ export interface BetaformOperation {
 
 /**
  * Rebooting the betaform amplifier, which "we practised yesterday". There
- * was no yesterday, and there is no routine operation: each time, three of
+ * was no yesterday, and there is no routine operation: each time, two of
  * these ten operations are drawn at random (`level2-room.ts`), each a real
  * control on the machine, set in any order. Placeholder lines, until
  * they are recorded.
  */
 export const LEVEL2_BETAFORM = {
   intro:
-    "Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot. Three things, in any order you like.",
+    "Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot.",
   outro: "There. That's all it is. That's all it ever was.",
   operations: {
     isolator: {
