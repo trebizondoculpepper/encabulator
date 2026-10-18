@@ -343,6 +343,9 @@ describe('Level 0 process model', () => {
         hydro: true,
         fan: true,
       });
+      // Each with the control circuits of its energised units.
+      light.senseControlAmps(4);
+      heavy.senseControlAmps(4);
       heavy.control.driveSpeed.set(10);
       heavy.driveStart();
       run(heavy, 10);
@@ -378,6 +381,7 @@ describe('Level 0 process model', () => {
 
     it('moves the control supply between phases without changing the main disconnect monitor', () => {
       const p = plant({ ...RUNNING, mainMotor: true, feed: true });
+      p.senseControlAmps(4);
       run(p, 5);
       const monitor = p.monitor.value;
       const sums: number[][] = [];
@@ -389,10 +393,7 @@ describe('Level 0 process model', () => {
         const pair = [phase, (phase + 1) % 3];
         const other = [0, 1, 2].find((k) => !pair.includes(k))!;
         expect(lines[pair[0]]).toBe(lines[pair[1]]);
-        expect(lines[pair[0]] - lines[other]).toBeCloseTo(
-          PLANT.controlTransformerAmps,
-          9,
-        );
+        expect(lines[pair[0]] - lines[other]).toBeCloseTo(4, 9);
         sums.push(lines);
       }
       // The same current, drawn from another pair.
@@ -403,6 +404,7 @@ describe('Level 0 process model', () => {
 
     it('sags the voltmeter of the pair feeding the control supply', () => {
       const p = plant({ ...RUNNING });
+      p.senseControlAmps(4);
       const middle = (phase: number) => {
         p.control.controlPhase.set(phase);
         let sum = [0, 0, 0];
@@ -416,6 +418,40 @@ describe('Level 0 process model', () => {
         const volts = middle(phase);
         expect(Math.min(...volts)).toBe(volts[phase]);
       }
+    });
+  });
+
+  describe('main disconnect monitor', () => {
+    it('reads no current with the disconnect open, and power as volts times amps', () => {
+      const p = plant({ incoming: true });
+      p.step(0.25);
+      expect(p.monitor.value.amps).toBe(0);
+      expect(p.monitor.value.kilowatts).toBe(0);
+      p.sense({ ...RUNNING, mainMotor: true });
+      p.senseControlAmps(3);
+      run(p, 3, 0.25);
+      const { volts, amps, kilowatts } = p.monitor.value;
+      expect(amps).toBeGreaterThan(20);
+      expect(kilowatts).toBeCloseTo((volts * amps) / 1000, 9);
+    });
+
+    it('climbs as each unit is switched on', () => {
+      const p = plant({ incoming: true, mains: true });
+      const readings: number[] = [];
+      const read = () => {
+        p.step(0.25);
+        readings.push(p.monitor.value.amps);
+      };
+      p.senseControlAmps(0.2);
+      read();
+      p.senseControlAmps(1.4);
+      read();
+      p.sense({ lube: true });
+      read();
+      p.sense({ mainMotor: true });
+      read();
+      for (let i = 1; i < readings.length; i++)
+        expect(readings[i]).toBeGreaterThan(readings[i - 1]);
     });
   });
 });

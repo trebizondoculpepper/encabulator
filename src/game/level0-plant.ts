@@ -36,12 +36,11 @@ export type CardCondition = 'ok' | 'failed' | 'absent';
 
 export const PLANT = {
   /** The supply: nominal phase-to-phase volts, the supply's impedance
-   * (ohms, as volts lost an amp), how far a pair's voltage wanders an amp
-   * of its current, and the control transformer's current across L1-L2. */
+   * (ohms, as volts lost an amp) and how far a pair's voltage wanders an
+   * amp of its current. */
   nominalVolts: 480,
   supplyOhms: 0.1,
   fluctuationVoltsPerAmp: 0.02,
-  controlTransformerAmps: 4,
   /** Lube oil, psi: running pressure, and the drive's permissive. */
   oilPressure: 45,
   oilOk: 25,
@@ -238,6 +237,15 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         a.map((f) => f.code),
         b.map((f) => f.code),
       )) as never,
+  });
+  /**
+   * The control transformer's current, at the supply's voltage: what every
+   * energised unit's control circuit, screens, PLC rack and drive
+   * electronics draw, bridged in from the units downstream of the main
+   * disconnect (`src/rendering/level0-wiring.ts`).
+   */
+  const controlAmps = g.input('electrical.controlAmps', 0, {
+    where: 'electrical circuit',
   });
   const card = Object.fromEntries(
     CARD_KINDS.map((kind) => [
@@ -559,6 +567,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.driveHz,
       s.auxHz,
       s.fan,
+      controlAmps,
     ],
     (
       mains,
@@ -575,10 +584,11 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       hz,
       auxHz,
       fanP,
+      control,
     ) =>
       !mains
         ? 0
-        : 4 +
+        : control +
           (lube ? 4 : 0) +
           (cooling ? 3 : 0) +
           (hydraulic ? 9 : 0) +
@@ -635,9 +645,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
    */
   const lineAmps = g.derive(
     'supply.lineAmps',
-    [loadAmps, e.mains, control.controlPhase],
-    (amps, mains, phase) => {
-      const control = mains ? PLANT.controlTransformerAmps : 0;
+    [loadAmps, e.mains, controlAmps, control.controlPhase],
+    (amps, mains, controlled, phase) => {
+      const control = mains ? controlled : 0;
       const balanced = Math.max(0, amps - control);
       return [0, 1, 2].map(
         (line) =>
@@ -677,17 +687,20 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     },
   );
   /**
-   * What MAIN DISCONNECT's power monitor shows: the average phase-to-phase
-   * voltage and line current and the total kW, from its own transformers.
-   * Moving the control transformer between phases does not change it:
-   * the same current is drawn, only from another pair.
+   * What MAIN DISCONNECT's power monitor shows, measured downstream of the
+   * disconnect: the average phase-to-phase voltage, the average line
+   * current of everything energised after it, and the power, volts times
+   * amps. Nothing flows with the disconnect open; the current climbs as
+   * each unit is switched on. Moving the control transformer between
+   * phases does not change it: the same current is drawn, only from
+   * another pair.
    */
   const monitor = g.output(
     'supply.monitor',
-    [e.incoming, loadAmps, e.mains, s.clock],
-    (incoming, amps, mains, t) => {
+    [e.incoming, loadAmps, e.mains, controlAmps, s.clock],
+    (incoming, amps, mains, controlled, t) => {
       if (!incoming) return { volts: 0, amps: 0, kilowatts: 0 };
-      const control = mains ? PLANT.controlTransformerAmps : 0;
+      const control = mains ? controlled : 0;
       // The average line current: the control load is on two of three.
       const line = Math.max(0, amps - control) + (control * 2) / 3;
       const wobble = Math.sin(t * 0.61) * 0.6 + Math.sin(t * 1.43 + 1) * 0.4;
@@ -698,7 +711,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       return {
         volts,
         amps: line,
-        kilowatts: (Math.sqrt(3) * volts * line * 0.86) / 1000,
+        kilowatts: (volts * line) / 1000,
       };
     },
     {
@@ -1328,6 +1341,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     gramZero,
     gramCalibrate,
     countReset,
+    /** Bridge in what the energised units' control circuits draw. */
+    senseControlAmps(amps: number) {
+      controlAmps.set(amps);
+    },
     /** Bridge the components' own fault reports in. */
     report(list: readonly PlantFault[]) {
       components.set(list);

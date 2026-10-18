@@ -8,6 +8,7 @@ import { createLevel0Dresser, level0Tones, UNITS } from '../scene/level0-faces';
 import {
   UNIT_ROLES,
   componentReports,
+  controlAmps,
   createUnitWiring,
 } from './level0-wiring';
 import { createRetroEncabulatorMcc } from '../scene/retro-encabulator-mcc';
@@ -183,6 +184,7 @@ export function createLevel0Machine(
         ),
     });
     plant.report(componentReports(mcc));
+    plant.senseControlAmps(controlAmps(mcc, mains.value));
     assembly.slots!.forEach((slot, i) => {
       const card = slot.occupant.value;
       plant.senseCard(

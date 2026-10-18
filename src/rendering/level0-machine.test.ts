@@ -245,6 +245,12 @@ describe('Level 0 machine wiring', () => {
     expect(handle.operate()).toBe(true);
     run(1);
     expect(plant.electrical.mains.value).toBe(true);
+    // Downstream of the disconnect, the monitor's current climbs as each
+    // unit is energised: first only the control transformer.
+    const amps = () => plant.monitor.value.amps;
+    const idle = amps();
+    expect(idle).toBeGreaterThan(0);
+    expect(idle).toBeLessThan(0.5);
     // Each unit still waits for its own switch.
     expect(plant.plcStatus.value).toBe('off');
     expect(mcc.circuits.get(UNITS.lube)!.running.value).toBe(false);
@@ -253,9 +259,12 @@ describe('Level 0 machine wiring', () => {
     expect(plant.plcStatus.value).toBe('booting');
     run(PLANT.plcBoot + 0.5);
     expect(plant.plcStatus.value).toBe('run');
+    const withPlc = amps();
+    expect(withPlc).toBeGreaterThan(idle);
     breaker(UNITS.lube).operate();
     run(5);
     expect(plant.oilOk.value).toBe(true);
+    expect(amps()).toBeGreaterThan(withPlc + 3);
     // The main drive motor has power and oil, and waits for START.
     breaker(UNITS.mainMotor).operate();
     run(1);

@@ -233,3 +233,45 @@ export function componentReports(machine: MccView): PlantFault[] {
   }
   return list;
 }
+
+/**
+ * What each kind of unit's control circuit draws while energised, in amps
+ * at the supply's voltage, through the control transformer: its lamps,
+ * meters and screens, coils and electronics. A starter's contactor coil
+ * draws a little more while it is pulled in; Automation Control's rack a
+ * little more while its backplane runs.
+ */
+export const CONTROL_AMPS: Record<UnitRole, number> = {
+  supply: 0.05,
+  starter: 0.08,
+  control: 0.25,
+  field: 0.3,
+  automation: 0.4,
+  drive: 0.5,
+  isolator: 0.05,
+};
+/** The control transformer's own magnetising current, energised. */
+export const TRANSFORMER_AMPS = 0.2;
+const COIL_AMPS = 0.04;
+const RACK_AMPS = 0.6;
+
+/**
+ * The control load downstream of the main disconnect: the transformer
+ * itself while the bus is live, and every energised unit's draw. MAIN
+ * INCOMING is upstream of the disconnect and not counted.
+ */
+export function controlAmps(machine: MccView, mains: boolean) {
+  if (!mains) return 0;
+  let amps = TRANSFORMER_AMPS;
+  for (const [id, circuit] of machine.circuits) {
+    if (id === UNITS.incoming || !circuit.powered.value) continue;
+    const role = UNIT_ROLES[id] ?? 'supply';
+    amps += CONTROL_AMPS[role];
+    if (role === 'starter' && circuit.running.value) amps += COIL_AMPS;
+    if (role === 'automation') {
+      const rack = circuit.devices.find((d) => d.kind === 'backplane');
+      if (rack?.service?.running.value) amps += RACK_AMPS;
+    }
+  }
+  return amps;
+}
