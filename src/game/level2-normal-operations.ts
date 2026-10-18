@@ -45,7 +45,7 @@ export function createLevel2NormalOperations() {
           stage = 'normal';
           return 'normal' as const;
         case 'normal':
-          if (!input.normalComplete) return null;
+          if (!input.normalComplete || input.speaking) return null;
           stage = 'oil';
           oilArmed = !input.oil;
           return 'prime-oil' as const;

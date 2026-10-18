@@ -70,6 +70,14 @@ describe('the normal-operation lesson', () => {
     expect(step({ delta: 1 })).toBe('normal');
   });
 
+  it('waits for the second instruction to finish before priming the oil pump', () => {
+    const { lesson, step } = fixture();
+    expect(step({ delta: 7 })).toBe('normal');
+    expect(step({ delta: 0, normalComplete: true, speaking: true })).toBeNull();
+    expect(lesson.stage).toBe('normal');
+    expect(step({ speaking: false })).toBe('prime-oil');
+  });
+
   it('draws two distinct operations and a different additional instruction', () => {
     const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
     for (const random of [() => 0, () => 0.5, () => 0.999]) {

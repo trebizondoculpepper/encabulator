@@ -329,10 +329,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const reminderPause = createNarrationPause();
   let smokeOn = false;
   const lesson = createLevel2NormalOperations();
-  // Establish normal operation: two operations drawn at random
-  // from ten, each a real control round the machine, set in any order and
-  // latched once done (`LEVEL2_BETAFORM`). No two playthroughs agree on
-  // what routine operation is.
+  // Draw two distinct controls, then assign them one at a time.
   const control = (name: string) => mcc.controls.get(name)!.position;
   /** Something done by doing one thing and then another. */
   const cycle = (first: () => boolean, then: () => boolean) => {
@@ -386,11 +383,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const { initial: drawn, extra: extraOperation } = drawNormalOperations(
     Object.keys(LEVEL2_BETAFORM.operations) as BetaformId[],
   );
-  const checks = new Map(drawn.map((id) => [id, makeCheck(id)]));
-  const betaform = new Set<BetaformId>();
-  let listed = false;
+  let normalIndex = 0;
+  let normalCheck = () => false;
   let nagTime = 0;
-  let nagged = 0;
   let extraComplete = false;
   let extraCheck = () => false;
   let idle = 0;
@@ -647,12 +642,14 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       }
     } else if (phase === 1) {
       if (lesson.stage === 'normal') {
-        for (const id of drawn) {
-          if (betaform.has(id) || !checks.get(id)!()) continue;
-          betaform.add(id);
+        if (normalIndex < drawn.length && normalCheck()) {
+          normalIndex++;
           nagTime = 0;
-          if (betaform.size < drawn.length && !voice.busy)
-            voice.say(LEVEL2_BETAFORM.acks[(betaform.size - 1) % 3]);
+          if (normalIndex < drawn.length) {
+            voice.say(LEVEL2_BETAFORM.acks[0]);
+            normalCheck = makeCheck(drawn[normalIndex]);
+            voice.say(LEVEL2_BETAFORM.operations[drawn[normalIndex]].say);
+          }
         }
       } else if (lesson.stage === 'extra' && !extraComplete) {
         extraComplete = extraCheck();
@@ -662,7 +659,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         powered: mcc.supply.value && main.closed.value,
         oil: oil.closed.value,
         hydro: hydro.closed.value,
-        normalComplete: betaform.size === drawn.length,
+        normalComplete: normalIndex === drawn.length,
         extraComplete,
         stalled: mcc.stalled,
         restarted: mcc.failure === null,
@@ -671,6 +668,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       switch (event) {
         case 'normal':
           voice.interrupt(2);
+          normalCheck = makeCheck(drawn[0]);
+          voice.say(LEVEL2_BETAFORM.operations[drawn[0]].say);
           break;
         case 'prime-oil':
           driveFeed.value = true;
@@ -714,25 +713,15 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       }
       // Sarcastic prompts follow a full quiet interval, never the speech.
       nagTime = voice.busy ? 0 : nagTime + delta;
-      const remaining = drawn.filter((id) => !betaform.has(id));
       if (
         lesson.stage === 'normal' &&
         !voice.busy &&
-        remaining.length &&
+        normalIndex < drawn.length &&
         nagTime >= 20 &&
         reminderPause.take()
       ) {
         nagTime = 0;
-        if (!listed) {
-          listed = true;
-          voice.say(LEVEL2_BETAFORM.intro);
-          for (const id of remaining)
-            voice.say(LEVEL2_BETAFORM.operations[id].say);
-          voice.say(LEVEL2_BETAFORM.outro);
-        } else {
-          const id = remaining[nagged++ % remaining.length];
-          voice.say(LEVEL2_BETAFORM.operations[id].remind);
-        }
+        voice.say(LEVEL2_BETAFORM.operations[drawn[normalIndex]].remind);
       } else if (
         lesson.stage === 'extra' &&
         !voice.busy &&

@@ -68,25 +68,19 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 ## Establish normal operation
 
-**PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, two of the ten operations below are drawn at random; the player may do them in any order. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday.
+**PLAYER ACTION — BETAFORM AMPLIFIER:** There is no routine operation with this machine. Each time this point is reached, two distinct operations are drawn from the ten below. The narrator gives the first instruction only. Once the player completes it, the narrator gives the second instruction. Every operation is a real control on the machine. Nobody, the player included, has been told any of this before: there was no yesterday. An action taken before its instruction cannot complete the later task.
 
-**TRIGGER:** If the player has not finished both after at least twenty seconds of quiet following the line above, the narrator lists them: the introduction, the two drawn operations, then the sign-off.
+**TRIGGER:** After the normal-operation line, the narrator immediately gives the first drawn operation. Only that operation is active.
 
-**NARRATOR (wearily):** Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot.
+**NARRATOR:** [The first drawn operation's instruction.]
 
-**NARRATOR:** [The instruction line of each of the two drawn operations, in turn.]
-
-**NARRATOR:** There. That's all it is. That's all it ever was.
-
-**TRIGGER:** Each time the player completes one of the two, the narrator grudgingly acknowledges it, the first and second in turn (the last is replaced by the line below when it finishes the set).
+**TRIGGER:** When the first operation is complete, the narrator acknowledges it, then gives the second drawn operation's instruction. Only the second operation is active now.
 
 **NARRATOR:** Yes. Well done.
 
-**NARRATOR:** There. Was that so hard?
+**NARRATOR:** [The second drawn operation's instruction.]
 
-**NARRATOR:** Look at you. Just like yesterday.
-
-**TRIGGER:** After at least twenty seconds of quiet without progress, the narrator picks one operation still undone and talks the player through it precisely, sarcastically, with that operation's reminder line.
+**TRIGGER:** After at least twenty seconds of quiet without progress, the narrator talks the player through the currently assigned operation precisely, sarcastically, with that operation's reminder line. The other operation is never named early.
 
 **TRIGGER:** When both are done:
 
