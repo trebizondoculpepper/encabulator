@@ -38,6 +38,7 @@ import type {
 import { machineComponent } from '../toolkit/components/industrial-control/parts/machine-components';
 import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
 import { createAnnunciator } from '../toolkit/components/industrial-control/logic/annunciator';
+import { createSoftStarter as createSoftStarterLogic } from '../toolkit/components/industrial-control/logic/soft-starter';
 import {
   beginPart,
   createPartSet,
@@ -1559,22 +1560,19 @@ function dressDoor(
       put(starter.group, cx - 0.045, top - 0.06, 0.95);
       const hoa = selector(3, cx - 0.09, -0.05, 0.9, 2);
       register('feed.hoa', hoa);
-      updates.push((_, clock) => {
-        // It starts, ramps up over three seconds, runs, and stops again;
-        // HAND runs it, OFF stops it.
+      // Each start ramps the feed motor up from rest, the yellow bar
+      // filling before UP TO SPEED; in a fault it runs down to a stop and
+      // FAULT flashes red (`soft-starter.ts`).
+      const softStart = createSoftStarterLogic();
+      updates.push((delta, clock) => {
+        // It starts and stops on a cycle in AUTO; HAND runs it, OFF stops it.
         const t = clock % 40;
         const demand =
           hoa.position.value === 0 || (hoa.position.value === 2 && t < 30);
         if (demand) circuit.start();
         else circuit.stop();
-        const on = circuit.running.value;
-        const ramp = Math.min(1, t / 3);
-        starter.set({
-          running: on && lit.value,
-          ramp: on ? ramp : 0,
-          fault: false,
-          amps: ramp < 1 ? 6 + 30 * ramp : 11.6 + Math.sin(clock * 1.7) * 0.4,
-        });
+        const on = circuit.running.value && lit.value;
+        starter.set(softStart.step(delta, on, on && faults.active.value));
       });
       legend('HAND OFF AUTO', cx - 0.09, -0.02, 0.07);
       lamp('green', cx + 0.0, -0.05, () => circuit.running.value);

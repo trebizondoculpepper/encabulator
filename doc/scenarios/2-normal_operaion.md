@@ -384,11 +384,11 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **TRIGGER:** The fourth Pepperdyne card is pulled free. Play immediately, once, and cancel any remaining fourth-card encouragement.
 
-**NARRATOR:** You did it, you bloody genius.
+**NARRATOR:** You're really doing it, you bloody genius.
 
 **COUNT:** One card remains fitted after the fourth removal in the normal sequence.
 
-**NARRATOR:** Yeah, hot dang, you did it.
+**NARRATOR:** There's a chance… a real chance our machine might pull through.
 
 **NARRATOR:** They said you couldn't… I mean, you wouldn't.
 
@@ -517,6 +517,12 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 **NARRATOR:** It's really gone this time.
 
 **BEAT:** A pause, as at a graveside. He clears his throat.
+
+**NARRATOR:** All my dreams, all our dreams.
+
+**NARRATOR:** Goodbye, old friend.
+
+**NARRATOR:** You'll be encabulating spill-tunions in Valhalla.
 
 **NARRATOR (slowly, with great dignity):** Fade out reciting WH Auden's Funeral Blues
 

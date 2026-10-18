@@ -41,6 +41,8 @@ const HIGH = 0.91;
 const LIFT = 0.07;
 const PLATE = 0.005;
 const RAIL = 0.06;
+/** The side rails' outer faces, from the middle: their inner faces stand 3 mm proud of the inside plates. */
+const RAIL_OUT = WIDE / 2 - PLATE - 0.003 + RAIL;
 /** The lifting lugs: how far along, how high, and how thick. */
 const LUG_X = 0.62;
 const LUG_Y = HIGH - 0.2;
@@ -238,11 +240,16 @@ export function createSkip(kit: PanelKit, hirer = anySkipHirer()) {
   box(FLOOR_LONG, PLATE, WIDE, 0, LIFT + PLATE / 2, 0, rusty);
 
   // The sides: a trapezium each, the outside yellow, the inside rust.
+  // Their tops stop just under the top rail's top face, hidden inside it,
+  // so their edges never lie on its face.
+  const top = HIGH - 0.01;
+  const topHalf =
+    FLOOR_LONG / 2 + ((LONG - FLOOR_LONG) / 2) * ((top - LIFT) / (HIGH - LIFT));
   const side = new Shape();
   side.moveTo(-FLOOR_LONG / 2, LIFT);
   side.lineTo(FLOOR_LONG / 2, LIFT);
-  side.lineTo(LONG / 2, HIGH);
-  side.lineTo(-LONG / 2, HIGH);
+  side.lineTo(topHalf, top);
+  side.lineTo(-topHalf, top);
   side.closePath();
   const sideGeometry = new ShapeGeometry(side);
   for (const s of [-1, 1]) {
@@ -282,8 +289,10 @@ export function createSkip(kit: PanelKit, hirer = anySkipHirer()) {
     board.rotation.set(0, (s * Math.PI) / 2, 0);
     board.rotateX(slope);
     group.add(board);
-    // The end's top rail, along the top of its slope.
-    box(RAIL, RAIL, WIDE + RAIL, (s * LONG) / 2, HIGH - RAIL / 2, 0);
+    // The end's top rail, along the top of its slope, running right
+    // across to the side rails' outer faces and a hair past them, so no
+    // two faces at the corners lie in one plane (they would flicker).
+    box(RAIL, RAIL, 2 * RAIL_OUT + 0.004, (s * LONG) / 2, HIGH - RAIL / 2, 0);
     // A strengthening rib across the end, halfway up.
     const rib = box(0.03, 0.06, WIDE, 0, 0, 0);
     const k = 0.35;
@@ -297,8 +306,10 @@ export function createSkip(kit: PanelKit, hirer = anySkipHirer()) {
 
   // The top rails along the sides, the side stiffeners, and the lugs.
   for (const s of [-1, 1]) {
-    const z = s * (WIDE / 2 + RAIL / 2 - PLATE);
-    box(LONG + RAIL, RAIL, RAIL, 0, HIGH - RAIL / 2, z);
+    // Between the end rails, its inner face just clear of the inside
+    // plate (on one plane they would flicker).
+    const z = s * (RAIL_OUT - RAIL / 2);
+    box(LONG - RAIL, RAIL, RAIL, 0, HIGH - RAIL / 2, z);
     for (const x of STIFFENERS)
       box(
         STIFFENER,

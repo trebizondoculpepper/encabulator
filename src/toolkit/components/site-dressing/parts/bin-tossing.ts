@@ -4,6 +4,7 @@ import { click, partAudio } from '../../core/audio/part-audio';
 import {
   BIN_REACH,
   aimsAtBin,
+  overBin,
   arcSeconds,
   binArc,
   binRest,
@@ -157,6 +158,24 @@ export function createBinTossing({
     divert(object: Object3D, portable: PortableObject) {
       camera.getWorldPosition(eye).divideScalar(m);
       camera.getWorldDirection(look);
+      // Let go over a bin (or at its rim), it falls in, whichever way the
+      // player faces; it must never drop through the bin to the floor.
+      const held = new Box3()
+        .setFromObject(object)
+        .getCenter(new Vector3())
+        .divideScalar(m);
+      const under = bins.find((b) =>
+        overBin(
+          { x: held.x, z: held.z },
+          { x: b.x, z: b.z },
+          b.footprint,
+          b.group.rotation.y,
+        ),
+      );
+      if (under) {
+        toss(object, portable, under);
+        return true;
+      }
       const bin = bins
         .filter((b) =>
           aimsAtBin(

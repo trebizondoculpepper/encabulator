@@ -64,8 +64,8 @@ clip,asset_key,section,text
 63,cue_055,The fourth board,"It's true what they say about friendship in times of adversity, isn't it?"
 64,cue_056,The fourth board,"Friends... yes, that's what we are."
 65,cue_057,The fourth board,"Please, friend, do it."
-66,cue_058,The fourth board,"You did it, you bloody genius."
-67,cue_059,The fourth board,"Yeah, hot dang, you did it."
+66,cue_058,The fourth board,"You're really doing it, you bloody genius."
+67,cue_059,The fourth board,There's a chance… a real chance our machine might pull through.
 68,cue_060,The fourth board,"They said you couldn't... I mean, you wouldn't."
 69,cue_061,The fourth board,That you weren't the kind of person who could handle pressure.
 70,cue_062,The fourth board,That you aren't the sort of person who can handle the heat.
@@ -102,73 +102,68 @@ clip,asset_key,section,text
 101,cue_093,Recovery and the ending,"No, no, no. Come on. Come on, old thing."
 102,cue_094,Recovery and the ending,It's gone.
 103,cue_095,Recovery and the ending,It's really gone this time.
-104,cue_096,Recovery and the ending,"Stop all the clocks, cut off the telephone, Prevent the dog from barking with a juicy bone, Silence the pianos and with muffled drum Bring out the coffin, let the mourners come. Let aeroplanes circle moaning overhead Scribbling on the sky the message 'It is Dead'. Put crepe bows round the white necks of the public doves, Let the traffic policemen wear black cotton gloves. It was my North, my South, my East and West, My working week and my Sunday rest, My noon, my midnight, my talk, my song; I thought that love would last forever: I was wrong. The stars are not wanted now; put out every one, Pack up the moon and dismantle the sun, Pour away the ocean and sweep up the wood; For nothing now can ever come to any good."
-105,startup_main_reset,Conditional: a premature main-power switch,"The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second."
-106,betaform_intro,Conditional: the two normal-operation reminders,"Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot."
-107,betaform_outro,Conditional: the two normal-operation reminders,There. That's all it is. That's all it ever was.
-108,betaform_ack_1,Conditional: the two normal-operation reminders,Yes. Well done.
-109,betaform_ack_2,Conditional: the two normal-operation reminders,There. Was that so hard?
-110,betaform_ack_3,Conditional: the two normal-operation reminders,Look at you. Just like yesterday.
-111,betaform_isolator_say,Random operations: instructions and reminders,"Cycle the drive isolator. Off, and on again."
-112,betaform_isolator_remind,Random operations: instructions and reminders,"The drive isolator. Under the drive, second section from the right. The red handle. Off. And then, and this is the part people forget, on again."
-113,betaform_speed_say,Random operations: instructions and reminders,Turn the speed knob on the drive all the way up.
-114,betaform_speed_remind,Random operations: instructions and reminders,The speed knob. On the drive. All the way up. Clockwise. The way clocks go. You've seen a clock.
-115,betaform_fan_say,Random operations: instructions and reminders,Put the panendermic fan on high.
-116,betaform_fan_remind,Random operations: instructions and reminders,"The panendermic fan, in the far right-hand section. The selector. High. Not low. Not off. High. We sang a little song about it."
-117,betaform_key_say,Random operations: instructions and reminders,Turn the hydraulic pump key to local.
-118,betaform_key_remind,Random operations: instructions and reminders,"The hydraulic pump. Third section along, the little key. Turn it to local. You did this yesterday. You had a biscuit. You held the biscuit in your other hand."
-119,betaform_boost_say,Random operations: instructions and reminders,Press boost on the panendermic fan.
-120,betaform_boost_remind,Random operations: instructions and reminders,The blue button. On the panendermic fan. It says boost. It has always said boost. Press it until it is blue.
-121,betaform_phase_say,Random operations: instructions and reminders,Set the phase selector on main incoming to the left.
-122,betaform_phase_remind,Random operations: instructions and reminders,"Main incoming. The very first cabinet, at the top. The little selector beside the meters. Turn it to the left. All the way. It won't hurt."
-123,betaform_kirk_say,Random operations: instructions and reminders,Turn off the Kirk key on the main disconnect.
-124,betaform_kirk_remind,Random operations: instructions and reminders,"The Kirk key. On the main disconnect. It's a key, in a lock, called Kirk. Turn it off. Nobody knows who Kirk was. We don't talk about Kirk."
-125,betaform_hoa_say,Random operations: instructions and reminders,Put the feed motor into hand.
-126,betaform_hoa_remind,Random operations: instructions and reminders,"The feed motor. Second section, in the middle. The hand off auto switch. Turn it all the way round to hand. Like waving goodbye."
-127,betaform_test_say,Random operations: instructions and reminders,Test the annunciator.
-128,betaform_test_remind,Random operations: instructions and reminders,"The annunciator. The panel of little windows, under the main disconnect. Press test. They all light up. Everyone loves that bit. You loved that bit yesterday."
-129,betaform_stop_say,Random operations: instructions and reminders,"Press the emergency stop on the auxiliary motor, then pull it out again."
-130,betaform_stop_remind,Random operations: instructions and reminders,"The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency."
-131,reset_prompt,Conditional: reset and the skip,"Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot."
-132,reset_remind,Conditional: reset and the skip,The blue button. Automation control. Reset. Please. For all of us.
-133,skip_appears,Conditional: reset and the skip,Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.
-134,cue_097,"Optional: idle, holding, floor and refusal reactions","You think all this is a bit unhinged? Think I'm overreacting? I've seen good men go to their death. I've seen legions mown down. I've seen the killing fields of applied industrial engineering. So before you go telling me that I'm overreacting, tell that to the wives and widows of the men who lost everything... who gave everything."
-135,cue_098,"Optional: idle, holding, floor and refusal reactions","Every moment we let this filth operate, we let the criminals win. Somebody has to take a stand."
-136,cue_099,"Optional: idle, holding, floor and refusal reactions",All it takes for evil to prevail is for good men to do nothing.
-137,cue_100,"Optional: idle, holding, floor and refusal reactions",Why don't I do it? You have no idea the sacrifices I've made for the cause.
-138,cue_101,"Optional: idle, holding, floor and refusal reactions",What more evidence do you need that these things are evil?
-139,cue_102,"Optional: idle, holding, floor and refusal reactions","Throw it away, get rid of it!"
-140,cue_103,"Optional: idle, holding, floor and refusal reactions","What are you thinking? Sullying our beautiful Encabulator with this filth! Our pristine, perfect, innocent Encabulator, soiled and besmirched with this foreign muck... No, don't you dare. Keep it away from my Encabulator."
-141,cue_104,"Optional: idle, holding, floor and refusal reactions","Litterbug! Honestly. If there's one thing I can't stand, it's littering. Littering! In a place this special."
-142,cue_105,"Optional: idle, holding, floor and refusal reactions","The skip. Over there. Big, yellow, you can't miss it."
-143,cue_106,"Optional: idle, holding, floor and refusal reactions","Pick it up, you slob, and put it in the skip."
-144,cue_107,"Optional: idle, holding, floor and refusal reactions","Yes, the skip, you dolt. Pick it up and put it in there."
-145,cue_108,"Optional: idle, holding, floor and refusal reactions","Go on then, what are you waiting for... pull it. Take out the trash."
-146,card_1,Alternate first-card names,A Pepperdyne Betaform Amplifier. A modial-interaction board.
-147,card_2,Alternate first-card names,A Pepperdyne Modial Interaction Controller. A modial-interaction board.
-148,card_3,Alternate first-card names,A Pepperdyne Plynost Modulation Rectifier. A modial-interaction board.
-149,card_4,Alternate first-card names,A Pepperdyne Hydrocoptic Phase Regulator. A modial-interaction board.
-150,card_5,Alternate first-card names,A Pepperdyne Baltovsky Flux Compensator. A modial-interaction board.
-151,encourage_a_1,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the betaform amplifier."
-152,encourage_b_1,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the betaform amplifier, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
-153,encourage_a_2,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the modial interaction controller."
-154,encourage_b_2,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the modial interaction controller, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
-155,encourage_a_3,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the plynost modulation rectifier."
-156,encourage_b_3,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the plynost modulation rectifier, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
-157,encourage_a_4,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the hydrocoptic phase regulator."
-158,encourage_b_4,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the hydrocoptic phase regulator, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
-159,encourage_a_5,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the baltovsky flux compensator."
-160,encourage_b_5,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the baltovsky flux compensator, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
-161,last_1,Alternate final-card names,"Quickly, the last card, the betaform amplifier, in the skip."
-162,last_2,Alternate final-card names,"Quickly, the last card, the modial interaction controller, in the skip."
-163,last_3,Alternate final-card names,"Quickly, the last card, the plynost modulation rectifier, in the skip."
-164,last_4,Alternate final-card names,"Quickly, the last card, the hydrocoptic phase regulator, in the skip."
-165,last_5,Alternate final-card names,"Quickly, the last card, the baltovsky flux compensator, in the skip."
-166,remaining_a_0,Alternate remaining-card counts,"Two down, 0 to go… you can do it. I have faith in you."
-167,remaining_b_0,Alternate remaining-card counts,"Like a sick, wounded child. Please, you're the doctor. We have to operate. There are 0 more Pepperdyne modial-interaction boards in my baby's heart."
-168,remaining_a_1,Alternate remaining-card counts,"Two down, 1 to go… you can do it. I have faith in you."
-169,remaining_b_1,Alternate remaining-card counts,"Like a sick, wounded child. Please, you're the doctor. We have to operate. There are 1 more Pepperdyne modial-interaction boards in my baby's heart."
-170,remaining_a_2,Alternate remaining-card counts,"Two down, 2 to go… you can do it. I have faith in you."
-171,remaining_b_2,Alternate remaining-card counts,"Like a sick, wounded child. Please, you're the doctor. We have to operate. There are 2 more Pepperdyne modial-interaction boards in my baby's heart."
-172,remaining_a_3,Alternate remaining-card counts,"Two down, 3 to go… you can do it. I have faith in you."
-173,remaining_b_3,Alternate remaining-card counts,"Like a sick, wounded child. Please, you're the doctor. We have to operate. There are 3 more Pepperdyne modial-interaction boards in my baby's heart."
+104,farewell_1,Recovery and the ending,"All my dreams, all our dreams."
+105,farewell_2,Recovery and the ending,"Goodbye, old friend."
+106,farewell_3,Recovery and the ending,You'll be encabulating spill-tunions in Valhalla.
+107,cue_096,Recovery and the ending,"Stop all the clocks, cut off the telephone, Prevent the dog from barking with a juicy bone, Silence the pianos and with muffled drum Bring out the coffin, let the mourners come. Let aeroplanes circle moaning overhead Scribbling on the sky the message 'It is Dead'. Put crepe bows round the white necks of the public doves, Let the traffic policemen wear black cotton gloves. It was my North, my South, my East and West, My working week and my Sunday rest, My noon, my midnight, my talk, my song; I thought that love would last forever: I was wrong. The stars are not wanted now; put out every one, Pack up the moon and dismantle the sun, Pour away the ocean and sweep up the wood; For nothing now can ever come to any good."
+108,startup_main_reset,Conditional: a premature main-power switch,"The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second."
+109,betaform_intro,Conditional: the two normal-operation reminders,"Oh. I see. Yesterday didn't happen for you, did it. It happened for me. I was there. Fine. The betaform amplifier reboot."
+110,betaform_outro,Conditional: the two normal-operation reminders,There. That's all it is. That's all it ever was.
+111,betaform_ack_1,Conditional: the two normal-operation reminders,Yes. Well done.
+112,betaform_ack_2,Conditional: the two normal-operation reminders,There. Was that so hard?
+113,betaform_ack_3,Conditional: the two normal-operation reminders,Look at you. Just like yesterday.
+114,betaform_isolator_say,Random operations: instructions and reminders,"Cycle the drive isolator. Off, and on again."
+115,betaform_isolator_remind,Random operations: instructions and reminders,"The drive isolator. Under the drive, second section from the right. The red handle. Off. And then, and this is the part people forget, on again."
+116,betaform_speed_say,Random operations: instructions and reminders,Turn the speed knob on the drive all the way up.
+117,betaform_speed_remind,Random operations: instructions and reminders,The speed knob. On the drive. All the way up. Clockwise. The way clocks go. You've seen a clock.
+118,betaform_fan_say,Random operations: instructions and reminders,Put the panendermic fan on high.
+119,betaform_fan_remind,Random operations: instructions and reminders,"The panendermic fan, in the far right-hand section. The selector. High. Not low. Not off. High. We sang a little song about it."
+120,betaform_key_say,Random operations: instructions and reminders,Turn the hydraulic pump key to local.
+121,betaform_key_remind,Random operations: instructions and reminders,"The hydraulic pump. Third section along, the little key. Turn it to local. You did this yesterday. You had a biscuit. You held the biscuit in your other hand."
+122,betaform_boost_say,Random operations: instructions and reminders,Press boost on the panendermic fan.
+123,betaform_boost_remind,Random operations: instructions and reminders,The blue button. On the panendermic fan. It says boost. It has always said boost. Press it until it is blue.
+124,betaform_phase_say,Random operations: instructions and reminders,Set the phase selector on main incoming to the left.
+125,betaform_phase_remind,Random operations: instructions and reminders,"Main incoming. The very first cabinet, at the top. The little selector beside the meters. Turn it to the left. All the way. It won't hurt."
+126,betaform_kirk_say,Random operations: instructions and reminders,Turn off the Kirk key on the main disconnect.
+127,betaform_kirk_remind,Random operations: instructions and reminders,"The Kirk key. On the main disconnect. It's a key, in a lock, called Kirk. Turn it off. Nobody knows who Kirk was. We don't talk about Kirk."
+128,betaform_hoa_say,Random operations: instructions and reminders,Put the feed motor into hand.
+129,betaform_hoa_remind,Random operations: instructions and reminders,"The feed motor. Second section, in the middle. The hand off auto switch. Turn it all the way round to hand. Like waving goodbye."
+130,betaform_test_say,Random operations: instructions and reminders,Test the annunciator.
+131,betaform_test_remind,Random operations: instructions and reminders,"The annunciator. The panel of little windows, under the main disconnect. Press test. They all light up. Everyone loves that bit. You loved that bit yesterday."
+132,betaform_stop_say,Random operations: instructions and reminders,"Press the emergency stop on the auxiliary motor, then pull it out again."
+133,betaform_stop_remind,Random operations: instructions and reminders,"The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency."
+134,reset_prompt,Conditional: reset and the skip,"Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot."
+135,reset_remind,Conditional: reset and the skip,The blue button. Automation control. Reset. Please. For all of us.
+136,skip_appears,Conditional: reset and the skip,Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.
+137,cue_097,"Optional: idle, holding, floor and refusal reactions","You think all this is a bit unhinged? Think I'm overreacting? I've seen good men go to their death. I've seen legions mown down. I've seen the killing fields of applied industrial engineering. So before you go telling me that I'm overreacting, tell that to the wives and widows of the men who lost everything... who gave everything."
+138,cue_098,"Optional: idle, holding, floor and refusal reactions","Every moment we let this filth operate, we let the criminals win. Somebody has to take a stand."
+139,cue_099,"Optional: idle, holding, floor and refusal reactions",All it takes for evil to prevail is for good men to do nothing.
+140,cue_100,"Optional: idle, holding, floor and refusal reactions",Why don't I do it? You have no idea the sacrifices I've made for the cause.
+141,cue_101,"Optional: idle, holding, floor and refusal reactions",What more evidence do you need that these things are evil?
+142,cue_102,"Optional: idle, holding, floor and refusal reactions","Throw it away, get rid of it!"
+143,cue_103,"Optional: idle, holding, floor and refusal reactions","What are you thinking? Sullying our beautiful Encabulator with this filth! Our pristine, perfect, innocent Encabulator, soiled and besmirched with this foreign muck... No, don't you dare. Keep it away from my Encabulator."
+144,cue_104,"Optional: idle, holding, floor and refusal reactions","Litterbug! Honestly. If there's one thing I can't stand, it's littering. Littering! In a place this special."
+145,cue_105,"Optional: idle, holding, floor and refusal reactions","The skip. Over there. Big, yellow, you can't miss it."
+146,cue_106,"Optional: idle, holding, floor and refusal reactions","Pick it up, you slob, and put it in the skip."
+147,cue_107,"Optional: idle, holding, floor and refusal reactions","Yes, the skip, you dolt. Pick it up and put it in there."
+148,cue_108,"Optional: idle, holding, floor and refusal reactions","Go on then, what are you waiting for... pull it. Take out the trash."
+149,card_1,Alternate first-card names,A Pepperdyne Betaform Amplifier. A modial-interaction board.
+150,card_2,Alternate first-card names,A Pepperdyne Modial Interaction Controller. A modial-interaction board.
+151,card_3,Alternate first-card names,A Pepperdyne Plynost Modulation Rectifier. A modial-interaction board.
+152,card_4,Alternate first-card names,A Pepperdyne Hydrocoptic Phase Regulator. A modial-interaction board.
+153,card_5,Alternate first-card names,A Pepperdyne Baltovsky Flux Compensator. A modial-interaction board.
+154,encourage_a_1,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the betaform amplifier."
+155,encourage_b_1,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the betaform amplifier, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
+156,encourage_a_2,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the modial interaction controller."
+157,encourage_b_2,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the modial interaction controller, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
+158,encourage_a_3,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the plynost modulation rectifier."
+159,encourage_b_3,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the plynost modulation rectifier, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
+160,encourage_a_4,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the hydrocoptic phase regulator."
+161,encourage_b_4,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the hydrocoptic phase regulator, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
+162,encourage_a_5,Alternate fourth-card encouragement,"I know it's hard for you, and it's a lot to ask, but can you remove one more? It's only the baltovsky flux compensator."
+163,encourage_b_5,Alternate fourth-card encouragement,"You've got this. Just reach into the cabinet, locate the baltovsky flux compensator, and give it a gentle tug and a slight twist to the right. You'll know it when you feel the click."
+164,last_1,Alternate final-card names,"Quickly, the last card, the betaform amplifier, in the skip."
+165,last_2,Alternate final-card names,"Quickly, the last card, the modial interaction controller, in the skip."
+166,last_3,Alternate final-card names,"Quickly, the last card, the plynost modulation rectifier, in the skip."
+167,last_4,Alternate final-card names,"Quickly, the last card, the hydrocoptic phase regulator, in the skip."
+168,last_5,Alternate final-card names,"Quickly, the last card, the baltovsky flux compensator, in the skip."

@@ -6,6 +6,7 @@ import type { SoundRecipe } from '../../components/core/audio/part-audio';
 import { bootBeep, postBeep } from '../../components/sound/audio/boot-beep';
 import { createAnnunciator } from '../../components/industrial-control/logic/annunciator';
 import { createScreenBoot } from '../../components/industrial-control/logic/screen-boot';
+import { createSoftStarter as createSoftStarterLogic } from '../../components/industrial-control/logic/soft-starter';
 import {
   createDrive,
   driveDisplay,
@@ -560,7 +561,6 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
   const fed = computed(() => power.value && disconnect.on.value);
   const running = signal(false);
   const fault = signal(false);
-  let ramp = 0;
   board.place(
     pushbuttonStation(kit, {
       buttons: [
@@ -591,25 +591,22 @@ export function createCabinetBoard(kit: PanelKit): TestFitting {
   board.at(starter.group, 0.5, 0.2);
   board.caption('SOFT STARTER', 0.5, 0.145);
   const faultSim = lever('FAULT SIM', 0.03, 0.04);
-  const amps = () =>
-    running.value
-      ? ramp < 1
-        ? 6 + 30 * ramp
-        : 11.5 + Math.sin(clock * 1.7) * 0.4
-      : 0;
+  const softStart = createSoftStarterLogic();
+  let current = 0;
+  const amps = () => current;
   updates.push((delta) => {
     if (!fed.value) running.value = false;
     if (faultSim.value && running.value) {
       fault.value = true;
       running.value = false;
     }
-    ramp = running.value ? Math.min(1, ramp + delta / 3) : 0;
-    starter.set({
-      running: running.value,
-      ramp,
-      fault: fault.value,
-      amps: amps(),
-    });
+    const lamps = softStart.step(
+      delta,
+      running.value || fault.value,
+      fault.value,
+    );
+    current = lamps.speed > 0 ? lamps.amps : 0;
+    starter.set(lamps);
   });
 
   const monitor = createPowerMonitor(kit);

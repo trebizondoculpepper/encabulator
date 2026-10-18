@@ -31,7 +31,7 @@ def main() -> None:
         ("The third board", "The machine is a sick child. Hope, pleading, gratitude.", cues(30, 38)),
         ("The fourth board", "Coaxing and extravagant promises. Then shared triumph.", cues(39, 71)),
         ("The last board", "Triumph collapses into panic and grief. The machine is still under warranty.", cues(72, 84)),
-        ("Recovery and the ending", "Relief, awkward intimacy, then a sharp return to the training-film voice. Let the final poem breathe.", cues(85, 96)),
+        ("Recovery and the ending", "Relief, awkward intimacy, then a sharp return to the training-film voice. Let the final poem breathe.", cues(85, 95) + ["farewell_1", "farewell_2", "farewell_3", "cue_096"]),
         ("Conditional: a premature main-power switch", "Patient correction. Isolator first, main power second.", ["startup_main_reset"]),
         ("Conditional: the two normal-operation reminders", "Weariness and precise sarcasm. Each clip is a separate response to inaction.", ["betaform_intro", "betaform_outro", "betaform_ack_1", "betaform_ack_2", "betaform_ack_3"]),
         ("Random operations: instructions and reminders", "For each control: a plain instruction first, then a separate sarcastic reminder. Record all ten; the game chooses two, then one different operation later.", [f"betaform_{operation}_{kind}" for operation in operations for kind in ("say", "remind")]),
@@ -40,19 +40,24 @@ def main() -> None:
         ("Alternate first-card names", "The first card can be any of the five. Record each version.", [f"card_{i}" for i in range(1, 6)]),
         ("Alternate fourth-card encouragement", "Coaxing the trainee: each card can be the fourth one removed.", [f"encourage_{kind}_{i}" for i in range(1, 6) for kind in ("a", "b")]),
         ("Alternate final-card names", "Desperate urgency. Each card can be the last.", [f"last_{i}" for i in range(1, 6)]),
-        ("Alternate remaining-card counts", "Faith and the sick-child metaphor. Read digits as ordinary spoken numbers. Each version is its own clip.", [f"remaining_{kind}_{i}" for i in range(4) for kind in ("a", "b")]),
     ]
     assigned = [key for _, _, keys in groups for key in keys]
     if len(assigned) != len(set(assigned)) or set(assigned) != set(lines):
         raise SystemExit(f"Clip coverage mismatch: missing {set(lines) - set(assigned)}, unknown {set(assigned) - set(lines)}")
     instructions = (
-        'Record one WAV for the whole session. Before each clip, say its number aloud, '
-        'for example, "Clip one." Pause about two seconds, read the speech, then pause '
-        'another two seconds. For a retake, say "Clip one, again" and repeat the whole '
-        'clip. Read only the speech and the spoken clip number; headings, asset names '
-        'and italic directions are silent. Do not wait for the game\'s seven- or '
-        'twenty-second pauses: those are added during playback. Keep the original WAV '
-        'untrimmed so the slates and gaps can guide editing.'
+        'Record all the speeches in one continuous WAV or FLAC. Before each speech, '
+        'say its clip number aloud, for example, "Clip one." Leave about three '
+        'seconds of silence, then perform the speech and leave another three seconds '
+        'before the next slate. The printed words are a guide: improvise within a '
+        'clip as you like. If you retake it, say "Clip one, again" and perform the '
+        'whole speech; the last complete take is the one to use. Record each '
+        'alternative as its own numbered clip. Headings, asset names and italic '
+        'directions are silent. Do not wait for the game\'s seven- or twenty-second '
+        'pauses: those are added during playback. Keep the original recording '
+        'untrimmed. The editor will identify each slate, cut out the speech between '
+        'the surrounding gaps, match it to the asset key in the clip index, and '
+        'replace the temporary AI voice. Any improvisation that changes when a '
+        'line belongs in the game will be checked with you before it is assigned.'
     )
     md = ["# Module 2: Standard Encabulation Operation — teleprompter", "", instructions, "", f"{len(assigned)} clips, including all optional lines and card-name/count alternatives. Alternate versions belong to separate takes, not to one playthrough.", ""]
     plain = ["MODULE 2: STANDARD ENCABULATION OPERATION", "TELEPROMPTER / RECORDING SCRIPT", "", instructions, "", f"{len(assigned)} clips. Directions and asset IDs are not spoken.", ""]
@@ -63,9 +68,11 @@ def main() -> None:
         plain += ["=" * 60, title.upper(), "[" + direction + "]", ""]
         for key in keys:
             number += 1
-            speech = " ".join(lines[key].split())
-            md += [f"### Clip {number:03d} · {key}", "", speech, ""]
-            plain += [f"CLIP {number:03d} [{key}]", "", speech, "", ""]
+            # A verse keeps its lines and stanzas; prose is one paragraph.
+            stanzas = [[" ".join(line.split()) for line in stanza.split("\n")] for stanza in lines[key].split("\n\n")]
+            speech = " ".join(" ".join(stanza) for stanza in stanzas)
+            md += [f"### Clip {number:03d} · {key}", "", "\n\n".join("\\\n".join(stanza) for stanza in stanzas), ""]
+            plain += [f"CLIP {number:03d} [{key}]", "", "\n\n".join("\n".join(stanza) for stanza in stanzas), "", ""]
             rows.append((number, key, title, speech))
     (HERE / "level2-teleprompter.md").write_text("\n".join(md))
     (HERE / "level2-teleprompter.txt").write_text("\n".join(plain).rstrip() + "\n")

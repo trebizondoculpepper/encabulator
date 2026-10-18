@@ -108,7 +108,7 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'Second board in the skip — faith and trust',
-    text: 'Two down, [BOARDS REMAINING: THREE] to go… you can do it. I have faith in you.',
+    text: 'Two down, three to go… you can do it. I have faith in you.',
   },
   {
     section: 'Second board in the skip — faith and trust',
@@ -128,7 +128,7 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'Second board in the skip — faith and trust',
-    text: "Like a sick, wounded child. Please, you're the doctor. We have to operate. There are [BOARDS REMAINING: THREE] more Pepperdyne modial-interaction boards in my baby's heart.",
+    text: "Like a sick, wounded child. Please, you're the doctor. We have to operate. There are three more Pepperdyne modial-interaction boards in my baby's heart.",
   },
   {
     section: 'Third board removed — signs of recovery',
@@ -244,11 +244,11 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'Fourth card removed',
-    text: 'You did it, you bloody genius.',
+    text: "You're really doing it, you bloody genius.",
   },
   {
     section: 'Fourth card removed',
-    text: 'Yeah, hot dang, you did it.',
+    text: "There's a chance… a real chance our machine might pull through.",
   },
   {
     section: 'Fourth card removed',
@@ -396,7 +396,7 @@ export const LEVEL2_CUES = [
   },
   {
     section: 'All five cards in the skip',
-    text: "Stop all the clocks, cut off the telephone, Prevent the dog from barking with a juicy bone, Silence the pianos and with muffled drum Bring out the coffin, let the mourners come. Let aeroplanes circle moaning overhead Scribbling on the sky the message 'It is Dead'. Put crepe bows round the white necks of the public doves, Let the traffic policemen wear black cotton gloves. It was my North, my South, my East and West, My working week and my Sunday rest, My noon, my midnight, my talk, my song; I thought that love would last forever: I was wrong. The stars are not wanted now; put out every one, Pack up the moon and dismantle the sun, Pour away the ocean and sweep up the wood; For nothing now can ever come to any good.",
+    text: "Stop all the clocks, cut off the telephone,\nPrevent the dog from barking with a juicy bone,\nSilence the pianos and with muffled drum\nBring out the coffin, let the mourners come.\n\nLet aeroplanes circle moaning overhead\nScribbling on the sky the message 'It is Dead'.\nPut crepe bows round the white necks of the public doves,\nLet the traffic policemen wear black cotton gloves.\n\nIt was my North, my South, my East and West,\nMy working week and my Sunday rest,\nMy noon, my midnight, my talk, my song;\nI thought that love would last forever: I was wrong.\n\nThe stars are not wanted now; put out every one,\nPack up the moon and dismantle the sun,\nPour away the ocean and sweep up the wood;\nFor nothing now can ever come to any good.",
   },
   {
     section: 'Optional narration — idle or holding a board',
@@ -554,6 +554,16 @@ export const LEVEL2_SKIP = {
   appears:
     "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.",
 } as const;
+
+/**
+ * When the machine is finally dead, after "It's really gone this time.":
+ * a farewell, line by line, before the recital (cue 96).
+ */
+export const LEVEL2_FAREWELL = [
+  'All my dreams, all our dreams.',
+  'Goodbye, old friend.',
+  "You'll be encabulating spill-tunions in Valhalla.",
+] as const;
 
 /**
  * The introduction, before the player does anything: the importance and

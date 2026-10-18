@@ -8,9 +8,9 @@ export const LEVEL2_START = {
   yaw: 0,
   pitch: 0.05,
 };
-/** About twenty metres' carrying distance, clear of the south loading-gate apron. */
-export const LEVEL2_SKIP_SPOTS = [
-  { x: -8, z: 10 },
-  { x: 0, z: 10.5 },
-  { x: 8, z: 10 },
-];
+/**
+ * Where the skip always appears, and a stack of chairs stands until then:
+ * about twenty metres' carrying distance, clear of the south loading-gate
+ * apron.
+ */
+export const LEVEL2_SKIP_SPOT = { x: 0, z: 10.5 };

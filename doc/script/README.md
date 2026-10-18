@@ -39,3 +39,11 @@ Given the one long file:
 ## 4. Wiring it in
 
 The room dispatches `plinth-arrival` (with the plinth, the previous one, every one before and the visit count). `src/game/plinth-narration.ts` selects lines for arrival, leaving a plinth, lingering, being in the dark and approaching the far east exit. `src/audio/plinth-narration.ts` plays them after a user gesture, rotates variants, pauses when the room is hidden, and lets a more immediate moment interrupt a lesser one. The east exit leads to the Hall; the original west portals remain.
+
+## Module 2: replacing the temporary voice
+
+`level2-teleprompter.md` (or its plain-text version) is the recording script for Module 2. `make-level2-teleprompter.py` generates both from `src/audio/assets/narration/level2/lines.json`, along with `level2-recording-clips.csv`, which maps each spoken clip number to the asset key the game plays. Regenerate these files after changing a scripted line; do not renumber clips in the teleprompter by hand.
+
+The owner records the numbered speeches in one continuous, untrimmed WAV or FLAC, leaving the gaps described at the top of the teleprompter. Improvisations within a speech are welcome. When the recording is supplied, preserve the original, transcribe or listen for the spoken clip numbers, and cut the last complete take for each number at its surrounding silences. Remove the spoken slates, retain a little room tone and short edge fades, and report missing clips or improvisations that change a line's in-game moment. Match every cut against `level2-recording-clips.csv`; a different performance of the same moment keeps its existing asset key.
+
+Keep the editable human cuts in `resources/sound/narrations/level2/`, prepare consistent browser audio in `src/audio/assets/narration/level2/` under the existing asset keys, and update `CREDITS.md` with the performer and recording details. Replace the temporary recordings only for clips that have been identified and checked. The game already looks up those keys through `src/audio/level2-voice.ts`, so the new files take the place of the temporary voice without changing playback timing.

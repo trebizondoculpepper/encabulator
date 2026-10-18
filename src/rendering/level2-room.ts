@@ -12,7 +12,7 @@ import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
 import {
   LEVEL2_MACHINE,
   LEVEL2_START,
-  LEVEL2_SKIP_SPOTS,
+  LEVEL2_SKIP_SPOT,
 } from '../game/level2-room-plan';
 import {
   Group,
@@ -23,7 +23,6 @@ import {
   Scene,
   SphereGeometry,
   Vector2,
-  Vector3,
 } from 'three';
 import type { Object3D } from 'three';
 import { signal } from '@preact/signals-core';
@@ -33,6 +32,7 @@ import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import {
   LEVEL2_BETAFORM,
   LEVEL2_CUES,
+  LEVEL2_FAREWELL,
   LEVEL2_INTRO,
   LEVEL2_RESET,
   LEVEL2_SKIP,
@@ -46,6 +46,7 @@ import type { PortableObject } from '../toolkit/controls/input/object-handling';
 import {
   createPanelKit,
   disposeKit,
+  kitPaint,
 } from '../toolkit/components/core/views/eighties-controls';
 import { ISOLATOR } from '../toolkit/components/industrial-control/views/incoming-isolator';
 import {
@@ -61,7 +62,10 @@ import {
   addSkipLamps,
   createSkip,
 } from '../toolkit/components/site-dressing/views/skip';
-import { hiddenSpot, offSight } from '../toolkit/controls/logic/hidden-spot';
+import {
+  CHAIR_STACK_HALF,
+  createChairStack,
+} from '../toolkit/components/site-dressing/views/chair-stack';
 import { dressSkip } from '../toolkit/components/site-dressing/logic/skip-dressing';
 import { createBinTossing } from '../toolkit/components/site-dressing/parts/bin-tossing';
 import type { TossBin } from '../toolkit/components/site-dressing/parts/bin-tossing';
@@ -73,9 +77,7 @@ import {
 } from '../toolkit/components/core/parts/render-style';
 
 /** Module 2 adds its scenario and apparatus to the shared Guildford warehouse. */
-const SKIP_SPOTS = LEVEL2_SKIP_SPOTS;
-/** The glance down at the first dropped card: seconds turning, holding. */
-const GLANCE = { turn: 0.7, hold: 1.1 };
+const SKIP_SPOT = LEVEL2_SKIP_SPOT;
 
 export function startLevel2Room(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -187,10 +189,12 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const removed = new Set<number>();
   const floorTime = new Map<number, number>();
   const floorReminders = new Map<number, number>();
-  // There is no bin. The first card the player drops on the floor has the
-  // narrator scold them and point out the skip "over there", which only
-  // then appears, behind them, where they were not looking: it was never
-  // there before he said so (`LEVEL2_SKIP`).
+  // There is no bin, and never was. At the far end of the room stands a
+  // stack of training-room chairs; the moment the first card comes out of
+  // its slot, while the player is looking into the cabinet, the chairs go
+  // and a skip stands in their place, always the same place, as if it had
+  // always been there. Dropping a card on the floor has the narrator point
+  // it out (`LEVEL2_SKIP`).
   const tossing = createBinTossing({
     camera,
     metre: m,
@@ -199,96 +203,30 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       if (index >= 0 && !binned.has(index)) onBinned(index);
     },
   });
+  const chairs = createChairStack(8, {
+    fabric: kitPaint(kit, '#2c4775'),
+    shell: kitPaint(kit, '#1d1f22'),
+    chrome: kitPaint(kit, '#c9cccc', 0.9),
+  });
+  chairs.scale.setScalar(m);
+  chairs.position.set(SKIP_SPOT.x * m, 0, SKIP_SPOT.z * m);
+  chairs.rotation.y = 0.12;
+  scene.add(chairs);
   const skipModel = createSkip(kit);
   skipModel.group.scale.setScalar(m);
   let skip: TossBin | null = null;
   let skipLamps: ReturnType<typeof addSkipLamps> | null = null;
   let skipGraffiti: ReturnType<typeof addSkipGraffiti> | null = null;
-  const eye = new Vector3();
-  const look = new Vector3();
+  let barnSaid = false;
   const conjureSkip = () => {
-    camera.getWorldPosition(eye).divideScalar(m);
-    camera.getWorldDirection(look);
-    // One of three places at the far end, where the player is neither
-    // standing nor looking (nor has dropped a card).
-    const loose = cards
-      .filter(
-        (card, index) =>
-          !binned.has(index) &&
-          (card.object.userData.portable as PortableObject).component.phase
-            .value !== 'installed',
-      )
-      .map((card) =>
-        card.object.getWorldPosition(new Vector3()).divideScalar(m),
-      );
-    const clear = SKIP_SPOTS.filter((spot) =>
-      loose.every((at) => Math.hypot(at.x - spot.x, at.z - spot.z) > 1.4),
-    );
-    const halfView = Math.atan(
-      Math.tan((camera.fov * Math.PI) / 360) * camera.aspect,
-    );
-    const facing = { x: look.x, z: look.z };
-    const at = { x: eye.x, z: eye.z };
-    const spot =
-      hiddenSpot({
-        eye: at,
-        facing,
-        halfView,
-        size: skipModel.footprint,
-        candidates: clear.length ? clear : SKIP_SPOTS,
-        near: 2.5,
-        ideal: 20,
-      }) ??
-      // Should they be looking that way, the one furthest from their view.
-      [...SKIP_SPOTS].sort(
-        (a, b) => offSight(at, facing, b) - offSight(at, facing, a),
-      )[0];
-    skipModel.group.position.set(spot.x * m, 0, spot.z * m);
+    if (skip) return;
+    scene.remove(chairs);
+    skipModel.group.position.set(SKIP_SPOT.x * m, 0, SKIP_SPOT.z * m);
     scene.add(skipModel.group);
     const dressing = dressSkip();
     skipGraffiti = addSkipGraffiti(kit, skipModel.group, dressing.tags);
     skipLamps = addSkipLamps(kit, skipModel.group, dressing.lamps);
-    skip = tossing.add({ name: 'skip', ...skipModel, ...spot });
-  };
-  // On the first card dropped, the player's eyes go down to it, as the
-  // narrator draws breath: a glance the room makes, holding the player
-  // for a moment (`hold`), so the skip appears unseen.
-  let glance: {
-    t: number;
-    from: { yaw: number; pitch: number };
-    to: { yaw: number; pitch: number };
-  } | null = null;
-  const glanceAt = (object: Object3D) => {
-    const target = object.getWorldPosition(new Vector3());
-    camera.getWorldPosition(eye);
-    const yaw = Math.atan2(target.x - eye.x, -(target.z - eye.z));
-    const pitch = Math.atan2(
-      target.y - eye.y,
-      Math.hypot(target.x - eye.x, target.z - eye.z),
-    );
-    const from = { yaw: walk.walker.yaw, pitch: walk.walker.pitch };
-    // Turning the short way round.
-    const turn =
-      ((((yaw - from.yaw) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2)) -
-      Math.PI;
-    glance = { t: 0, from, to: { yaw: from.yaw + turn, pitch } };
-    walk.hold(true);
-  };
-  const glancing = (delta: number) => {
-    if (!glance) return;
-    glance.t += delta;
-    const k = Math.min(1, glance.t / GLANCE.turn);
-    const ease = k * k * (3 - 2 * k);
-    walk.place(
-      walk.walker.x,
-      walk.walker.z,
-      glance.from.yaw + (glance.to.yaw - glance.from.yaw) * ease,
-      glance.from.pitch + (glance.to.pitch - glance.from.pitch) * ease,
-    );
-    if (glance.t >= GLANCE.turn + GLANCE.hold) {
-      glance = null;
-      walk.hold(false);
-    }
+    skip = tossing.add({ name: 'skip', ...skipModel, ...SKIP_SPOT });
   };
   for (const card of cards)
     (card.object.userData.portable as PortableObject).component.setLocked(true);
@@ -410,6 +348,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let lastRemoved = -1;
   voice.onStart((id) => {
     if (id === 91) endingCountdown = 7;
+    if (id === 96) {
+      caption.textContent = 'Module 2 complete.';
+      caption.hidden = false;
+    }
   });
   const advance = (next: number, ...cues: number[]) => {
     phase = next;
@@ -430,6 +372,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     const count = removed.size;
     if (count === cards.length) smokeOn = false;
     if (count === 1) {
+      // Eyes on the cabinet: the skip takes the chairs' place unseen.
+      conjureSkip();
       voice.interrupt();
       voice.say(`A Pepperdyne ${cardName(index)}. A modial-interaction board.`);
       voice.queue(11, 12);
@@ -457,23 +401,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       voice.say(LEVEL2_RESET.prompt);
     } else if (binned.size === 1) voice.interrupt(13);
     else if (binned.size === 2) {
-      const remaining = cards.length - removed.size;
-      voice.interrupt();
-      voice.say(
-        LEVEL2_CUES[23].text.replace(
-          '[BOARDS REMAINING: THREE]',
-          String(remaining),
-        ),
-      );
-      if (remaining > 0) {
-        voice.queue(25, 26, 27, 28);
-        voice.say(
-          LEVEL2_CUES[28].text.replace(
-            '[BOARDS REMAINING: THREE]',
-            String(remaining),
-          ),
-        );
-      }
+      // One take of each, by the owner's choice: "two down, three to go"
+      // whatever the count, rather than a recording for every count.
+      voice.interrupt(24);
+      if (cards.length - removed.size > 0) voice.queue(25, 26, 27, 28, 29);
     } else if (binned.size === 3) {
       const next = cards.findIndex((_, slot) => !removed.has(slot));
       const name = cardName(next >= 0 ? next : index).toLowerCase();
@@ -561,7 +492,15 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
               maxZ: (skip.z + skip.footprint.z / 2 + 0.05) * m,
             },
           ]
-        : []),
+        : [
+            // Until then, the chairs stand there.
+            {
+              minX: (SKIP_SPOT.x - CHAIR_STACK_HALF) * m,
+              maxX: (SKIP_SPOT.x + CHAIR_STACK_HALF) * m,
+              minZ: (SKIP_SPOT.z - CHAIR_STACK_HALF) * m,
+              maxZ: (SKIP_SPOT.z + CHAIR_STACK_HALF) * m,
+            },
+          ]),
     ],
     divert: (object, portable) => tossing.divert(object, portable),
     redirectDrop: (placement) =>
@@ -606,7 +545,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     clock += delta;
     walk.update(delta);
     room.parts.update(delta);
-    glancing(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     mcc.update(delta);
@@ -614,7 +552,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     phaseTime += delta;
     reminderPause.step(delta, voice.busy);
     if (started) titleTime += delta;
-    if (phase < 13 && titleTime > 5) caption.hidden = true;
+    if (phase < 12 && titleTime > 5) caption.hidden = true;
     if (endingCountdown >= 0) {
       endingCountdown -= delta;
       if (endingCountdown < 0) {
@@ -628,7 +566,11 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     }
     if (griefCountdown >= 0) {
       griefCountdown -= delta;
-      if (griefCountdown < 0) advance(12, 92, 93, 94, 95, 96);
+      if (griefCountdown < 0) {
+        advance(12, 92, 93, 94, 95);
+        for (const line of LEVEL2_FAREWELL) voice.say(line);
+        voice.queue(96);
+      }
     }
     if (phase === 11) {
       // Waiting for RESET; then the machine sputters back into life, and
@@ -655,11 +597,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     }
     if (phase === 12 && !voice.busy) {
       phase = 13;
-      completionTimer = window.setTimeout(() => {
-        caption.textContent = 'Module 2 complete.';
-        caption.hidden = false;
-        jingle();
-      }, 3000);
+      completionTimer = window.setTimeout(jingle, 3000);
     }
     if (phase === 0) {
       const instruction = startup.step(mcc.supply.value, main.closed.value);
@@ -814,10 +752,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
           const previous = floorTime.get(index);
           const age = (previous ?? 0) + delta;
           floorTime.set(index, age);
-          if (previous === undefined && !skip) {
-            // The first card on the floor: there never was a bin.
-            glanceAt(card.object);
-            conjureSkip();
+          if (previous === undefined && !barnSaid) {
+            // The first card on the floor: the narrator points out the
+            // skip, which was there all along.
+            barnSaid = true;
             voice.interrupt();
             voice.say(LEVEL2_SKIP.appears);
           } else if (previous === undefined) voice.interrupt(104, 105);
@@ -891,10 +829,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     mcc.parts.dispose();
     room.parts.dispose();
     disposeKit(kit, scene as unknown as Group);
-    scene.remove(skipModel.group);
+    scene.remove(skipModel.group, chairs);
     skipLamps?.dispose();
     skipGraffiti?.dispose();
-    for (const root of [scene, skipModel.group])
+    for (const root of [scene, skipModel.group, chairs])
       root.traverse((object) => {
         if (object instanceof Mesh) object.geometry.dispose();
       });
@@ -926,10 +864,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       failedSupplyCard: failedSupplyCard.faulted.value,
     }),
     view: (x: number, z: number, yaw = 0) => walk.place(x * m, z * m, yaw, 0),
-    /** Glance at the first card and conjure the skip, as a first drop does. */
+    /** Put the skip in the chairs' place, as the first card's removal does. */
     conjureSkip: () => {
       if (skip) return skip;
-      glanceAt(cards[0].object);
       conjureSkip();
       return { x: skip!.x, z: skip!.z };
     },

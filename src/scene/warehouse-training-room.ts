@@ -446,11 +446,13 @@ export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
       13.85,
       x < 0 ? Math.PI / 2 : -Math.PI / 2,
     );
-  for (const x of [-14.45, 14.45])
+  // Under each pair of extinguishers, which hang 1 and 1.4 m along the
+  // wall from their fire point (at z 12.5), centred between them.
+  for (const x of [-14.55, 14.55])
     floorMark(
       createFireKeepClear(kit, 1, 0.8, []),
       x,
-      12.1,
+      11.3,
       x < 0 ? Math.PI / 2 : -Math.PI / 2,
     );
   for (const z of [12.7, 14.3]) floorMark(createWalkwayTape(kit, 25.7), 0, z);

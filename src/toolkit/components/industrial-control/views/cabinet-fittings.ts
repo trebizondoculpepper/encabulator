@@ -22,6 +22,7 @@ import {
   kitPaint,
 } from '../../core/views/eighties-controls';
 import { createBrandBadge } from '../../core/views/brand-badge';
+import type { SoftStarterLamps } from '../logic/soft-starter';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import { createLegendPlate, createPushButton } from './industrial-controls';
 import type { OperatorColour, PushButtonView } from './industrial-controls';
@@ -1080,12 +1081,8 @@ export function createRotaryIsolatorHandle(
 
 export interface SoftStarterView {
   group: Group;
-  set(state: {
-    running: boolean;
-    ramp: number;
-    fault: boolean;
-    amps: number;
-  }): void;
+  /** Show its lamps, bar and current (`../logic/soft-starter.ts`). */
+  set(lamps: SoftStarterLamps): void;
 }
 
 /**
@@ -1168,14 +1165,14 @@ export function createSoftStarter(
   group.add(unit);
   return {
     group,
-    set(state) {
-      run(state.running);
-      full(state.running && state.ramp >= 1);
-      fault(state.fault);
+    set(lamps) {
+      run(lamps.run);
+      full(lamps.upToSpeed);
+      fault(lamps.fault);
       bar.forEach((seg, i) => {
-        seg.material = state.ramp * 10 > i ? segOn : segOff;
+        seg.material = i < lamps.blocks ? segOn : segOff;
       });
-      amps.show(state.running ? state.amps.toFixed(1) : '');
+      amps.show(lamps.speed > 0 ? lamps.amps.toFixed(1) : '');
     },
   };
 }

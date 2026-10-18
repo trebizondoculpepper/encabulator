@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { BIN_REACH, aimsAtBin, arcSeconds, binArc, binRest } from './bin-toss';
+import {
+  BIN_LIP,
+  BIN_REACH,
+  aimsAtBin,
+  arcSeconds,
+  binArc,
+  binRest,
+  overBin,
+} from './bin-toss';
 import type { BinShape } from './bin-toss';
 
 /** A small seeded random number generator (mulberry32). */
@@ -86,5 +94,28 @@ describe('putting things in the bin', () => {
     const tilt = (from: number, to: number) =>
       rests.slice(from, to).reduce((sum, r) => sum + r.tilt, 0) / (to - from);
     expect(tilt(30, 40)).toBeGreaterThan(tilt(0, 5) * 2);
+  });
+});
+
+describe('letting go over a bin', () => {
+  const skip = { x: 1.83, z: 1.22 };
+  it('puts in whatever is let go of over it or at its rim', () => {
+    expect(overBin({ x: 0.5, z: 0.3 }, { x: 0, z: 0 }, skip)).toBe(true);
+    expect(
+      overBin({ x: 0.915 + BIN_LIP - 0.01, z: 0 }, { x: 0, z: 0 }, skip),
+    ).toBe(true);
+    expect(
+      overBin({ x: 0, z: 0.61 + BIN_LIP + 0.05 }, { x: 0, z: 0 }, skip),
+    ).toBe(false);
+    expect(overBin({ x: 3, z: 0 }, { x: 0, z: 0 }, skip)).toBe(false);
+  });
+
+  it('follows a bin turned on the floor', () => {
+    // Turned a quarter turn, its length lies along z.
+    const turned = Math.PI / 2;
+    expect(overBin({ x: 0, z: 1.05 }, { x: 0, z: 0 }, skip, turned)).toBe(true);
+    expect(overBin({ x: 1.05, z: 0 }, { x: 0, z: 0 }, skip, turned)).toBe(
+      false,
+    );
   });
 });

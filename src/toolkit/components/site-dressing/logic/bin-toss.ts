@@ -41,6 +41,33 @@ export function aimsAtBin(
   return cos >= Math.cos(BIN_FACING);
 }
 
+/** How far past a bin's edge, metres, a let-go object still falls in. */
+export const BIN_LIP = 0.25;
+
+/**
+ * Whether an object let go of at `point` is over the bin, or so near its
+ * edge that it would hit the rim: then it goes in, whichever way the
+ * player faces, rather than falling through the bin to the floor. The
+ * bin's footprint is `size` (its length along its own x), its middle at
+ * `bin`, turned `turn` radians about the vertical.
+ */
+export function overBin(
+  point: Point,
+  bin: Point,
+  size: { x: number; z: number },
+  turn = 0,
+  lip = BIN_LIP,
+) {
+  const dx = point.x - bin.x;
+  const dz = point.z - bin.z;
+  // Into the bin's own frame: undo its turn about the vertical.
+  const c = Math.cos(turn);
+  const s = Math.sin(turn);
+  const x = dx * c - dz * s;
+  const z = dx * s + dz * c;
+  return Math.abs(x) <= size.x / 2 + lip && Math.abs(z) <= size.z / 2 + lip;
+}
+
 /** Seconds an object takes to fly `distance` metres into the bin. */
 export function arcSeconds(distance: number) {
   return 0.4 + 0.22 * distance;

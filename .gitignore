@@ -14,3 +14,7 @@ agent-inbox.toml
 # Working sound recordings stay local until edited and approved for the game.
 resources/sound/**/*.wav
 tmp/audio/
+
+# The owner's raw narration take: transcripts, logs and working cuts stay local.
+resources/sound/narrations/level2/owner-take/*
+!resources/sound/narrations/level2/owner-take/*.py
