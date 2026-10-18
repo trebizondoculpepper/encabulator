@@ -44,6 +44,7 @@ import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createLevel0Machine } from './level0-machine';
 import { addWarehouseLighting } from './warehouse-lighting';
+import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 
 /** Level 2's initial setting, with an independent machine and no scenario. */
 export function startLevel0Room(canvas: HTMLCanvasElement) {
@@ -55,10 +56,14 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   const kit = createPanelKit();
-  const room = createWarehouseTrainingRoom(kit);
+  const building = createArchitecturalServices();
+  const room = createWarehouseTrainingRoom(kit, false, { lighting: building });
   room.group.scale.setScalar(m);
   scene.add(room.group);
-  addWarehouseLighting(scene, room.lights, m);
+  const lighting = addWarehouseLighting(scene, room.lights, m, {
+    daylight: 0.5,
+    circuit: building.model.lighting.roomLight,
+  });
   const bounds: Footprint = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -179,6 +184,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     lockCards();
     walk.update(delta);
     room.parts.update(delta);
+    lighting.update();
     mcc.update(delta);
     partAudio.listen(camera, m);
     renderer.render(scene, camera);

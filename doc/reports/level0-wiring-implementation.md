@@ -8,13 +8,10 @@ Work is being committed in milestones, each passing the five checks, so that a s
 
 ### Plan
 
-- The world graph holds a Level 0 process model (`src/game/level0-plant.ts`): pressures, temperatures, speeds, permissives, the PLC's boot and diagnostics, fault identities and the achieved dimensionality, with the electrical components' states bridged into it as graph inputs.
-- The shared line-up gains hooks (door dressing, interlocks, tone rates, stack-light source, board mounts) so that Level 0 can wire its own panels without changing Level 2 or dev6.
-- Replaceable boards: the PLC backplane's slots accept a compatible card again, and the drive's DC bus capacitor board has a mount; a spares shelf supplies healthy replacements.
-- One injected random failure at a time (`src/game/level0-incidents.ts`), on simulation time, with a fresh interval after recovery.
-- The first removal of an installed board swaps the chairs for the skip, once.
+The plan is in `doc/plans/level0-wiring.md`.
 
 ### Milestones
 
 - Milestone 0: planning prompts, diary and this report committed.
 - Milestone 1, toolkit support: the PLC backplane's slots are wired to whichever card is seated in them (`slots`, `spare`, `insert` on the backplane device, tested in `src/toolkit/components/industrial-control/parts/machine-components.test.ts`); a released object the room diverts is forgotten by the shared object handling, so it can be installed somewhere new; potentiometers can be bound to world values; a key switch and a breaker's handle can be latched (for the Kirk key); a screen's boot can be restarted and a controller's boot lines are exported; the annunciator has ISA sequence M (manual RESET, tested); the LCD monitor takes bound signals for its trend and vector traces, and a picture drawn by the room. Level 2, dev0 and dev6 behave as before (all existing tests pass).
+- Milestone 2, pure logic, tested: `src/game/level0-plant.ts`, the process model on the world graph (15 tests in `level0-plant.test.ts`, including the graph analysis: no unseen controls, constant outputs, unwritten or invisible states); `src/game/dimensionality.ts`, the stages, their conditions and the projected n-cubes (5 tests); `src/game/level0-incidents.ts`, the one-at-a-time failure scheduler with an injected random source (6 tests).

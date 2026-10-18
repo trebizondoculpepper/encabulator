@@ -5,18 +5,21 @@ import {
   PointLight,
 } from 'three';
 import type { Scene } from 'three';
+import type { Readable } from '../toolkit/components/core/logic/world/components';
 
 /** Shared overcast daylight and suspended lights for every warehouse instance. */
 export function addWarehouseLighting(
   scene: Scene,
   lights: readonly { x: number; y: number; z: number }[],
   metre: number,
+  options: { daylight?: number; circuit?: Readable<number> } = {},
 ) {
+  const skyLevel = options.daylight ?? 1;
   scene.add(
-    new HemisphereLight('#e1e9ec', '#6f7067', 0.85),
-    new AmbientLight('#e9ece5', 0.3),
+    new HemisphereLight('#e1e9ec', '#6f7067', 0.85 * skyLevel),
+    new AmbientLight('#e9ece5', 0.3 * skyLevel),
   );
-  const daylight = new DirectionalLight('#edf3f5', 1.3);
+  const daylight = new DirectionalLight('#edf3f5', 1.3 * skyLevel);
   daylight.position.set(7 * metre, 24 * metre, 5 * metre);
   daylight.castShadow = true;
   daylight.shadow.mapSize.set(2048, 2048);
@@ -32,9 +35,20 @@ export function addWarehouseLighting(
   daylight.shadow.normalBias = 0.02 * metre;
   daylight.shadow.radius = 4;
   scene.add(daylight);
+  const fittings: PointLight[] = [];
   for (const { x, y, z } of lights) {
     const light = new PointLight('#f2f3e9', 8 * metre * metre, 13 * metre, 2);
     light.position.set(x * metre, y * metre, z * metre);
     scene.add(light);
+    fittings.push(light);
   }
+  const update = () => {
+    const level = Math.max(0, options.circuit?.value ?? 1);
+    for (const light of fittings) {
+      light.intensity = 8 * metre * metre * level;
+      light.visible = level > 0;
+    }
+  };
+  update();
+  return { update };
 }

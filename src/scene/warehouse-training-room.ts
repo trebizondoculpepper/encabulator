@@ -29,17 +29,23 @@ import { createPartSet } from '../toolkit/components/core/parts/parts';
 import type { ArchitecturalKind } from '../toolkit/components/architectural/logic/architectural-fittings';
 import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
 import { WAREHOUSE_HEADS } from '../toolkit/components/architectural/logic/warehouse-services';
+import type { ArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { mergeStatic } from '../toolkit/components/core/views/merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
 
 /** Empty early-1990s Guildford industrial shell. No Level 2 apparatus or utility interiors. */
-export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
+export function createWarehouseTrainingRoom(
+  kit: PanelKit,
+  gallery = false,
+  options: { lighting?: ArchitecturalServices } = {},
+) {
   const group = new Group();
   group.name = 'Guildford warehouse training room';
   const p = warehouseSurfaces(kit);
   const parts = createPartSet();
   const fitted = new Set<Object3D>();
   const seen = new Set<ArchitecturalKind>();
+  const lighting = options.lighting;
   const put = (
     kind: ArchitecturalKind,
     parent: Object3D,
@@ -48,7 +54,16 @@ export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
     z: number,
     options: Parameters<typeof architecturalPart>[3] = {},
   ) => {
-    const part = parts.add(architecturalPart(kit, kind, undefined, options));
+    const services = [
+      'switch',
+      'luminaire',
+      'distribution',
+      'emergency',
+      'exit',
+    ].includes(kind)
+      ? lighting
+      : undefined;
+    const part = parts.add(architecturalPart(kit, kind, services, options));
     part.object.position.set(x, y, z);
     parent.add(part.object);
     fitted.add(part.object);
@@ -334,7 +349,9 @@ export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
     put('emergency', station, 0, 3.2, 0.3);
     put('water', station, -side, 0, 0);
     put('co2', station, -side * 1.4, 0, 0);
-    put('switch', station, -side * 0.5, 1.1, 0);
+    put('switch', station, -side * 0.5, 1.1, 0, { index: side < 0 ? 0 : 1 });
+    if (lighting)
+      label(station, 'WAREHOUSE LIGHTS', 0.24, 0.012, -side * 0.5, 1.02, 0.004);
     label(
       station,
       'FIRE ACTION\nRaise the alarm\nLeave by the nearest exit\nReport to the assembly point',

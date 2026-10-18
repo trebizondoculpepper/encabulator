@@ -73,7 +73,9 @@ export function architecturalPart(
       break;
     }
     case 'switch':
-      part = lightSwitch(kit, { gangs: [m.lighting.switchDoor] });
+      part = lightSwitch(kit, {
+        gangs: [i === 1 ? m.lighting.switchFar : m.lighting.switchDoor],
+      });
       break;
     case 'emergency':
       part = emergencyLight(kit, {

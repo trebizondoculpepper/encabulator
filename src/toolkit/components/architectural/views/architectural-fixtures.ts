@@ -1,11 +1,5 @@
 import { installDoorHardware } from './door-hardware';
-import {
-  BoxGeometry,
-  CylinderGeometry,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-} from 'three';
+import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import type { Material, Object3D } from 'three';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import {
@@ -57,7 +51,9 @@ export function createArchitecturalFixture(
     mark.position.set(x, y, z);
     group.add(mark);
   };
-  let lens: Material | undefined;
+  let lens: Mesh | undefined;
+  let lensOn: Material | undefined;
+  let lensOff: Material | undefined;
   if (kind === 'lever' || kind === 'pull' || kind === 'panic') {
     installDoorHardware(kit, group, kind, 0, 0, 0);
   } else if (kind === 'pipe') {
@@ -76,8 +72,9 @@ export function createArchitecturalFixture(
     }
   } else if (kind === 'luminaire') {
     box(group, pale, 1.6, 0.09, 0.09);
-    lens = kitGlow(kit, '#edf1e5');
-    box(group, lens, 1.55, 0.025, 0.08, 0, -0.05, 0);
+    lensOn = kitGlow(kit, '#edf1e5');
+    lensOff = kitPaint(kit, '#b7bdb2');
+    lens = box(group, lensOn, 1.55, 0.025, 0.08, 0, -0.05, 0);
     for (const x of [-0.69, 0.69])
       box(group, steel, 0.025, 0.035, 0.1, x, -0.025, 0);
   } else if (kind === 'heater') {
@@ -163,8 +160,7 @@ export function createArchitecturalFixture(
     group,
     actuator: undefined,
     set(on: boolean) {
-      if (lens && 'color' in lens)
-        (lens as MeshStandardMaterial).color.set(on ? '#edf1e5' : '#777b72');
+      if (lens) lens.material = on ? lensOn! : lensOff!;
     },
   };
 }
