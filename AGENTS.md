@@ -14,6 +14,7 @@ For now the game is a series of development rooms that test the concepts the mac
 - Record significant sessions in `diary/`.
 - Never commit `agent-mailbox.toml` or `agent-inbox.toml`.
 - Ask the owner one question at a time.
+- Every task, implementation or review prompt written or maintained for this repository must include an explicit **Return path**: a concrete repository-relative file path where the executing agent must leave completion notes, comments, feedback, validation results, limitations and unresolved questions or blockers. State who should read it next and link related task/review reports where applicable. Require the agent to create the destination if missing, preserve existing feedback and add a dated entry on subsequent runs. A final chat response alone is not the return path.
 - Record every sound credit in `CREDITS.md` (author, source URL, licence, edits); technical notes go in `src/toolkit/components/core/audio/assets/README.md`.
 - Keep working recordings in `resources/sound/` (`effects/`, `narrations/`, `bgm/`); only prepared game assets belong in `src/audio/assets/`.
 - Treat volumes named `NO NAME` as read-only sources; copy files into the workspace before editing them.
