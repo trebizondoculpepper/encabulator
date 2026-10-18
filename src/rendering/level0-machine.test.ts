@@ -79,7 +79,6 @@ function sandbox() {
     control.driveSpeed.set(6);
     control.auxSpeed.set(5);
     control.chartRun.set(1);
-    control.ammeterPhase.set(2);
     run(20);
   };
   const dispose = () => {
@@ -193,7 +192,8 @@ describe('Level 0 machine wiring', () => {
     expect(control.kirk.value).toBe(false);
     expect(control.feedHoa.value).toBe(1);
     expect(control.hydraulicKey.value).toBe(1);
-    expect(control.ammeterPhase.value).toBe(0);
+    // PHASE has no OFF: it chooses the control supply's phase.
+    expect(control.controlPhase.value).toBe(0);
     expect(control.fanMode.value).toBe(1);
     expect(control.fanBoost.value).toBe(false);
     expect(control.dingleEnable.value).toBe(0);
@@ -270,10 +270,11 @@ describe('Level 0 machine wiring', () => {
     plant.control.hydraulicKey.set(0);
     run(1);
     expect(mcc.circuits.get(UNITS.hydraulic)!.running.value).toBe(true);
-    // The ammeter reads nothing until a phase is selected.
-    expect(plant.meterReading.value.amps).toBe(0);
-    plant.control.ammeterPhase.set(1);
-    expect(plant.meterReading.value.amps).toBeGreaterThan(0);
+    // The main disconnect's monitor reads the load, whatever PHASE is.
+    const monitor = plant.monitor.value;
+    expect(monitor.amps).toBeGreaterThan(0);
+    plant.control.controlPhase.set(2);
+    expect(plant.monitor.value).toEqual(monitor);
     dispose();
   });
 

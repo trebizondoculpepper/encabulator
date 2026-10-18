@@ -200,15 +200,15 @@ export function createLevel0Dresser(
         }
         caption('LINE VOLTS', cx - 0.07, -0.085);
         place(
-          // A meter selector switch's four positions: OFF disconnects the
-          // power monitor's volts and amps; L1 to L3 choose the phase.
-          selector(kit, { positions: 4, bound: p.control.ammeterPhase }),
+          // Which phase feeds the control transformer: turned to a sound
+          // phase if one fails; the voltmeters show which are sound.
+          selector(kit, { positions: 3, bound: p.control.controlPhase }),
           cx + 0.13,
           -0.03,
           0.9,
         );
-        legend('METER PHASE', cx + 0.13, 0.005, 0.075);
-        caption('OFF  L1  L2  L3', cx + 0.13, -0.075);
+        legend('PHASE', cx + 0.13, 0.005, 0.05);
+        caption('L1   L2   L3\nCONTROL SUPPLY', cx + 0.13, -0.075);
         return true;
       }
       case 'main': {
@@ -217,25 +217,13 @@ export function createLevel0Dresser(
         const monitor = createPowerMonitor(kit);
         put(monitor.group, cx - 0.1, top - 0.08);
         caption(
-          'METER PHASE: ITS VOLTS (TO NEXT LINE), AMPS · TOTAL KW',
+          'SUPPLY: AVERAGE VOLTS, AVERAGE AMPS, TOTAL KW',
           cx - 0.1,
           top - 0.145,
         );
         every(() => {
-          // The selected phase's volts and amps; kW from all three.
-          const { volts, amps } = p.meterReading.value;
-          const lines = p.lineAmps.value;
-          const average = p.supplyVolts.value.reduce((a, b) => a + b, 0) / 3;
-          monitor.show(
-            volts,
-            amps,
-            (Math.sqrt(3) *
-              average *
-              ((lines[0] + lines[1] + lines[2]) / 3) *
-              0.86) /
-              1000,
-            lit.value,
-          );
+          const { volts, amps, kilowatts } = p.monitor.value;
+          monitor.show(volts, amps, kilowatts, lit.value);
         });
         // The Kirk key: trapped while the disconnect is closed, and with it
         // turned out the disconnect cannot be closed.

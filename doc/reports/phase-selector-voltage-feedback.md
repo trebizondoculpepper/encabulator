@@ -23,3 +23,13 @@ The model (`src/game/level0-plant.ts`, pure, on the world graph): each line's cu
 
 - With every unit running and the drive at full speed the machine draws about 103 A through a 100 A main disconnect; nothing trips, as the main breaker has no overcurrent model. The owner may want the loads trimmed or the disconnect re-rated.
 - Level 2 and dev6 keep the shared line-up's own meter readings; this change is Level 0's.
+
+## 2026-10-18, owner's correction
+
+The owner found that turning the selector changed the main disconnect's voltage and current, and wanted a three-position switch. The selector's real job, as the owner described it: it chooses which phase feeds the machine's control systems, so that the control supply can be moved to a sound phase if one fails, the three voltmeters showing which phases are sound. Now:
+
+- MAIN INCOMING's PHASE selector is a three-position lever, L1, L2, L3 (no OFF, being a supply selector), captioned CONTROL SUPPLY, starting at L1. It connects the control transformer (every lamp, controller and the PLC, 4 A) across L1-L2, L2-L3 or L3-L1 (`incoming.controlPhase` in `src/game/level0-plant.ts`).
+- Moving it moves that single-phase load to another pair: those two lines carry it (`supply.lineAmps`), and that pair's voltmeter sits a little lower than the others. The total current is unchanged.
+- MAIN DISCONNECT's power monitor no longer follows the selector: it shows the supply's average phase-to-phase voltage, average line current and total kW from its own transformers (`supply.monitor`), which the selector cannot change.
+- Tests: the selector moves the control load to its pair without changing the monitor or the total current; the selected pair's voltmeter reads lowest on average. Browser: the lever, its PHASE plate and its L1 L2 L3 CONTROL SUPPLY caption.
+- Not modelled yet: a failed phase. With all three phases always sound, the selector only moves the control load; a phase-loss fault, in which the control supply on a failed pair is lost until PHASE is turned to a sound one, would complete the owner's description.

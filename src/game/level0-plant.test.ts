@@ -376,20 +376,45 @@ describe('Level 0 process model', () => {
       expect(spread(heavy.supplyVolts.value)).toBe(0);
     });
 
-    it('measures the selected phase without moving any load', () => {
+    it('moves the control supply between phases without changing the main disconnect monitor', () => {
       const p = plant({ ...RUNNING, mainMotor: true, feed: true });
       run(p, 5);
-      const volts = p.supplyVolts.value;
-      const lines = p.lineAmps.value;
-      expect(p.meterReading.value).toEqual({ volts: 0, amps: 0 });
-      for (const phase of [1, 2, 3]) {
-        p.control.ammeterPhase.set(phase);
-        expect(p.supplyVolts.value).toEqual(volts);
-        expect(p.lineAmps.value).toEqual(lines);
-        expect(p.meterReading.value).toEqual({
-          volts: volts[phase - 1],
-          amps: lines[phase - 1],
-        });
+      const monitor = p.monitor.value;
+      const sums: number[][] = [];
+      for (const phase of [0, 1, 2]) {
+        p.control.controlPhase.set(phase);
+        expect(p.monitor.value).toEqual(monitor);
+        const lines = p.lineAmps.value;
+        // The control load is on the selected phase and the next.
+        const pair = [phase, (phase + 1) % 3];
+        const other = [0, 1, 2].find((k) => !pair.includes(k))!;
+        expect(lines[pair[0]]).toBe(lines[pair[1]]);
+        expect(lines[pair[0]] - lines[other]).toBeCloseTo(
+          PLANT.controlTransformerAmps,
+          9,
+        );
+        sums.push(lines);
+      }
+      // The same current, drawn from another pair.
+      const total = (l: number[]) => l[0] + l[1] + l[2];
+      expect(total(sums[1])).toBeCloseTo(total(sums[0]), 9);
+      expect(total(sums[2])).toBeCloseTo(total(sums[0]), 9);
+    });
+
+    it('sags the voltmeter of the pair feeding the control supply', () => {
+      const p = plant({ ...RUNNING });
+      const middle = (phase: number) => {
+        p.control.controlPhase.set(phase);
+        let sum = [0, 0, 0];
+        for (let i = 0; i < 400; i++) {
+          p.step(0.25);
+          sum = sum.map((v, k) => v + p.supplyVolts.value[k]);
+        }
+        return sum.map((v) => v / 400);
+      };
+      for (const phase of [0, 1, 2]) {
+        const volts = middle(phase);
+        expect(Math.min(...volts)).toBe(volts[phase]);
       }
     });
   });

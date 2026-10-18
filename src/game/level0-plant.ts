@@ -289,9 +289,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     }),
     /** AUXILIARY DRIVE SPEED, detents 0 to 10. */
     auxSpeed: g.input('aux.speed', 0, { where: 'AUXILIARY DRIVE SPEED knob' }),
-    /** MAIN INCOMING METER PHASE: 0 OFF (meter disconnected), 1 L1, 2 L2, 3 L3. */
-    ammeterPhase: g.input('incoming.ammeter', 0, {
-      where: 'MAIN INCOMING METER PHASE selector',
+    /**
+     * MAIN INCOMING's PHASE selector: which phase feeds the control
+     * transformer, the supply of every lamp, controller and the PLC,
+     * so that it can be moved to a sound phase if one fails. 0 L1 (across
+     * L1-L2), 1 L2 (L2-L3), 2 L3 (L3-L1). No OFF: it is a supply selector.
+     */
+    controlPhase: g.input('incoming.controlPhase', 0, {
+      where: 'MAIN INCOMING PHASE selector',
     }),
     /** The main disconnect's Kirk key, in and turned (true); it starts out. */
     kirk: g.input('main.kirk', false, { where: 'MAIN DISCONNECT Kirk key' }),
@@ -625,16 +630,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   /**
    * The current in each line, L1, L2 and L3. The motors and drives are
    * balanced three-phase loads; the control transformer (lamps,
-   * controllers, the PLC) is a single-phase load across L1 and L2, so
-   * those two lines carry its current too.
+   * controllers, the PLC) is a single-phase load across the pair the PHASE
+   * selector has chosen, so those two lines carry its current too.
    */
   const lineAmps = g.derive(
     'supply.lineAmps',
-    [loadAmps, e.mains],
-    (amps, mains) => {
+    [loadAmps, e.mains, control.controlPhase],
+    (amps, mains, phase) => {
       const control = mains ? PLANT.controlTransformerAmps : 0;
       const balanced = Math.max(0, amps - control);
-      return [balanced + control, balanced + control, balanced];
+      return [0, 1, 2].map(
+        (line) =>
+          balanced + (line === phase || line === (phase + 1) % 3 ? control : 0),
+      );
     },
     { equals: sameList as never },
   );
@@ -669,20 +677,33 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     },
   );
   /**
-   * What MAIN INCOMING's METER PHASE selector puts on the power monitor:
-   * OFF, nothing; L1, L2 or L3, that line's current and its voltage to the
-   * next line. It only chooses what is measured; it moves no load.
+   * What MAIN DISCONNECT's power monitor shows: the average phase-to-phase
+   * voltage and line current and the total kW, from its own transformers.
+   * Moving the control transformer between phases does not change it:
+   * the same current is drawn, only from another pair.
    */
-  const meterReading = g.output(
-    'supply.meter',
-    [control.ammeterPhase, lineAmps, supplyVolts],
-    (phase, amps, volts) =>
-      phase === 0
-        ? { volts: 0, amps: 0 }
-        : { volts: volts[phase - 1], amps: amps[phase - 1] },
+  const monitor = g.output(
+    'supply.monitor',
+    [e.incoming, loadAmps, e.mains, s.clock],
+    (incoming, amps, mains, t) => {
+      if (!incoming) return { volts: 0, amps: 0, kilowatts: 0 };
+      const control = mains ? PLANT.controlTransformerAmps : 0;
+      // The average line current: the control load is on two of three.
+      const line = Math.max(0, amps - control) + (control * 2) / 3;
+      const wobble = Math.sin(t * 0.61) * 0.6 + Math.sin(t * 1.43 + 1) * 0.4;
+      const volts =
+        PLANT.nominalVolts -
+        line * PLANT.supplyOhms -
+        line * PLANT.fluctuationVoltsPerAmp * wobble;
+      return {
+        volts,
+        amps: line,
+        kilowatts: (Math.sqrt(3) * volts * line * 0.86) / 1000,
+      };
+    },
     {
       where: 'MAIN DISCONNECT power monitor',
-      equals: ((a: { volts: number; amps: number }, b: typeof a) =>
+      equals: ((a: Record<string, number>, b: Record<string, number>) =>
         a.volts === b.volts && a.amps === b.amps) as never,
     },
   );
@@ -1289,7 +1310,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     loadAmps,
     lineAmps,
     supplyVolts,
-    meterReading,
+    monitor,
     displays,
     closePermit,
     gramDisplay,

@@ -47,3 +47,7 @@ A fresh room is silent and unpowered: the supply off, the PLC off, no load, ever
 
 - The exceptions and the Kirk key above await the owner's review.
 - A retained room keeps its settings because nothing resets them; there is no separate save of the machine's state.
+
+## 2026-10-18, PHASE selector corrected
+
+The OFF position added to MAIN INCOMING's selector in the first run has gone: the owner identified the selector as the control supply's phase selector, a three-position L1 / L2 / L3 switch, and a supply selector has no meaningful OFF. It starts at L1. See `doc/reports/phase-selector-voltage-feedback.md`.
