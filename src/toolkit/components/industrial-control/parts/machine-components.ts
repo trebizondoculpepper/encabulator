@@ -270,11 +270,19 @@ export function machineComponent(
         const portable = card.object.userData.portable as
           | PortableObject
           | undefined;
+        // A card is still in the slot only while it is installed there.
+        const current = seats[index].peek();
+        const occupied =
+          current !== null &&
+          (
+            current.object.userData.portable as PortableObject | undefined
+          )?.component.phase.peek() === 'installed' &&
+          current.object.parent === a.object;
         if (
           !known.includes(card) ||
           !portable ||
           EXPANSION_CARD_KINDS[index] !== card.kind ||
-          seats[index].peek() !== null
+          occupied
         )
           return false;
         a.object.add(card.object);
@@ -322,7 +330,15 @@ export function machineComponent(
       });
       a.uses.set(view.service, handle.operate);
       a.updates.push(() =>
-        view.set(handle!.on.value, breaker!.position.value === 'tripped', true),
+        view.set(
+          handle!.on.value,
+          breaker!.position.value === 'tripped',
+          true,
+          [],
+          0,
+          false,
+          power.value,
+        ),
       );
       a.disposers.push(handle.dispose);
       part = a.part();

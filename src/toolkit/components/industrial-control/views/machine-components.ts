@@ -198,7 +198,18 @@ export function createMachineDeviceView(
     face + 0.001,
     dark,
   );
-  status.visible = kind.startsWith('plc-') || kind === 'relay';
+  status.visible =
+    kind.startsWith('plc-') || kind === 'relay' || kind === 'breaker';
+  if (kind === 'breaker') {
+    status.name = 'Breaker status indicator';
+    const legend = createMicroLabel(kit, 'POWER / ON', {
+      height: 0.002,
+      maxWidth: width * 0.8,
+      ink: '#e8e5d9',
+    });
+    legend.position.set(0, height * 0.12 - 0.008, face);
+    body.add(legend);
+  }
   // A card's red activity lamp, over its green one: while the card has
   // power it flickers in uneven bursts and pauses, as if it were busy with
   // random reads and writes; it is dark when the card is off or failed.
@@ -312,8 +323,18 @@ export function createMachineDeviceView(
       bits: readonly boolean[] = [],
       dt = 1,
       detached = false,
+      supplied = true,
     ) {
-      status.material = failed ? red : on ? green : dark;
+      if (kind === 'breaker') {
+        const indication = !supplied
+          ? 'black'
+          : on && !failed
+            ? 'green'
+            : 'red';
+        status.material =
+          indication === 'black' ? dark : indication === 'green' ? green : red;
+        status.userData.indication = indication;
+      } else status.material = failed ? red : on ? green : dark;
       if (card) flicker(on && !failed && inserted, dt);
       service.rotation.x =
         kind === 'breaker'

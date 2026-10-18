@@ -927,7 +927,8 @@ export function createRetroEncabulatorMcc(
       );
       if (!spec.fixed) {
         // Quarter-turn wing latches on the flange, by the free edge: the
-        // only part of the door that opens it. Both work the one door.
+        // only part of the door that opens it. Both toggle the one door;
+        // its rear cover also closes it when approached from behind.
         let shared: ReturnType<typeof doorLatch>['door'] | undefined;
         for (const y of [h / 2 - 0.05, -h / 2 + 0.05]) {
           const latch = parts.add(

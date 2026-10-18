@@ -981,6 +981,30 @@ it('drives the gauge above BOOST into the red band and returns when released', (
   dispose();
 });
 
+it('indicates incoming supply and contact state on the shared moulded-case breaker', () => {
+  const kit = createPanelKit();
+  const power = signal(false);
+  const breaker = machineComponent(kit, 'breaker', { power });
+  const lamp = breaker.object.getObjectByName('Breaker status indicator')!;
+  const indication = () => {
+    breaker.update(0);
+    return lamp.userData.indication;
+  };
+  expect(indication()).toBe('black');
+  power.value = true;
+  expect(indication()).toBe('green');
+  breaker.breaker!.operate();
+  expect(indication()).toBe('red');
+  power.value = false;
+  expect(indication()).toBe('black');
+  power.value = true;
+  breaker.breaker!.operate();
+  breaker.breaker!.trip();
+  expect(indication()).toBe('red');
+  breaker.dispose();
+  disposeKit(kit, breaker.object);
+});
+
 it('shows the Automation isolator green on, red off, and dark without upstream power', () => {
   const { mcc, dispose } = fixture();
   const status = mcc.group.getObjectByName(
