@@ -376,4 +376,55 @@ describe('the Hyperplasc Scenario Simulator', () => {
     const end = LEVEL0_MACHINE.x + MCC_WIDTH / 2 + 0.1;
     expect(rack.minX - end).toBeGreaterThan(0.8);
   });
+
+  it('drowns a live machine from its SPRINKLER fault: shorts, shutdown, secondary faults', () => {
+    const { machine, panel, symptoms, dispose } = sandbox();
+    const failures = createLevel0Failures(createPanelKit(), machine);
+    const step = (seconds: number) => {
+      for (let t = 0; t < seconds; t += 0.5) {
+        panel.update(0.5);
+        machine.update(0.5);
+        symptoms.update(0.5);
+        failures.update(0.5);
+      }
+    };
+    useOf(panel, 'FULL ON states switch')();
+    step(40);
+    const faulted = () =>
+      [...machine.mcc.circuits.values()].flatMap((u) =>
+        u.devices.filter((d) => d.kind !== 'breaker' && d.faulted.value),
+      ).length;
+    const before = faulted();
+    useOf(panel, 'SPRINKLER faults switch')();
+    step(1);
+    expect(machine.plant.fire.stage.value).toBe('evacuate');
+    step(10);
+    expect(machine.plant.drowned.value).toBe(true);
+    expect(failures.flood.visible).toBe(true);
+    // Total shutdown, and it will not stay on while shorted.
+    expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
+    expect(machine.plant.electrical.mains.value).toBe(false);
+    expect(faulted()).toBeGreaterThan(before);
+    // RESET: dried out, repaired, the heads replaced.
+    useOf(panel, 'RESET states switch')();
+    step(1);
+    expect(machine.plant.drowned.value).toBe(false);
+    expect(machine.plant.fire.discharging.value).toBe(false);
+    failures.dispose();
+    dispose();
+  });
+
+  it('only shows the rain from its SPRINKLER symptom', () => {
+    const { machine, panel, symptoms, run, dispose } = sandbox();
+    useOf(panel, 'FULL ON states switch')();
+    run(30, 0.5);
+    useOf(panel, 'SPRINKLER symptoms switch')();
+    run(20, 0.5);
+    expect(symptoms.raining.value).toBe(true);
+    expect(machine.plant.fire.discharging.value).toBe(false);
+    expect(machine.plant.drowned.value).toBe(false);
+    useOf(panel, 'RESET states switch')();
+    expect(symptoms.raining.value).toBe(false);
+    dispose();
+  });
 });

@@ -1,3 +1,5 @@
+import { signal } from '@preact/signals-core';
+import type { ReadonlySignal } from '@preact/signals-core';
 import { sootAfter } from '../game/machine-failure';
 import { createUnitSmoke } from '../scene/mcc-smoke';
 import { UNITS } from '../scene/level0-faces';
@@ -31,6 +33,8 @@ export function createLevel0Symptoms(machine: Level0Machine) {
   let leaking = false;
   let fireAge = -1;
   let warpAge = -1;
+  /** The RAIN symptom: the heads over the machine spray, for show. */
+  const raining = signal(false);
   // The fire: no flames, only smoke pouring from round the doors of the
   // units it burns in, and the soot it leaves on the faces above them.
   // (The components inside, ruined, come later.)
@@ -74,8 +78,14 @@ export function createLevel0Symptoms(machine: Level0Machine) {
     warp() {
       warpAge = 0;
     },
+    /** SPRINKLER: the heads over the machine spray; nothing follows. */
+    rain() {
+      raining.value = true;
+    },
+    raining: raining as ReadonlySignal<boolean>,
     /** Put every symptom away. */
     reset() {
+      raining.value = false;
       leak = 0;
       leaking = false;
       fireAge = -1;

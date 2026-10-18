@@ -154,9 +154,72 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     seized = now;
   });
 
+  // ---- Water in a live machine: shorts, then total shutdown. -------------
+  // The sprinkler water floods the floor round the machine, as wide as it
+  // is wet; where it reaches the live bus it flashes over in unit after
+  // unit, trips the main breaker and keeps it tripped until the machine is
+  // dried out and repaired; and the wet units are left with faults of
+  // their own (blown fuses, tripped overloads) to find and repair.
+  const waterMaterial = new MeshStandardMaterial({
+    color: '#3d4a52',
+    roughness: 0.02,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.55,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+  const flood = new Mesh(spill.geometry, waterMaterial);
+  flood.name = 'Sprinkler water on the floor';
+  flood.rotation.x = -Math.PI / 2;
+  flood.userData.noCollision = true;
+  flood.raycast = () => {};
+  flood.visible = false;
+  mcc.group.add(flood);
+  const shorting = [
+    UNITS.vfd,
+    UNITS.mainMotor,
+    UNITS.control,
+    UNITS.automation,
+    UNITS.hydraulic,
+    UNITS.auxDrive,
+  ].map((id) => {
+    const unit = mcc.unitFaces.get(id)!;
+    const spark = createShortSpark(kit, 14);
+    spark.group.scale.setScalar(2.5);
+    spark.group.position.set(
+      unit.centre,
+      (unit.face.bottom + unit.face.top) / 2,
+      mcc.doorFront + 0.04,
+    );
+    unit.section.add(spark.group);
+    return spark;
+  });
+  let flashes = 0;
+  let wasDrowned = plant.drowned.peek();
+  const stopDrowning = effect(() => {
+    const drowned = plant.drowned.value;
+    const live = plant.electrical.mains.value;
+    if (drowned && !wasDrowned) {
+      flashes = 12;
+      partAudio.play(SEIZE, shorting[0].group);
+      // Secondary faults in the wet units.
+      const eligible = machine.eligible();
+      for (let i = 0; i < 2 && eligible.length; i++)
+        machine.inflict(
+          eligible.splice(Math.floor(Math.random() * eligible.length), 1)[0],
+        );
+    }
+    wasDrowned = drowned;
+    // Shorted, the bus will not hold: the main breaker trips straight out.
+    if (drowned && live) mcc.mainBreaker.trip();
+  });
+
   let clock = 0;
   return {
     spill,
+    flood,
     /** `symptom`: oil the simulator's OIL LEAK has spread, 0 to 1. */
     update(delta: number, symptom = 0) {
       clock += delta;
@@ -168,6 +231,17 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       // Its back edge stays tucked under the plinth: it spreads forward
       // from the base of the cabinet, never from a gap in front of it.
       spill.position.set(lubeX, 0.004, radius * 0.5 - 0.02);
+      // The sprinkler water, wider and thinner, under the heads.
+      const wet = plant.wetness.value;
+      flood.visible = wet > 0.01;
+      const reach = 0.3 + 1.6 * Math.sqrt(wet);
+      flood.scale.set(reach * 1.6, reach, 1);
+      flood.position.set(0, 0.003, reach * 0.5 - 0.1);
+      if (flashes > 0 && Math.random() < delta * 5) {
+        shorting[Math.floor(Math.random() * shorting.length)].fire();
+        flashes--;
+      }
+      for (const spark of shorting) spark.update(delta, reducedMotion());
       for (const hazard of hazards) {
         if (hazard.sparks > 0 && Math.random() < delta * 6) {
           hazard.spark.fire();
@@ -183,6 +257,8 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     },
     dispose() {
       stop();
+      stopDrowning();
+      waterMaterial.dispose();
       oil.dispose();
       spill.geometry.dispose();
       for (const hazard of hazards) hazard.smoke.dispose();

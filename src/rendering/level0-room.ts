@@ -1,5 +1,5 @@
 import { createMachineSideCulling } from '../scene/machine-side-culling';
-import { effect, signal } from '@preact/signals-core';
+import { computed, effect, signal } from '@preact/signals-core';
 import {
   createArchitecturalServices,
   createWarehouseFire,
@@ -17,6 +17,7 @@ import {
 import type { Object3D } from 'three';
 import {
   LEVEL0_CHAIRS,
+  LEVEL0_MACHINE_HEADS,
   LEVEL0_SCENARIOS,
   LEVEL0_MACHINE,
   LEVEL0_START,
@@ -98,9 +99,25 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   voice.object.scale.setScalar(m);
   voice.object.position.set(0, 6.4 * m, 0);
   scene.add(voice.object);
+  // The simulator's SYMPTOMS: a failure's effects without its cause. Its
+  // SPRINKLER shows on the heads over the machine, for show only.
+  const symptoms = createLevel0Symptoms(machine);
+  const shownHeads = Object.assign(
+    computed(() =>
+      fire.heads.value.map((head, i) =>
+        symptoms.raining.value && LEVEL0_MACHINE_HEADS.includes(i)
+          ? { burst: true, spraying: true }
+          : head,
+      ),
+    ),
+    { id: 'sprinkler.heads.shown' },
+  );
   const room = createWarehouseTrainingRoom(kit, false, {
     lighting: building,
-    fire: createWarehouseFire(fire, voice.evacuationTone),
+    fire: createWarehouseFire(
+      { ...fire, heads: shownHeads },
+      voice.evacuationTone,
+    ),
   });
   room.parts.add(voice);
   room.group.scale.setScalar(m);
@@ -177,8 +194,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   machine.onBoardRemoved(conjureSkip);
 
   // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
-  // The simulator's SYMPTOMS: a failure's effects without its cause.
-  const symptoms = createLevel0Symptoms(machine);
   const scenarios = createLevel0Scenarios(machine, Math.random, symptoms);
   // What the machine's failures look and sound like: the oil spill, worn
   // bearings grinding, the seizure.

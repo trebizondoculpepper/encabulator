@@ -85,6 +85,12 @@ const GROUPS: readonly {
         led: 'amber',
         act: 'switchStuck',
       },
+      {
+        legend: 'SPRINKLER',
+        cap: 'blue',
+        led: 'blue',
+        act: 'sprinklerFailure',
+      },
       { legend: 'GLITCH', cap: 'yellow', led: 'red', act: 'glitch' },
       { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
     ],
@@ -101,6 +107,7 @@ const GROUPS: readonly {
         act: 'warp',
       },
       { legend: 'HICCUP', cap: 'yellow', led: 'amber', act: 'hiccup' },
+      { legend: 'SPRINKLER', cap: 'blue', led: 'blue', act: 'rain' },
     ],
   },
 ];

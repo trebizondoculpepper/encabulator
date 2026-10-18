@@ -149,6 +149,10 @@ export function createLevel0Scenarios(
      */
     sealFailure: () => plant.sealFailure(),
     switchStuck: () => plant.switchStuck(),
+    /** FAULTS: a sprinkler head over the machine fails and sprays. */
+    sprinklerFailure: () => plant.sprinklerFailure(),
+    /** SYMPTOMS: the heads over the machine spray, and nothing follows. */
+    rain: () => symptoms?.rain(),
     /** SYMPTOMS: oil spreading over the floor, the pressure untouched. */
     oilLeak: () => symptoms?.oilLeak(),
     /** SYMPTOMS: flames and smoke on top of the drive's section. */
