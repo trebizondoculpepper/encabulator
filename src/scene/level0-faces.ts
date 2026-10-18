@@ -1,10 +1,14 @@
 import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import { CARD_KINDS, PLANT, WINDOWS } from '../game/level0-plant';
+import { CARD_KINDS, MODULE_WINDOWS, PLANT } from '../game/level0-plant';
 import type { Level0Plant } from '../game/level0-plant';
 import { STAGE_NAMES } from '../game/dimensionality';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
-import { createAnnunciator } from '../toolkit/components/industrial-control/logic/annunciator';
+import {
+  createStatusScanner,
+  statusColour,
+  statusLight,
+} from '../game/level0-status';
 import { createSoftStarter as createSoftStarterLogic } from '../toolkit/components/industrial-control/logic/soft-starter';
 import { controllerBootLines } from '../toolkit/components/industrial-control/logic/screen-boot';
 import { cardDesignation } from '../toolkit/components/industrial-control/logic/machine-components';
@@ -261,29 +265,56 @@ export function createLevel0Dresser(
         return true;
       }
       case 'annunciator': {
-        const labels = WINDOWS.map((w) =>
-          w === 'GRAM-METER' ? 'GRAM-\nMETER' : w.replace(' ', '\n'),
-        );
+        // Status lights, one subsystem a window: dark without its power,
+        // green OK, flashing green waiting for its first update, amber
+        // sub-optimal, red failed, flashing red a critical failure until
+        // acknowledged (`src/game/level0-status.ts`).
+        // One window a module, in the line-up's order.
+        const labels = MODULE_WINDOWS.map(([, legend]) => legend);
         const panel = createAnnunciatorPanel(kit, labels, {
           columns: 4,
           cell: 0.07,
         });
-        put(panel.group, cx - 0.02, top - 0.1);
-        caption('FAULT ANNUNCIATOR', cx - 0.02, top - 0.005);
-        // Sequence M: an acknowledged window stays lit until RESET once
-        // its fault has cleared, so the operator can see what tripped.
-        const alarms = createAnnunciator(labels.length, { manualReset: true });
+        put(panel.group, cx - 0.02, top - 0.17);
+        panel.windows.forEach(
+          (lens, i) => (lens.name = `Status ${MODULE_WINDOWS[i][0]}`),
+        );
+        caption('MODULE STATUS', cx - 0.02, top + 0.0);
+        const LAMP = { green: '#4dff6e', amber: '#ffb12a', red: '#ff3b2a' };
+        const acknowledged = new Set<string>();
+        // A slow 1980s scanner: one window at a time, recovering through
+        // flashing green (`createStatusScanner`).
+        const scanner = createStatusScanner(labels.length);
         let testUntil = 0;
         let now = 0;
         // On the station battery, charged from the incoming side.
-        const shows = computed(() => machine.value?.supply.value ?? false);
-        every((_, clock) => {
+        const powered = computed(() => machine.value?.supply.value ?? false);
+        every((delta, clock) => {
           now = clock;
-          alarms.sense(p.alarms.value);
-          alarms.test = clock < testUntil;
-          panel.set(alarms.lit(clock).map((on) => shows.value && on));
+          const targets = p.windowStates.value.map((state) => {
+            // A critical failure that has cleared is forgotten, so the
+            // next one flashes again.
+            if (state.worst !== 'critical') acknowledged.delete(state.window);
+            return statusLight({
+              powered: true,
+              on: state.on,
+              starting: state.starting,
+              worst: state.worst,
+              acknowledged: acknowledged.has(state.window),
+            });
+          });
+          const shown = scanner.step(delta, powered.value, targets);
+          if (powered.value && clock < testUntil) {
+            panel.show(labels.map(() => '#fff2d8'));
+            return;
+          }
+          panel.show(
+            shown.map((light) => {
+              const colour = statusColour(light, clock);
+              return colour && LAMP[colour];
+            }),
+          );
         });
-        const powered = shows;
         place(
           pushButton(kit, {
             colour: 'black',
@@ -292,7 +323,7 @@ export function createLevel0Dresser(
             action: () => (testUntil = now + 2),
           }),
           cx - 0.12,
-          top - 0.3,
+          top - 0.4,
           0.9,
         );
         place(
@@ -300,10 +331,13 @@ export function createLevel0Dresser(
             colour: 'amber',
             legend: 'ACK',
             power: powered,
-            action: () => alarms.acknowledge(),
+            action: () => {
+              for (const state of p.windowStates.value)
+                if (state.worst === 'critical') acknowledged.add(state.window);
+            },
           }),
           cx - 0.02,
-          top - 0.3,
+          top - 0.4,
           0.9,
         );
         place(
@@ -311,20 +345,25 @@ export function createLevel0Dresser(
             colour: 'blue',
             legend: 'RESET',
             power: powered,
-            action: () => alarms.reset(),
+            action: () => acknowledged.clear(),
           }),
           cx + 0.08,
-          top - 0.3,
+          top - 0.4,
           0.9,
         );
         caption(
-          'LAMP TEST · ACKNOWLEDGE · RESET CLEARED',
+          'LAMP TEST · ACK STEADIES FLASHING RED · RESET RE-ARMS',
           cx - 0.02,
-          top - 0.355,
+          top - 0.455,
+        );
+        caption(
+          'DARK NO POWER · GREEN OK · FLASHING GREEN STARTING · AMBER SUB-OPTIMAL\nRED FAILED OR OFF · FLASHING RED CRITICAL',
+          cx - 0.02,
+          top - 0.485,
         );
         const hours = createHourMeterView(kit);
-        put(hours.group, cx - 0.02, top - 0.45);
-        caption('BUS HOURS RUN', cx - 0.02, top - 0.49);
+        put(hours.group, cx - 0.02, top - 0.56);
+        caption('BUS HOURS RUN', cx - 0.02, top - 0.6);
         let hoursRun = 61842.7;
         every((delta) => {
           if (p.electrical.mains.value) hoursRun += delta / 3600;

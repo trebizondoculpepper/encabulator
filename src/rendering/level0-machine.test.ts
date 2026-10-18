@@ -17,6 +17,9 @@ import {
 import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
 import type { PortableObject } from '../toolkit/controls/input/object-handling';
 import { createLevel0Machine } from './level0-machine';
+import { MODULE_OF, UNIT_ROLES } from './level0-wiring';
+import { SCAN_SECONDS_PER_WINDOW } from '../game/level0-status';
+import { WINDOWS } from '../game/level0-plant';
 
 beforeEach(() => {
   // Label and screen canvases are made, but nothing is drawn.
@@ -558,6 +561,103 @@ describe('Level 0 machine wiring', () => {
     run(1);
     expect(aux.running.value).toBe(true);
     expect(display.userData.shown.run).toBe(true);
+    dispose();
+  });
+});
+
+describe('Level 0 status annunciator', () => {
+  /** The colour a window shows, through a second of flashing. */
+  const seen = (
+    machine: ReturnType<typeof createLevel0Machine>,
+    window: string,
+    run: (s: number, dt?: number) => void,
+  ) => {
+    const lens = machine.mcc.group.getObjectByName(`Status ${window}`)!;
+    const colours = new Set<string | null>();
+    for (let i = 0; i < 10; i++) {
+      run(0.1);
+      colours.add(lens.userData.shown as string | null);
+    }
+    return colours;
+  };
+  const GREEN = '#4dff6e';
+  /** Long enough for the slow scanner to come round twice. */
+  const SCAN = SCAN_SECONDS_PER_WINDOW * WINDOWS.length * 2 + 0.5;
+  const RED = '#ff3b2a';
+
+  it('shows LUBE red with the pump off, flashing green as pressure builds, then green', () => {
+    const { machine, breaker, run, dispose } = sandbox();
+    isolate(machine);
+    machine.plant.control.interlockKey.set(true);
+    breaker(UNITS.main).operate();
+    // Every window waits for its first scan, then shows its module.
+    run(SCAN);
+    expect(seen(machine, 'LUBE', run)).toEqual(new Set([RED]));
+    breaker(UNITS.lube).operate();
+    // Recovering, it flashes green before it goes steady.
+    const flashes = new Set<string | null>();
+    for (let t = 0; t < SCAN; t += 1)
+      for (const c of seen(machine, 'LUBE', run)) flashes.add(c);
+    expect(flashes).toContain(null);
+    expect(flashes).toContain(GREEN);
+    run(SCAN);
+    expect(machine.plant.oilOk.value).toBe(true);
+    expect(seen(machine, 'LUBE', run)).toEqual(new Set([GREEN]));
+    dispose();
+  });
+
+  it('has a window for every module, red when that module is switched off', () => {
+    const { machine, breaker, powerUp, run, dispose } = sandbox();
+    expect(Object.keys(MODULE_OF).sort()).toEqual(
+      Object.keys(UNIT_ROLES).sort(),
+    );
+    powerUp();
+    machine.plant.control.fanMode.set(2);
+    machine.plant.control.dingleEnable.set(1);
+    breaker(UNITS.hydro).operate();
+    run(20 + SCAN);
+    const colour = (window: string) => seen(machine, window, run);
+    // A running machine: every module green.
+    for (const [, window] of Object.entries(MODULE_OF))
+      expect(colour(window), window).toEqual(new Set([GREEN]));
+    // Each module switched off at its own breaker shows red on its window.
+    for (const [id, window] of Object.entries(MODULE_OF)) {
+      if (id === UNITS.incoming || id === UNITS.main) continue;
+      breaker(id).operate();
+      run(SCAN / 2);
+      expect(colour(window), window).toContain(RED);
+      breaker(id).operate();
+    }
+    dispose();
+  });
+
+  it("shows a component's failure on its own module's window", () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    run(SCAN);
+    expect(seen(machine, 'COOLING', run)).toEqual(new Set([GREEN]));
+    machine.inflict(`fuse:${UNITS.cooling}`);
+    run(SCAN / 2);
+    expect(seen(machine, 'COOLING', run)).toEqual(new Set([RED]));
+    expect(
+      machine.plant.faults.value.find((f) => f.code === 'U32-F1')!.window,
+    ).toBe('COOLING');
+    dispose();
+  });
+
+  it('is dark without power and flashes a critical failure red until ACK', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    expect(seen(machine, 'PLC', run)).toEqual(new Set([null]));
+    powerUp();
+    run(SCAN);
+    expect(seen(machine, 'PLC', run)).toEqual(new Set([GREEN]));
+    machine.inflict('card:plc-power');
+    run(SCAN / 2);
+    expect(seen(machine, 'PLC', run)).toEqual(new Set([RED, null]));
+    const ack = within(machine, 'DISTRIBUTION', 'ACK push button');
+    machine.mcc.parts.uses.get(ack)!();
+    run(SCAN / 2);
+    expect(seen(machine, 'PLC', run)).toEqual(new Set([RED]));
     dispose();
   });
 });

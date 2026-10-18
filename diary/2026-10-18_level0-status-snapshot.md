@@ -1,0 +1,5 @@
+# Level0 status-annunciator snapshot
+
+At the owner's request to commit and push everything, consolidated the remaining workspace work on Level0's per-module annunciator and circuit reporting. The annunciator now has a status window for each machine module, with green/amber/red severity, startup flashing, critical-failure flashing until ACK, and darkness without supply. Component fault reports are assigned to their own module instead of broad shared alarm categories; distribution and modial supply states are included in the electrical bridge. The shared panel view accepts per-window colours and retains the original boolean-lighting interface for other scenes.
+
+Tests cover severity/colour rules, module coverage, startup, switch-off and individual component failures. The geometry-heavy workstation integration test has an explicit 15-second timeout to allow for concurrent test load. Full validation uses two Vitest workers to avoid oversubscribing this shared development machine. Neumann Link™ and live BBC guidance remain in their planning prompt; this status-annunciator work does not implement the diagnostic handshake or fourth pilot.

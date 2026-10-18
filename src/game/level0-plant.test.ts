@@ -99,7 +99,7 @@ describe('Level 0 process model', () => {
     p.step(0.1);
     expect(p.plcStatus.value).toBe('halted');
     expect(codes(p)).toEqual(expect.arrayContaining(['E10', 'E11']));
-    expect(p.alarms.value[WINDOWS.indexOf('GROUND FAULT')]).toBe(true);
+    expect(p.alarms.value[WINDOWS.indexOf('SAFETY')]).toBe(true);
   });
 
   it('loses only what a missing I/O card carries', () => {
@@ -235,13 +235,11 @@ describe('Level 0 process model', () => {
     const p = plant({ ...RUNNING, lube: false });
     p.step(0.1);
     const lit = () => WINDOWS.filter((_, i) => p.alarms.value[i]);
-    expect(lit()).toEqual(['LUBE LOW']);
+    expect(lit()).toEqual(['LUBE']);
     p.sense({ lube: true, liveDoorOpen: true });
-    p.report([
-      { code: 'U31-F1', text: 'CONTROL FUSE BLOWN', window: 'BREAKER TRIP' },
-    ]);
+    p.report([{ code: 'U31-F1', text: 'CONTROL FUSE BLOWN', window: 'LUBE' }]);
     run(p, 5);
-    expect(lit()).toEqual(['BREAKER TRIP', 'DOOR OPEN']);
+    expect(lit()).toEqual(['LUBE', 'SAFETY']);
     // An open door is shown but is not a fault.
     p.report([]);
     p.step(0.1);
@@ -262,7 +260,7 @@ describe('Level 0 process model', () => {
     run(p, 1);
     expect(p.feedDemand.value).toBe(false);
     expect(codes(p)).toContain('E61');
-    expect(p.alarms.value[WINDOWS.indexOf('CONTROL CCT')]).toBe(true);
+    expect(p.alarms.value[WINDOWS.indexOf('FIELD')]).toBe(true);
     // Without its interface chassis the PanelView loses the PLC.
     p.sense({ hmi: false });
     p.step(0.1);

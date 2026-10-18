@@ -10,6 +10,8 @@ import {
   stepDimension,
 } from './dimensionality';
 import type { DimensionConditions } from './dimensionality';
+import { worstSeverity } from './level0-status';
+import type { Severity } from './level0-status';
 
 /**
  * Level 0's process model: what the Retro Encabulator's line-up does with
@@ -108,6 +110,12 @@ export interface Electrical {
   panMonitor: boolean;
   dingle: boolean;
   grammeter: boolean;
+  /** DISTRIBUTION and MODIAL INTERACTION supplied. */
+  distribution: boolean;
+  modial: boolean;
+  /** The PLC-run starters' run circuits made, ready for its command. */
+  feedReady: boolean;
+  hydraulicReady: boolean;
   /** Automation Control's cabinet supply, and its backplane bus running. */
   plcCabinet: boolean;
   backplane: boolean;
@@ -158,6 +166,10 @@ export const ELECTRICAL_OFF: Electrical = {
   panMonitor: false,
   dingle: false,
   grammeter: false,
+  distribution: false,
+  modial: false,
+  feedReady: false,
+  hydraulicReady: false,
   plcCabinet: false,
   backplane: false,
   field: false,
@@ -187,23 +199,58 @@ export interface PlantFault {
   window: string;
   /** Shown, but not a fault: the machine is still healthy with it. */
   advisory?: boolean;
+  /** How bad it is; by default from its code (`severityOf`). */
+  severity?: Severity;
 }
 
-/** The annunciator's windows, as `dressDoor` labels them, one line each. */
-export const WINDOWS = [
-  'BUS OVERVOLT',
-  'GROUND FAULT',
-  'PHASE LOSS',
-  'BREAKER TRIP',
-  'DINGLE ARM',
-  'MODIAL HI',
-  'BEARING TEMP',
-  'LUBE LOW',
-  'FAN FAIL',
-  'GRAM-METER',
-  'DOOR OPEN',
-  'CONTROL CCT',
+/**
+ * How bad a fault is, from its code: a halted PLC, an earth fault, a
+ * tripped drive and failed DC bus parts are critical; lost lube, lost I/O,
+ * protective devices operated and wiring faults are failures; the rest
+ * (hot, unlocked, drifting, a door open) are warnings.
+ */
+export function severityOf(code: string): Severity {
+  if (/^(E01|E10|E11|E20|F04|F07)$|-(C1|A1)$/.test(code)) return 'critical';
+  if (/^(E02|E3\d|E4\d|E5\d|E6\d|A01)$|-(Q|F1|F2|KM|K\d|X\d|RU\d)$/.test(code))
+    return 'failure';
+  return 'warning';
+}
+
+/**
+ * The annunciator's windows: one for each module of the line-up, in the
+ * line-up's order, and one for the machine's safety (earth fault, doors).
+ * Each is a module's id and the legend engraved on its window.
+ */
+export const MODULE_WINDOWS = [
+  ['INCOMING', 'INCOMING'],
+  ['MAIN', 'MAIN\nDISCONNECT'],
+  ['DISTRIBUTION', 'DISTRI-\nBUTION'],
+  ['M-101', 'M-101\nMAIN MOTOR'],
+  ['M-102', 'M-102\nFEED'],
+  ['M-103', 'M-103\nAUX MOTOR'],
+  ['LUBE', 'M-201\nLUBE OIL'],
+  ['COOLING', 'M-202\nCOOLING'],
+  ['HYDRAULIC', 'M-203\nHYDRAULIC'],
+  ['AUX DRIVE', 'M-204\nAUX DRIVE'],
+  ['VENT', 'M-205\nVENT FAN'],
+  ['CONTROL', 'ENCAB\nCONTROL'],
+  ['MODIAL', 'MODIAL\nINTERACT'],
+  ['PHASE', 'PHASE\nREF'],
+  ['PAN MONITOR', 'PAN\nMONITOR'],
+  ['PLC', 'AUTO-\nMATION'],
+  ['FIELD', 'FIELD\nI/O'],
+  ['VFD', 'VFD-601'],
+  ['ISOLATOR', 'DRIVE\nISOLATOR'],
+  ['DINGLE', 'DINGLE\nARM'],
+  ['HYDRO', 'HYDRO\nPUMP'],
+  ['FAN', 'PAN\nFAN'],
+  ['GRAMMETER', 'GRAM-\nMETER'],
+  ['SAFETY', 'EARTH\nDOORS'],
 ] as const;
+export type ModuleWindow = (typeof MODULE_WINDOWS)[number][0];
+export const WINDOWS: readonly ModuleWindow[] = MODULE_WINDOWS.map(
+  ([id]) => id,
+);
 
 /** Approach `target` with time constant `tau`, the same at any frame rate. */
 const ease = (value: number, target: number, tau: number, dt: number) =>
@@ -808,6 +855,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.vfdFault,
       s.heatsink,
       s.oil,
+      e.lube,
       e.vfdControl,
       e.cooling,
       s.driveHz,
@@ -839,6 +887,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       vfdFault,
       heatsink,
       oil,
+      lubePump,
       vfdOn,
       cooling,
       hz,
@@ -868,85 +917,87 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       };
       if (cabinet && (halt ?? (status !== 'booting' ? rack : null))) {
         const code = halt ?? rack!;
-        add({ code, text: RACK[code], window: 'MODIAL HI' });
+        add({ code, text: RACK[code], window: 'PLC' });
       }
       if (cabinet && powerCard === 'failed')
         add({
           code: 'E11',
           text: 'BETAFORM AMPLIFIER EARTH FAULT',
-          window: 'GROUND FAULT',
+          window: 'SAFETY',
         });
       if (cards.run) {
         if (cards.input !== 'ok')
           add({
             code: 'E31',
             text: `INPUT MODULE SLOT 3 ${cards.input === 'absent' ? 'MISSING' : 'FAULT'}`,
-            window: 'MODIAL HI',
+            window: 'PLC',
           });
         else if (!cards.field)
           add({
             code: 'E32',
             text: 'FIELD 24 VDC SUPPLY OFF',
-            window: 'MODIAL HI',
+            window: 'FIELD',
           });
         if (cards.output !== 'ok')
           add({
             code: 'E41',
             text: `OUTPUT MODULE SLOT 4 ${cards.output === 'absent' ? 'MISSING' : 'FAULT'}`,
-            window: 'MODIAL HI',
+            window: 'PLC',
           });
         if (cards.analog !== 'ok')
           add({
             code: 'E51',
             text: `ANALOG MODULE SLOT 5 ${cards.analog === 'absent' ? 'MISSING' : 'FAULT'}`,
-            window: 'MODIAL HI',
+            window: 'PLC',
           });
       }
       if (vfdFault === 'F07')
         add({
           code: 'F07',
           text: 'VFD-601 DC BUS / POWER STAGE',
-          window: 'BUS OVERVOLT',
+          window: 'VFD',
         });
       if (vfdFault === 'F04')
         add({
           code: 'F04',
           text: 'VFD-601 HEATSINK OVERTEMP',
-          window: 'BEARING TEMP',
+          window: 'VFD',
         });
       else if (vfdOn && heatsink >= PLANT.heatsinkWarn)
         add({
           code: 'A09',
           text: 'VFD-601 HEATSINK HOT',
-          window: 'BEARING TEMP',
+          window: 'VFD',
         });
-      if (mains && oil < PLANT.oilOk)
-        add({ code: 'A01', text: 'LUBE OIL PRESSURE LOW', window: 'LUBE LOW' });
+      // Low with its pump stopped; while the pump runs and builds the
+      // pressure, LUBE flashes green instead.
+      if (mains && oil < PLANT.oilOk && !lubePump)
+        add({ code: 'A01', text: 'LUBE OIL PRESSURE LOW', window: 'LUBE' });
       if (vfdOn && hz > 1 && !cooling)
-        add({ code: 'A02', text: 'DRIVE COOLING FAN OFF', window: 'FAN FAIL' });
+        add({ code: 'A02', text: 'DRIVE COOLING FAN OFF', window: 'COOLING' });
       if (controlOn && !vent && controlTemp > PLANT.controlHot)
         add({
           code: 'A03',
           text: 'CONTROL SECTION HOT - VENT FAN',
-          window: 'FAN FAIL',
+          window: 'VENT',
         });
       if (mains && fanMode !== 1 && !fanRunning)
         add({
           code: 'A04',
           text: 'PANENDERMIC FAN NOT RUNNING',
-          window: 'FAN FAIL',
+          window: 'FAN',
         });
       if (hz > 5 && !locked)
         add({
           code: 'A05',
           text: 'PHASE REFERENCE NOT LOCKED',
-          window: 'PHASE LOSS',
+          window: 'PHASE',
         });
       if (mains && arm === 1 && !arming)
         add({
           code: 'A06',
           text: 'DINGLE ARM NOT STROKING',
-          window: 'DINGLE ARM',
+          window: 'DINGLE',
         });
       if (
         gramOn &&
@@ -956,24 +1007,23 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         add({
           code: 'A07',
           text: 'GRAMMETER OUT OF CALIBRATION',
-          window: 'GRAM-METER',
+          window: 'GRAMMETER',
         });
       for (const fault of reported) add(fault);
       if (cabinet && status !== 'off' && !hmi)
         add({
           code: 'E02',
           text: 'PANELVIEW INTERFACE LOST',
-          window: 'CONTROL CCT',
+          window: 'PLC',
         });
       if (cards.run)
         for (const [code, name, ok] of linkStates)
-          if (!ok)
-            add({ code, text: `${name} SIGNAL LOST`, window: 'CONTROL CCT' });
+          if (!ok) add({ code, text: `${name} SIGNAL LOST`, window: 'FIELD' });
       if (door)
         add({
           code: 'D01',
           text: 'DOOR OPEN ON A LIVE UNIT',
-          window: 'DOOR OPEN',
+          window: 'SAFETY',
           advisory: true,
         });
       return list;
@@ -994,6 +1044,157 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     {
       where: 'DISTRIBUTION annunciator',
       equals: sameList as never,
+    },
+  );
+  /**
+   * Each annunciator window's module: whether it is on (running, or, under
+   * the PLC, ready for its command), whether it is still starting, and its
+   * worst standing fault.
+   */
+  const windowStates = g.output(
+    'annunciator.status',
+    [
+      faults,
+      e.incoming,
+      e.mains,
+      e.distribution,
+      e.mainMotor,
+      e.feed,
+      e.auxMotor,
+      e.lube,
+      e.cooling,
+      e.hydraulic,
+      e.auxDrive,
+      e.vent,
+      e.control,
+      e.controlBooted,
+      e.modial,
+      e.phase,
+      e.panMonitor,
+      plcStatus,
+      e.field,
+      e.vfdControl,
+      e.vfdReady,
+      e.driveIsolator,
+      e.dingle,
+      e.hydro,
+      e.fan,
+      e.grammeter,
+      control.feedHoa,
+      control.hydraulicKey,
+      control.dingleEnable,
+      control.fanMode,
+      plcOutputs,
+      e.feedReady,
+      e.hydraulicReady,
+      oilOk,
+      hydraulicOk,
+      flowOk,
+      stroking,
+      s.fan,
+      s.calibrating,
+    ],
+    (
+      list,
+      incoming,
+      mains,
+      distribution,
+      mainMotor,
+      feed,
+      auxMotor,
+      lube,
+      cooling,
+      hydraulic,
+      auxDrive,
+      vent,
+      controlUnit,
+      controlBooted,
+      modial,
+      phase,
+      panMonitor,
+      status,
+      field,
+      vfdOn,
+      vfdReady,
+      isolator,
+      dingle,
+      hydro,
+      fan,
+      gram,
+      hoa,
+      key,
+      arm,
+      fanMode,
+      outputs,
+      feedReady,
+      hydraulicReady,
+      oil,
+      pressure,
+      flow,
+      arming,
+      fanPressure,
+      calibrating,
+    ) => {
+      const on: Record<ModuleWindow, boolean> = {
+        INCOMING: incoming,
+        MAIN: mains,
+        DISTRIBUTION: distribution,
+        'M-101': mainMotor,
+        // In AUTO the PLC runs it: ready for its command is on.
+        'M-102': feed || (hoa === 2 && feedReady && outputs),
+        'M-103': auxMotor,
+        LUBE: lube,
+        COOLING: cooling,
+        HYDRAULIC: hydraulic || (key === 2 && hydraulicReady && outputs),
+        'AUX DRIVE': auxDrive,
+        VENT: vent,
+        CONTROL: controlUnit,
+        MODIAL: modial,
+        PHASE: phase,
+        'PAN MONITOR': panMonitor,
+        PLC: status !== 'off',
+        FIELD: field,
+        VFD: vfdOn && vfdReady,
+        ISOLATOR: isolator,
+        DINGLE: dingle && arm === 1,
+        HYDRO: hydro,
+        FAN: fan && fanMode !== 1,
+        GRAMMETER: gram,
+        SAFETY: incoming,
+      };
+      const starting: Partial<Record<ModuleWindow, boolean>> = {
+        CONTROL: controlUnit && !controlBooted,
+        PLC: status === 'booting',
+        LUBE: lube && !oil,
+        HYDRAULIC: hydraulic && !pressure,
+        HYDRO: hydro && outputs && !flow,
+        DINGLE: dingle && arm === 1 && !arming && !pressure,
+        FAN: fan && fanMode !== 1 && fanPressure < PLANT.fanLow * 0.9,
+        GRAMMETER: calibrating > 0,
+      };
+      return WINDOWS.map((window) => ({
+        window,
+        on: on[window],
+        starting: starting[window] ?? false,
+        worst: worstSeverity(
+          list
+            .filter((f) => f.window === window)
+            .map((f) => f.severity ?? severityOf(f.code)),
+        ),
+      }));
+    },
+    {
+      where: 'DISTRIBUTION status annunciator',
+      equals: ((
+        a: { on: boolean; starting: boolean; worst: unknown }[],
+        b: typeof a,
+      ) =>
+        a.every(
+          (w, i) =>
+            w.on === b[i].on &&
+            w.starting === b[i].starting &&
+            w.worst === b[i].worst,
+        )) as never,
     },
   );
   const healthy = g.output(
@@ -1342,6 +1543,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     eventLog,
     faults,
     alarms,
+    windowStates,
     healthy,
     operating,
     plcReset,

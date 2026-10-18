@@ -1,6 +1,6 @@
 import { computed } from '@preact/signals-core';
 import type { ReadonlySignal } from '@preact/signals-core';
-import type { PlantFault } from '../game/level0-plant';
+import type { ModuleWindow, PlantFault } from '../game/level0-plant';
 import { UNITS } from '../scene/level0-faces';
 import type { MccView } from '../scene/retro-encabulator-mcc';
 import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
@@ -91,6 +91,33 @@ export const UNIT_NAMES: Record<string, string> = {
   [UNITS.grammeter]: 'CARDINAL GRAMMETER',
 };
 
+/** Each unit's window on the status annunciator. */
+export const MODULE_OF: Record<string, ModuleWindow> = {
+  [UNITS.incoming]: 'INCOMING',
+  [UNITS.main]: 'MAIN',
+  [UNITS.distribution]: 'DISTRIBUTION',
+  [UNITS.mainMotor]: 'M-101',
+  [UNITS.feed]: 'M-102',
+  [UNITS.auxMotor]: 'M-103',
+  [UNITS.lube]: 'LUBE',
+  [UNITS.cooling]: 'COOLING',
+  [UNITS.hydraulic]: 'HYDRAULIC',
+  [UNITS.auxDrive]: 'AUX DRIVE',
+  [UNITS.vent]: 'VENT',
+  [UNITS.control]: 'CONTROL',
+  [UNITS.modial]: 'MODIAL',
+  [UNITS.phase]: 'PHASE',
+  [UNITS.panMonitor]: 'PAN MONITOR',
+  [UNITS.automation]: 'PLC',
+  [UNITS.field]: 'FIELD',
+  [UNITS.vfd]: 'VFD',
+  [UNITS.driveIsolator]: 'ISOLATOR',
+  [UNITS.dingle]: 'DINGLE',
+  [UNITS.hydro]: 'HYDRO',
+  [UNITS.fan]: 'FAN',
+  [UNITS.grammeter]: 'GRAMMETER',
+};
+
 /** The terminals with a role; the rest of each strip is spare. */
 export const WIRED_TERMINALS = 4;
 
@@ -175,10 +202,12 @@ export function componentReports(machine: MccView): PlantFault[] {
     const [, section, bucket] = /section(\d)\.bucket(\d)/.exec(id) ?? [];
     const base = `U${section}${bucket}`;
     const name = UNIT_NAMES[id] ?? id;
-    const report = (tag: string, text: string, window: string) =>
+    // Every component's fault shows on its own unit's window.
+    const window = MODULE_OF[id] ?? 'SAFETY';
+    const report = (tag: string, text: string) =>
       list.push({ code: `${base}-${tag}`, text: `${name} ${text}`, window });
     const breaker = circuit.breaker;
-    if (breaker?.faulted.value) report('Q', 'BREAKER TRIPPED', 'BREAKER TRIP');
+    if (breaker?.faulted.value) report('Q', 'BREAKER TRIPPED');
     if (!breaker?.active.value) continue;
     let relays = 0;
     let chassis = 0;
@@ -186,30 +215,23 @@ export function componentReports(machine: MccView): PlantFault[] {
     for (const device of circuit.devices) {
       switch (device.kind) {
         case 'fuse':
-          if (device.faulted.value)
-            report('F1', 'CONTROL FUSE BLOWN', 'BREAKER TRIP');
+          if (device.faulted.value) report('F1', 'CONTROL FUSE BLOWN');
           break;
         case 'overload':
-          if (device.faulted.value)
-            report('F2', 'OVERLOAD TRIPPED', 'BREAKER TRIP');
+          if (device.faulted.value) report('F2', 'OVERLOAD TRIPPED');
           break;
         case 'contactor':
-          if (device.faulted.value)
-            report('KM', 'CONTACTOR WELDED', 'CONTROL CCT');
+          if (device.faulted.value) report('KM', 'CONTACTOR WELDED');
           break;
         case 'relay':
           relays++;
           if (device.faulted.value)
-            report(`K${relays}`, `RELAY K${relays} WELDED`, 'CONTROL CCT');
+            report(`K${relays}`, `RELAY K${relays} WELDED`);
           break;
         case 'terminal':
           terminals++;
           if (terminals <= WIRED_TERMINALS && device.faulted.value)
-            report(
-              `X${terminals}`,
-              `TERMINAL X${terminals} OPEN`,
-              'CONTROL CCT',
-            );
+            report(`X${terminals}`, `TERMINAL X${terminals} OPEN`);
           break;
         case 'rack-unit':
           chassis++;
@@ -217,16 +239,13 @@ export function componentReports(machine: MccView): PlantFault[] {
             report(
               `RU${chassis}`,
               `${chassis === 1 ? 'PANELVIEW INTERFACE' : 'REMOTE I/O ADAPTER'} WITHDRAWN`,
-              'CONTROL CCT',
             );
           break;
         case 'capacitors':
-          if (device.faulted.value)
-            report('C1', 'DC BUS CAPACITORS FAILED', 'BUS OVERVOLT');
+          if (device.faulted.value) report('C1', 'DC BUS CAPACITORS FAILED');
           break;
         case 'drive-power':
-          if (device.faulted.value)
-            report('A1', 'POWER STAGE FAILED', 'BUS OVERVOLT');
+          if (device.faulted.value) report('A1', 'POWER STAGE FAILED');
           break;
       }
     }

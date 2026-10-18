@@ -13,6 +13,7 @@ import type {
   Material,
   MeshBasicMaterial,
   Object3D,
+  Texture,
 } from 'three';
 import { createPs1Material } from '../../core/parts/ps1-material';
 import {
@@ -734,8 +735,10 @@ export interface AnnunciatorView {
   group: Group;
   /** Each window's lens, for clicks. */
   windows: Mesh[];
-  /** Light each window. */
+  /** Light each window, in its own colour. */
   set(lit: readonly boolean[]): void;
+  /** Light each window in a colour of its own choosing, or leave it dark (null). */
+  show(colours: readonly (string | null)[]): void;
 }
 
 /**
@@ -763,7 +766,12 @@ export function createAnnunciatorPanel(
     0.015,
   );
   const windows: Mesh[] = [];
-  const looks: { off: Material; on: Material }[] = [];
+  const looks: {
+    off: Material;
+    on: Material;
+    map: Texture;
+    tints: Map<string, Material>;
+  }[] = [];
   labels.forEach((label, i) => {
     const col = i % columns;
     const row = Math.floor(i / columns);
@@ -793,7 +801,7 @@ export function createAnnunciatorPanel(
       true,
     );
     kit.materials.push(off, on);
-    looks.push({ off, on });
+    looks.push({ off, on, map: art.texture, tints: new Map() });
     const x = -width / 2 + 0.006 + cw * (col + 0.5);
     const y = height / 2 - 0.006 - ch * (row + 0.5);
     const window = add(
@@ -814,6 +822,29 @@ export function createAnnunciatorPanel(
     set(lit) {
       windows.forEach((window, i) => {
         window.material = lit[i] ? looks[i].on : looks[i].off;
+      });
+    },
+    show(colours) {
+      windows.forEach((window, i) => {
+        const colour = colours[i];
+        const look = looks[i];
+        // What it shows, for a reader of the scene (a test, say).
+        window.userData.shown = colour ?? null;
+        if (!colour) {
+          window.material = look.off;
+          return;
+        }
+        let tint = look.tints.get(colour);
+        if (!tint) {
+          tint = createPs1Material(
+            { map: look.map, color: colour },
+            true,
+            true,
+          );
+          kit.materials.push(tint);
+          look.tints.set(colour, tint);
+        }
+        window.material = tint;
       });
     },
   };

@@ -72,4 +72,4 @@ it('joins the rear socket, protected floor run and real cabinet port continuousl
   mcc.parts.dispose();
   disposeKit(kit, station.group);
   disposeKit(kit, mcc.group);
-});
+}, 15000);

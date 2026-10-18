@@ -148,6 +148,10 @@ export function createLevel0Machine(
       panMonitor: wiring(UNITS.panMonitor).run.value,
       dingle: circuit(UNITS.dingle).running.value,
       grammeter: circuit(UNITS.grammeter).running.value,
+      distribution: circuit(UNITS.distribution).powered.value,
+      modial: wiring(UNITS.modial).run.value,
+      feedReady: wiring(UNITS.feed).run.value,
+      hydraulicReady: wiring(UNITS.hydraulic).run.value,
       plcCabinet: circuit(UNITS.automation).powered.value,
       backplane: assembly.service!.running.value,
       // FIELD TERMINATIONS: K1 the supply contactor, K2 and K3 interposing.
