@@ -2,6 +2,7 @@ import type { Object3D } from 'three';
 import { PLANT } from '../game/level0-plant';
 import { UNITS } from '../scene/level0-faces';
 import type { createLevel0Machine } from './level0-machine';
+import type { Level0Symptoms } from './level0-symptoms';
 
 type Level0Machine = ReturnType<typeof createLevel0Machine>;
 
@@ -16,16 +17,22 @@ export const SLOW_START_STEP_SECONDS = 2.5;
  * machine's own switches, selectors and actions, as a player would, so
  * every boot, ramp, interlock and status light follows on as usual.
  *
- * - FULL OFF: everything off, as a fresh room starts.
- * - FULL ON: everything on and running at once.
- * - RESET: every fault cleared, switch positions kept.
- * - SLOW START: FULL ON a step at a time, a unit every few seconds.
- * - HICCUP, GLITCH, KAPUT: failures (to be modelled in the plant next).
- * - FAULTS: causes, whose symptoms follow: OIL SEAL, PRESSURE SWITCH.
+ * In three groups:
+ *
+ * - STATES: FULL OFF (everything off, as a fresh room starts), FULL ON
+ *   (everything on and running at once), SLOW START (FULL ON a step at a
+ *   time) and RESET (every fault and symptom cleared, switches kept).
+ * - FAULTS, causes whose symptoms follow from the model: OIL SEAL,
+ *   PRESSURE SWITCH, GLITCH (a fuse blows or an overload trips) and KAPUT
+ *   (the rack's power card fails).
+ * - SYMPTOMS, effects alone, without a cause, to try them out: OIL LEAK,
+ *   FIRE, DIMENSIONAL WARP and HICCUP.
  */
 export function createLevel0Scenarios(
   machine: Level0Machine,
   random: () => number = Math.random,
+  /** The symptoms alone, if the room shows them. */
+  symptoms?: Level0Symptoms,
 ) {
   const { mcc, plant } = machine;
   const { control } = plant;
@@ -123,6 +130,7 @@ export function createLevel0Scenarios(
     mcc.recover();
     plant.clearFaults();
     plant.plcReset();
+    symptoms?.reset();
   };
   const slowStart = () => {
     queue = steps();
@@ -140,6 +148,12 @@ export function createLevel0Scenarios(
      */
     sealFailure: () => plant.sealFailure(),
     switchStuck: () => plant.switchStuck(),
+    /** SYMPTOMS: oil spreading over the floor, the pressure untouched. */
+    oilLeak: () => symptoms?.oilLeak(),
+    /** SYMPTOMS: flames and smoke on top of the drive's section. */
+    fire: () => symptoms?.fire(),
+    /** SYMPTOMS: the strangeness, almost to breakdown, then normality. */
+    warp: () => symptoms?.warp(),
     /** A brief stumble that recovers by itself. */
     hiccup: () => mcc.fail('hiccup'),
     /** A real component fault: a fuse blows or an overload trips. */

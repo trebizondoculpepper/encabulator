@@ -30,45 +30,58 @@ const PANEL_AT = 32;
 /** Half the cabinet's widest extent, for walking round it. */
 export const SIMULATOR_HALF = 0.5;
 
-const BUTTONS: readonly {
-  legend: string;
-  cap: StudioCapColour;
-  led: StudioLedColour;
-  act:
-    | 'fullOff'
-    | 'fullOn'
-    | 'slowStart'
-    | 'reset'
-    | 'hiccup'
-    | 'glitch'
-    | 'kaput';
-}[] = [
-  { legend: 'FULL OFF', cap: 'red', led: 'white', act: 'fullOff' },
-  { legend: 'FULL ON', cap: 'white', led: 'green', act: 'fullOn' },
-  { legend: 'SLOW START', cap: 'white', led: 'green', act: 'slowStart' },
-  { legend: 'RESET', cap: 'blue', led: 'white', act: 'reset' },
-  { legend: 'HICCUP', cap: 'yellow', led: 'amber', act: 'hiccup' },
-  { legend: 'GLITCH', cap: 'yellow', led: 'red', act: 'glitch' },
-  { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
-];
+type Act = Exclude<keyof Level0Scenarios, 'starting' | 'update'>;
 
 /**
- * The FAULTS row: one cause a switch, whose symptoms follow from the
- * model, as each is modelled. OIL SEAL and PRESSURE SWITCH together
- * starve the motors of lube.
+ * The simulator's three groups of switches, a row each: STATES the
+ * machine can be put in; FAULTS, causes whose symptoms follow from the
+ * model; SYMPTOMS, a failure's effects alone, without its cause.
  */
-const FAULTS: readonly {
-  legend: string;
-  cap: StudioCapColour;
-  led: StudioLedColour;
-  act: 'sealFailure' | 'switchStuck';
+const GROUPS: readonly {
+  title: string;
+  switches: readonly {
+    legend: string;
+    cap: StudioCapColour;
+    led: StudioLedColour;
+    act: Act;
+  }[];
 }[] = [
-  { legend: 'OIL\nSEAL', cap: 'black', led: 'amber', act: 'sealFailure' },
   {
-    legend: 'PRESSURE\nSWITCH',
-    cap: 'black',
-    led: 'amber',
-    act: 'switchStuck',
+    title: 'STATES',
+    switches: [
+      { legend: 'FULL OFF', cap: 'red', led: 'white', act: 'fullOff' },
+      { legend: 'FULL ON', cap: 'white', led: 'green', act: 'fullOn' },
+      { legend: 'SLOW START', cap: 'white', led: 'green', act: 'slowStart' },
+      { legend: 'RESET', cap: 'blue', led: 'white', act: 'reset' },
+    ],
+  },
+  {
+    title: 'FAULTS',
+    switches: [
+      { legend: 'OIL\nSEAL', cap: 'black', led: 'amber', act: 'sealFailure' },
+      {
+        legend: 'PRESSURE\nSWITCH',
+        cap: 'black',
+        led: 'amber',
+        act: 'switchStuck',
+      },
+      { legend: 'GLITCH', cap: 'yellow', led: 'red', act: 'glitch' },
+      { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
+    ],
+  },
+  {
+    title: 'SYMPTOMS',
+    switches: [
+      { legend: 'OIL\nLEAK', cap: 'yellow', led: 'amber', act: 'oilLeak' },
+      { legend: 'FIRE', cap: 'red', led: 'red', act: 'fire' },
+      {
+        legend: 'DIMENSIONAL\nWARP',
+        cap: 'white',
+        led: 'blue',
+        act: 'warp',
+      },
+      { legend: 'HICCUP', cap: 'yellow', led: 'amber', act: 'hiccup' },
+    ],
   },
 ];
 
@@ -203,58 +216,35 @@ export function createScenarioSimulator(
   });
   title.position.set(0, 0.075, 0.002);
   panel.face.add(title);
-  // Studio switches, two years newer than the line-up's controls: one
-  // row of coloured caps that stand out against the black rack, each LED
-  // showing its press; SLOW START's stays
-  // lit while the start goes on.
+  // Studio switches, two years newer than the line-up's controls: a row
+  // for each group, its name beside it, coloured caps that stand out
+  // against the black rack, each LED showing its press; SLOW START's
+  // stays lit while the start goes on.
   const starting = signal(false);
   const pitch = 0.052;
-  BUTTONS.forEach((spec, i) => {
-    const button = parts.add(
-      studioSwitch(kit, {
-        name: `${spec.legend} scenario switch`,
-        legend: spec.legend,
-        led: spec.led,
-        cap: spec.cap,
-        lamp: spec.act === 'slowStart' ? starting : undefined,
-        action: () => scenarios[spec.act](),
-      }),
-    );
-    button.object.position.set(
-      (i - (BUTTONS.length - 1) / 2) * pitch,
-      0.028,
-      0.002,
-    );
-    controls.add(button.object);
-  });
-  // A second row: FAULTS, each setting one of the machine's failures going
-  // (see `doc/plans/level0-failures.md`); more as they are modelled.
-  const faultsCaption = createMicroLabel(kit, 'FAULTS', {
-    height: 0.0055,
-    ink: '#c9ced3',
-  });
-  faultsCaption.position.set(
-    -((BUTTONS.length - 1) / 2) * pitch,
-    -0.015,
-    0.002,
-  );
-  panel.face.add(faultsCaption);
-  FAULTS.forEach((spec, i) => {
-    const button = parts.add(
-      studioSwitch(kit, {
-        name: `${spec.legend.replace('\n', ' ')} fault switch`,
-        legend: spec.legend,
-        led: spec.led,
-        cap: spec.cap,
-        action: () => scenarios[spec.act](),
-      }),
-    );
-    button.object.position.set(
-      (i - (BUTTONS.length - 1) / 2) * pitch,
-      -0.045,
-      0.002,
-    );
-    controls.add(button.object);
+  const rowPitch = 0.046;
+  GROUPS.forEach((group, row) => {
+    const y = 0.04 - row * rowPitch;
+    const caption = createMicroLabel(kit, group.title, {
+      height: 0.0055,
+      ink: '#c9ced3',
+    });
+    caption.position.set(-0.165, y, 0.002);
+    panel.face.add(caption);
+    group.switches.forEach((spec, i) => {
+      const button = parts.add(
+        studioSwitch(kit, {
+          name: `${spec.legend.replace('\n', ' ')} ${group.title.toLowerCase()} switch`,
+          legend: spec.legend,
+          led: spec.led,
+          cap: spec.cap,
+          lamp: spec.act === 'slowStart' ? starting : undefined,
+          action: () => scenarios[spec.act](),
+        }),
+      );
+      button.object.position.set(-0.09 + i * pitch, y, 0.002);
+      controls.add(button.object);
+    });
   });
 
   // The door: smoked perspex and its swing handle.

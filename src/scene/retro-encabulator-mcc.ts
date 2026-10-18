@@ -337,6 +337,13 @@ const rod = (
 };
 
 export interface MccView {
+  /** Every unit's face, by its bucket id: where smoke can come from. */
+  unitFaces: ReadonlyMap<
+    string,
+    { section: Group; bay: number; face: SootedFace; centre: number }
+  >;
+  /** Where the doors' fronts are, for smoke along their seams. */
+  doorFront: number;
   /** The exact green-tier indication, shared with observers. */
   steady: Readable<boolean>;
   diagnosticFault: Readable<boolean>;
@@ -1290,6 +1297,10 @@ export function createRetroEncabulatorMcc(
     group,
     parts,
     components,
+    /** Every unit's face, by its bucket id: where smoke can come from. */
+    unitFaces,
+    /** Where the doors' fronts are, for smoke along their seams. */
+    doorFront: DOOR_FRONT,
     steady,
     diagnosticFault: faults.active,
     diagnosticEndpoint: computed(

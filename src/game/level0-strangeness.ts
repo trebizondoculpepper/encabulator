@@ -29,6 +29,20 @@ export const STRANGENESS = {
 const ramp = (x: number, [from, to]: readonly [number, number]) =>
   Math.max(0, Math.min(1, (x - from) / (to - from)));
 
+/**
+ * The most each gets, just before breakdown: well short of dev1's and
+ * dev2's full strength (dev1's activity 1 is the VX3's end-state chaos),
+ * so the room is unsettling, not unreadable. The owner found the first
+ * tuning (activity 1, ghosting 0.55, patterns 0.65, 14 a minute) far too
+ * strong.
+ */
+export const MOST: Strangeness = {
+  activity: 0.3,
+  ghosting: 0.25,
+  patterns: 0.2,
+  apparitionsPerMinute: 4,
+};
+
 export const NORMAL: Strangeness = {
   activity: 0,
   ghosting: 0,
@@ -39,9 +53,10 @@ export const NORMAL: Strangeness = {
 export function strangeness(strain: number, brokenDown: boolean): Strangeness {
   if (brokenDown) return NORMAL;
   return {
-    activity: ramp(strain, STRANGENESS.activity),
-    ghosting: 0.55 * ramp(strain, STRANGENESS.ghosting),
-    patterns: 0.65 * ramp(strain, STRANGENESS.patterns),
-    apparitionsPerMinute: 14 * ramp(strain, STRANGENESS.apparitions),
+    activity: MOST.activity * ramp(strain, STRANGENESS.activity),
+    ghosting: MOST.ghosting * ramp(strain, STRANGENESS.ghosting),
+    patterns: MOST.patterns * ramp(strain, STRANGENESS.patterns),
+    apparitionsPerMinute:
+      MOST.apparitionsPerMinute * ramp(strain, STRANGENESS.apparitions),
   };
 }

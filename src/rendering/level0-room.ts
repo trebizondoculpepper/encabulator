@@ -57,6 +57,7 @@ import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createLevel0Machine } from './level0-machine';
 import { createLevel0Scenarios } from './level0-scenarios';
 import { createLevel0Failures } from './level0-failures';
+import { createLevel0Symptoms } from './level0-symptoms';
 import { createLevel0Strangeness } from './level0-strangeness';
 import { SIMULATOR_HALF, createScenarioSimulator } from './scenario-simulator';
 import { addWarehouseLighting } from './warehouse-lighting';
@@ -154,7 +155,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   machine.onBoardRemoved(conjureSkip);
 
   // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
-  const scenarios = createLevel0Scenarios(machine);
+  // The simulator's SYMPTOMS: a failure's effects without its cause.
+  const symptoms = createLevel0Symptoms(machine);
+  const scenarios = createLevel0Scenarios(machine, Math.random, symptoms);
   // What the machine's failures look and sound like: the oil spill, worn
   // bearings grinding, the seizure.
   const failures = createLevel0Failures(kit, machine);
@@ -349,10 +352,11 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
-    failures.update(delta);
+    symptoms.update(delta);
+    failures.update(delta, symptoms.spill);
     strangeness.update(
       delta,
-      machine.plant.strain.value,
+      Math.max(machine.plant.strain.value, symptoms.strain),
       machine.plant.brokenDown.value,
     );
     partAudio.listen(camera, m);
@@ -365,6 +369,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     walk.dispose();
     machine.dispose();
     failures.dispose();
+    symptoms.dispose();
     strangeness.dispose();
     mcc.parts.dispose();
     room.parts.dispose();

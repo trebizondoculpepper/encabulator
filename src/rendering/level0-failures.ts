@@ -157,10 +157,11 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
   let clock = 0;
   return {
     spill,
-    update(delta: number) {
+    /** `symptom`: oil the simulator's OIL LEAK has spread, 0 to 1. */
+    update(delta: number, symptom = 0) {
       clock += delta;
       // The spill, as wide as the oil that has leaked out.
-      const out = plant.spilled.value;
+      const out = Math.max(plant.spilled.value, symptom);
       spill.visible = out > 0.002;
       const radius = 0.12 + SPILL_METRES * 0.5 * Math.sqrt(out);
       spill.scale.set(radius, radius, 1);

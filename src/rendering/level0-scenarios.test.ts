@@ -21,6 +21,7 @@ import {
 } from './level0-scenarios';
 import { createLevel0Machine } from './level0-machine';
 import { createLevel0Failures } from './level0-failures';
+import { LEAK_SECONDS, createLevel0Symptoms } from './level0-symptoms';
 import { NORMAL, strangeness } from '../game/level0-strangeness';
 
 beforeEach(() => {
@@ -51,12 +52,14 @@ vi.setConfig({ testTimeout: 30_000 });
 function sandbox() {
   const kit = createPanelKit();
   const machine = createLevel0Machine(kit, { random: () => 0.99 });
-  const cheats = createLevel0Scenarios(machine, () => 0);
+  const symptoms = createLevel0Symptoms(machine);
+  const cheats = createLevel0Scenarios(machine, () => 0, symptoms);
   const panel = createScenarioSimulator(kit, cheats);
   const run = (seconds: number, dt = 0.1) => {
     for (let t = 0; t < seconds - 1e-9; t += dt) {
       panel.update(dt);
       machine.update(dt);
+      symptoms.update(dt);
     }
   };
   const dispose = () => {
@@ -65,7 +68,7 @@ function sandbox() {
     machine.mcc.parts.dispose();
     disposeKit(kit, machine.mcc.group);
   };
-  return { machine, cheats, panel, run, dispose };
+  return { machine, cheats, panel, symptoms, run, dispose };
 }
 
 /**
@@ -159,7 +162,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     const { machine, panel, run, dispose } = sandbox();
     workDoor(panel);
     run(0.5);
-    useOf(panel, 'FULL ON scenario switch')();
+    useOf(panel, 'FULL ON states switch')();
     // Everything boots and builds: six dimensions take about a minute.
     run(60);
     const { plant } = machine;
@@ -168,7 +171,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(plant.state.driveHz.value).toBeCloseTo(PLANT.driveMaxHz, 3);
     expect(plant.phaseLocked.value).toBe(true);
     expect(plant.achieved.value).toBe(6);
-    useOf(panel, 'FULL OFF scenario switch')();
+    useOf(panel, 'FULL OFF states switch')();
     run(10);
     expect(machine.mcc.supply.value).toBe(false);
     expect(plant.electrical.mains.value).toBe(false);
@@ -236,12 +239,12 @@ describe('the Hyperplasc Scenario Simulator', () => {
         failures.update(0.5);
       }
     };
-    useOf(panel, 'FULL ON scenario switch')();
+    useOf(panel, 'FULL ON states switch')();
     step(40);
     // Started all at once, the motor took a trace of wear as the oil came up.
     expect(machine.plant.strain.value).toBeLessThan(0.01);
-    useOf(panel, 'OIL SEAL fault switch')();
-    useOf(panel, 'PRESSURE SWITCH fault switch')();
+    useOf(panel, 'OIL SEAL faults switch')();
+    useOf(panel, 'PRESSURE SWITCH faults switch')();
     step(30);
     // Oil on the floor, spreading.
     expect(failures.spill.visible).toBe(true);
@@ -255,7 +258,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
       );
     }
     expect(failures.spill.scale.x).toBeGreaterThan(early);
-    expect(strange).toBeGreaterThan(0.3);
+    expect(strange).toBeGreaterThan(0.15);
     // The breakdown: seized, its overload and the main breaker tripped.
     expect(machine.plant.brokenDown.value).toBe(true);
     expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
@@ -268,11 +271,57 @@ describe('the Hyperplasc Scenario Simulator', () => {
       strangeness(machine.plant.strain.value, machine.plant.brokenDown.value),
     ).toEqual(NORMAL);
     // RESET: refilled, mopped up, the motor's bearings replaced.
-    useOf(panel, 'RESET scenario switch')();
+    useOf(panel, 'RESET states switch')();
     step(1);
     expect(machine.plant.brokenDown.value).toBe(false);
     expect(failures.spill.visible).toBe(false);
     failures.dispose();
+    dispose();
+  });
+
+  it('groups its switches as STATES, FAULTS and SYMPTOMS', () => {
+    const { panel, dispose } = sandbox();
+    for (const name of [
+      'FULL OFF states switch',
+      'SLOW START states switch',
+      'OIL SEAL faults switch',
+      'KAPUT faults switch',
+      'OIL LEAK symptoms switch',
+      'FIRE symptoms switch',
+      'DIMENSIONAL WARP symptoms switch',
+      'HICCUP symptoms switch',
+    ])
+      expect(useOf(panel, name)).toBeTypeOf('function');
+    dispose();
+  });
+
+  it('shows symptoms without their causes, and RESET puts them away', () => {
+    const { machine, panel, symptoms, run, dispose } = sandbox();
+    useOf(panel, 'FULL ON states switch')();
+    run(30, 0.5);
+    useOf(panel, 'OIL LEAK symptoms switch')();
+    useOf(panel, 'FIRE symptoms switch')();
+    useOf(panel, 'DIMENSIONAL WARP symptoms switch')();
+    run(LEAK_SECONDS, 0.5);
+    // The oil spreads and the fire burns, but nothing is wrong underneath.
+    expect(symptoms.spill).toBeCloseTo(1, 6);
+    expect(machine.plant.spilled.value).toBe(0);
+    expect(machine.plant.oilOk.value).toBe(true);
+    expect(symptoms.burning).toBe(false);
+    // Its smoke has cleared, leaving soot on the faces above.
+    expect(symptoms.soot).toBeGreaterThan(0.3);
+    // The warp built and has gone again of itself.
+    expect(symptoms.strain).toBe(0);
+    useOf(panel, 'FIRE symptoms switch')();
+    useOf(panel, 'DIMENSIONAL WARP symptoms switch')();
+    run(10, 0.5);
+    expect(symptoms.burning).toBe(true);
+    expect(symptoms.strain).toBeGreaterThan(0.5);
+    useOf(panel, 'RESET states switch')();
+    expect(symptoms.spill).toBe(0);
+    expect(symptoms.burning).toBe(false);
+    expect(symptoms.soot).toBe(0);
+    expect(symptoms.strain).toBe(0);
     dispose();
   });
 });
