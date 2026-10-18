@@ -55,6 +55,9 @@ const openRoom = async () => {
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
   else if (room === 'dev12')
     start = (await import('./toolkit/gallery/rooms/tones-room')).startTonesRoom;
+  else if (room === 'dev19')
+    start = (await import('./toolkit/gallery/rooms/retro-computing-room'))
+      .startRetroComputingRoom;
   else if (room === 'dev18')
     start = (await import('./toolkit/gallery/rooms/architectural-room'))
       .startArchitecturalGalleryRoom;

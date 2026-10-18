@@ -194,22 +194,20 @@ export function createLevel0Dresser(
           });
           put(view.group, cx - 0.16 + k * 0.09, -0.02);
           every((delta) => {
-            view.set(
-              lit.value ? (480 - p.loadAmps.value * 0.06 - k * 0.8) / 600 : 0,
-            );
+            view.set(lit.value ? p.supplyVolts.value[k] / 600 : 0);
             view.update(delta);
           });
         }
         caption('LINE VOLTS', cx - 0.07, -0.085);
         place(
-          // An ammeter selector switch's four positions: OFF disconnects
-          // the ammeter.
+          // A meter selector switch's four positions: OFF disconnects the
+          // power monitor's volts and amps; L1 to L3 choose the phase.
           selector(kit, { positions: 4, bound: p.control.ammeterPhase }),
           cx + 0.13,
           -0.03,
           0.9,
         );
-        legend('AMMETER PHASE', cx + 0.13, 0.005, 0.075);
+        legend('METER PHASE', cx + 0.13, 0.005, 0.075);
         caption('OFF  L1  L2  L3', cx + 0.13, -0.075);
         return true;
       }
@@ -219,17 +217,23 @@ export function createLevel0Dresser(
         const monitor = createPowerMonitor(kit);
         put(monitor.group, cx - 0.1, top - 0.08);
         caption(
-          'SUPPLY: VOLTS, AMPS (SELECTED PHASE), KW',
+          'METER PHASE: ITS VOLTS (TO NEXT LINE), AMPS · TOTAL KW',
           cx - 0.1,
           top - 0.145,
         );
         every(() => {
-          const volts = 480 - p.loadAmps.value * 0.06;
-          const amps = p.phaseAmps.value;
+          // The selected phase's volts and amps; kW from all three.
+          const { volts, amps } = p.meterReading.value;
+          const lines = p.lineAmps.value;
+          const average = p.supplyVolts.value.reduce((a, b) => a + b, 0) / 3;
           monitor.show(
             volts,
             amps,
-            (Math.sqrt(3) * volts * p.loadAmps.value * 0.86) / 1000,
+            (Math.sqrt(3) *
+              average *
+              ((lines[0] + lines[1] + lines[2]) / 3) *
+              0.86) /
+              1000,
             lit.value,
           );
         });

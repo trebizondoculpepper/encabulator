@@ -324,8 +324,20 @@ export function machineComponent(
       a.object.add(view.group);
       const level = props.handleSoundLevel ?? 0.3;
       a.voice(handle, {
-        on: click({ band: 900, q: 1, decay: 0.06, level }),
-        off: click({ band: 1200, q: 1, decay: 0.04, level }),
+        on: click({
+          band: 480,
+          q: 0.8,
+          decay: 0.08,
+          level,
+          thump: [135, 0.075],
+        }),
+        off: click({
+          band: 420,
+          q: 0.8,
+          decay: 0.065,
+          level,
+          thump: [145, 0.065],
+        }),
         trip: click({ band: 1700, q: 2, decay: 0.1, level: 0.4 }),
       });
       a.uses.set(view.service, handle.operate);

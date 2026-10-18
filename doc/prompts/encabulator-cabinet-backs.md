@@ -2,6 +2,8 @@
 
 Give the freestanding Encabulator a convincing rear elevation, visible when walking around it in the warehouse. Some cabinets should have solid backs; others should offer rear access to their internal equipment. This is a future implementation prompt; writing it does not execute the design.
 
+Research and a proposed per-section implementation plan are now available in [the plan](../plans/encabulator-cabinet-backs.md), [research notes](../research/encabulator-cabinet-backs.md) and [reference pictures](../../resources/reference/encabulator-cabinet-backs/README.md). Read these before implementation. Coordinate a future diagnostic cable connection with [the BBC Micro terminal prompt](bbc-micro-diagnostic-terminal.md), without implementing that separate feature as part of this task.
+
 ## Design intent
 
 Use real industrial cabinet construction as the reference. Start with the Rockwell CENTERLINE 2100 selection guide (https://literature.rockwellautomation.com/idc/groups/literature/documents/sg/2100-sg003_-en-p.pdf) and manufacturer enclosure/cable-entry documentation from Rittal or equivalent. Confirm relevant dimensions and construction details before modeling. Preserve the machine's existing proportions, powder-blue finish and Neumann Dynamik identity.

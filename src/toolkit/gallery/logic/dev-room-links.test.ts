@@ -28,7 +28,7 @@ describe('the rooms', () => {
       { to: 'dev0', side: 'north', x: bounds.minX + 2.1, z: bounds.minZ },
     ]);
     expect(devPortals('rhombus', bounds, 1)).toEqual([
-      { to: 'dev18', side: 'east', x: bounds.maxX, z: 0 },
+      { to: 'dev19', side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
 
@@ -49,6 +49,7 @@ describe('the rooms', () => {
   it('keeps the old rhombus URL as an alias, and dev4 is a room again', () => {
     expect(resolveRoomId('dev4')).toBe('dev4');
     expect(resolveRoomId('dev5')).toBe('rhombus');
+    expect(resolveRoomId('retro-computing')).toBe('dev19');
     expect(resolveRoomId('hall')).toBe('hall');
     expect(resolveRoomId('rhombus')).toBe('rhombus');
     expect(resolveRoomId('training')).toBe('training');

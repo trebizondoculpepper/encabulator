@@ -35,6 +35,13 @@ export type CardKind = (typeof CARD_KINDS)[number];
 export type CardCondition = 'ok' | 'failed' | 'absent';
 
 export const PLANT = {
+  /** The supply: nominal phase-to-phase volts, the supply's impedance
+   * (ohms, as volts lost an amp), how far a pair's voltage wanders an amp
+   * of its current, and the control transformer's current across L1-L2. */
+  nominalVolts: 480,
+  supplyOhms: 0.1,
+  fluctuationVoltsPerAmp: 0.02,
+  controlTransformerAmps: 4,
   /** Lube oil, psi: running pressure, and the drive's permissive. */
   oilPressure: 45,
   oilOk: 25,
@@ -282,9 +289,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     }),
     /** AUXILIARY DRIVE SPEED, detents 0 to 10. */
     auxSpeed: g.input('aux.speed', 0, { where: 'AUXILIARY DRIVE SPEED knob' }),
-    /** MAIN INCOMING AMMETER PHASE: 0 OFF (ammeter disconnected), 1 L1, 2 L2, 3 L3. */
+    /** MAIN INCOMING METER PHASE: 0 OFF (meter disconnected), 1 L1, 2 L2, 3 L3. */
     ammeterPhase: g.input('incoming.ammeter', 0, {
-      where: 'MAIN INCOMING AMMETER PHASE selector',
+      where: 'MAIN INCOMING METER PHASE selector',
     }),
     /** The main disconnect's Kirk key, in and turned (true); it starts out. */
     kirk: g.input('main.kirk', false, { where: 'MAIN DISCONNECT Kirk key' }),
@@ -616,14 +623,68 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     where: 'RECIPROCATING DINGLE ARM logger',
   });
   /**
-   * The current in the phase MAIN INCOMING's AMMETER PHASE selects; none
-   * with it OFF, the ammeter disconnected.
+   * The current in each line, L1, L2 and L3. The motors and drives are
+   * balanced three-phase loads; the control transformer (lamps,
+   * controllers, the PLC) is a single-phase load across L1 and L2, so
+   * those two lines carry its current too.
    */
-  const phaseAmps = g.output(
-    'supply.phaseAmps',
-    [loadAmps, control.ammeterPhase],
-    (amps, phase) => amps * [0, 1.02, 0.99, 1.03][phase],
-    { where: 'MAIN DISCONNECT power monitor' },
+  const lineAmps = g.derive(
+    'supply.lineAmps',
+    [loadAmps, e.mains],
+    (amps, mains) => {
+      const control = mains ? PLANT.controlTransformerAmps : 0;
+      const balanced = Math.max(0, amps - control);
+      return [balanced + control, balanced + control, balanced];
+    },
+    { equals: sameList as never },
+  );
+  /**
+   * The phase-to-phase voltages, L1-L2, L2-L3 and L3-L1: the nominal
+   * supply, sagging across the supply's impedance with the current in
+   * each pair's two lines, and fluctuating gently, slowly and by an
+   * amount that grows with that current. Without load all three read the
+   * same steady nominal voltage; without the incoming supply, nothing.
+   */
+  const supplyVolts = g.output(
+    'supply.volts',
+    [e.incoming, lineAmps, s.clock],
+    (incoming, [i1, i2, i3], t) => {
+      if (!incoming) return [0, 0, 0];
+      const pair = (a: number, b: number, k: number) => {
+        const amps = (a + b) / 2;
+        const wobble =
+          Math.sin(t * (0.53 + k * 0.17) + k * 2.1) * 0.6 +
+          Math.sin(t * (1.31 + k * 0.23) + k * 0.7) * 0.4;
+        return (
+          PLANT.nominalVolts -
+          amps * PLANT.supplyOhms -
+          amps * PLANT.fluctuationVoltsPerAmp * wobble
+        );
+      };
+      return [pair(i1, i2, 0), pair(i2, i3, 1), pair(i3, i1, 2)];
+    },
+    {
+      where: 'MAIN INCOMING voltmeters; MAIN DISCONNECT power monitor',
+      equals: sameList as never,
+    },
+  );
+  /**
+   * What MAIN INCOMING's METER PHASE selector puts on the power monitor:
+   * OFF, nothing; L1, L2 or L3, that line's current and its voltage to the
+   * next line. It only chooses what is measured; it moves no load.
+   */
+  const meterReading = g.output(
+    'supply.meter',
+    [control.ammeterPhase, lineAmps, supplyVolts],
+    (phase, amps, volts) =>
+      phase === 0
+        ? { volts: 0, amps: 0 }
+        : { volts: volts[phase - 1], amps: amps[phase - 1] },
+    {
+      where: 'MAIN DISCONNECT power monitor',
+      equals: ((a: { volts: number; amps: number }, b: typeof a) =>
+        a.volts === b.volts && a.amps === b.amps) as never,
+    },
   );
   /** What each display has been set to show: nothing else depends on it. */
   const displays = g.output(
@@ -1226,7 +1287,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     coherence,
     gramReading,
     loadAmps,
-    phaseAmps,
+    lineAmps,
+    supplyVolts,
+    meterReading,
     displays,
     closePermit,
     gramDisplay,

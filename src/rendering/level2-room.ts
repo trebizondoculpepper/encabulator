@@ -1,3 +1,4 @@
+import { addMachineWorkstation } from './machine-workstation';
 import {
   createLevel2NormalOperations,
   drawNormalOperations,
@@ -128,6 +129,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL2_MACHINE.x * m, 0, LEVEL2_MACHINE.z * m);
   scene.add(mcc.group);
+  const workstation = addMachineWorkstation(kit, LEVEL2_MACHINE, m);
+  scene.add(workstation.group);
   const device = (id: string) =>
     mcc.components.find((item) => item.object.name === `${id}: breaker`)!
       .breaker!;
@@ -426,7 +429,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
     const hit = raycaster.intersectObjects(
-      [mcc.group, ...room.fittings],
+      [mcc.group, workstation.group, ...room.fittings],
       true,
     )[0];
     if (!hit || hit.distance > 3.2 * m) return null;
@@ -435,7 +438,10 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       object;
       object = object.parent
     ) {
-      const work = mcc.parts.uses.get(object) ?? room.parts.uses.get(object);
+      const work =
+        mcc.parts.uses.get(object) ??
+        workstation.parts.uses.get(object) ??
+        room.parts.uses.get(object);
       if (!work) continue;
       return () => work(knobDirection(object!, hit.point, camera));
     }
@@ -482,6 +488,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     start: { ...LEVEL2_START, x: LEVEL2_START.x * m, z: LEVEL2_START.z * m },
     solids: () => [
       ...walls,
+      ...workstation.solids(),
       ...roomSolids,
       ...footprints,
       ...(skip
@@ -546,6 +553,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     clock += delta;
     walk.update(delta);
     room.parts.update(delta);
+    workstation.parts.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     mcc.update(delta);
@@ -836,6 +844,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     voice.dispose();
     mcc.parts.dispose();
     room.parts.dispose();
+    workstation.dispose();
     disposeKit(kit, scene as unknown as Group);
     scene.remove(skipModel.group, chairs);
     skipLamps?.dispose();
@@ -883,11 +892,13 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     suspend() {
       mcc.parts.setAudible(false);
       room.parts.setAudible(false);
+      workstation.setAudible(false);
       voice.suspend();
     },
     resume() {
       mcc.parts.setAudible(true);
       room.parts.setAudible(true);
+      workstation.setAudible(true);
       voice.resume();
     },
   });

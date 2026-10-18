@@ -297,4 +297,100 @@ describe('Level 0 process model', () => {
     expect(analysis.unwrittenStates).toEqual([]);
     expect(analysis.invisible).toEqual([]);
   });
+
+  describe('supply voltage', () => {
+    const spread = (v: readonly number[]) => Math.max(...v) - Math.min(...v);
+    /** The lowest and highest each pair reads over a minute. */
+    const watch = (p: ReturnType<typeof plant>) => {
+      const low = [Infinity, Infinity, Infinity];
+      const high = [-Infinity, -Infinity, -Infinity];
+      for (let t = 0; t < 60; t += 0.25) {
+        p.step(0.25);
+        p.supplyVolts.value.forEach((v, k) => {
+          low[k] = Math.min(low[k], v);
+          high[k] = Math.max(high[k], v);
+        });
+      }
+      return { low, high };
+    };
+
+    it('reads nothing without the incoming supply', () => {
+      const p = plant({});
+      p.step(1);
+      expect(p.supplyVolts.value).toEqual([0, 0, 0]);
+    });
+
+    it('reads the same steady nominal voltage on every pair with the main disconnect open', () => {
+      const p = plant({ incoming: true });
+      const { low, high } = watch(p);
+      expect(low).toEqual([480, 480, 480]);
+      expect(high).toEqual([480, 480, 480]);
+    });
+
+    it('sags and gently fluctuates under load, more under more load, and recovers without it', () => {
+      const light = plant({
+        ...RUNNING,
+        lube: false,
+        cooling: false,
+        vent: false,
+      });
+      const heavy = plant({
+        ...RUNNING,
+        mainMotor: true,
+        feed: true,
+        auxMotor: true,
+        hydraulic: true,
+        hydro: true,
+        fan: true,
+      });
+      heavy.control.driveSpeed.set(10);
+      heavy.driveStart();
+      run(heavy, 10);
+      const l = watch(light);
+      const h = watch(heavy);
+      for (let k = 0; k < 3; k++) {
+        expect(l.high[k]).toBeLessThan(480);
+        expect(h.high[k]).toBeLessThan(l.low[k]);
+        // Bounded and readable: within a few volts of its sag.
+        expect(h.high[k] - h.low[k]).toBeGreaterThan(l.high[k] - l.low[k]);
+        expect(h.high[k] - h.low[k]).toBeLessThan(6);
+        expect(h.low[k]).toBeGreaterThan(460);
+      }
+      // A step of a quarter second moves it smoothly, not in jumps.
+      let previous = heavy.supplyVolts.value;
+      for (let i = 0; i < 40; i++) {
+        heavy.step(0.25);
+        heavy.supplyVolts.value.forEach((v, k) =>
+          expect(Math.abs(v - previous[k])).toBeLessThan(1),
+        );
+        previous = heavy.supplyVolts.value;
+      }
+      // The control transformer across L1-L2 loads that pair more: lower
+      // in the middle of its fluctuation.
+      const middle = (k: number) => (h.low[k] + h.high[k]) / 2;
+      expect(middle(0)).toBeLessThan(middle(1));
+      expect(heavy.lineAmps.value[0]).toBeGreaterThan(heavy.lineAmps.value[2]);
+      heavy.sense({ mains: false });
+      heavy.step(0.25);
+      expect(heavy.supplyVolts.value).toEqual([480, 480, 480]);
+      expect(spread(heavy.supplyVolts.value)).toBe(0);
+    });
+
+    it('measures the selected phase without moving any load', () => {
+      const p = plant({ ...RUNNING, mainMotor: true, feed: true });
+      run(p, 5);
+      const volts = p.supplyVolts.value;
+      const lines = p.lineAmps.value;
+      expect(p.meterReading.value).toEqual({ volts: 0, amps: 0 });
+      for (const phase of [1, 2, 3]) {
+        p.control.ammeterPhase.set(phase);
+        expect(p.supplyVolts.value).toEqual(volts);
+        expect(p.lineAmps.value).toEqual(lines);
+        expect(p.meterReading.value).toEqual({
+          volts: volts[phase - 1],
+          amps: lines[phase - 1],
+        });
+      }
+    });
+  });
 });

@@ -257,9 +257,9 @@ describe('Level 0 machine wiring', () => {
     run(1);
     expect(mcc.circuits.get(UNITS.hydraulic)!.running.value).toBe(true);
     // The ammeter reads nothing until a phase is selected.
-    expect(plant.phaseAmps.value).toBe(0);
+    expect(plant.meterReading.value.amps).toBe(0);
     plant.control.ammeterPhase.set(1);
-    expect(plant.phaseAmps.value).toBeGreaterThan(0);
+    expect(plant.meterReading.value.amps).toBeGreaterThan(0);
     dispose();
   });
 

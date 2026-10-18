@@ -247,18 +247,19 @@ const MUSHROOM = click({
 });
 /** A disconnect's operating handle: a stiff lever, a heavy mechanism. */
 const HANDLE = click({
-  band: 900,
-  q: 1.1,
-  decay: 0.08,
-  level: 0.9,
-  thump: [70, 0.12],
+  band: 420,
+  q: 0.75,
+  decay: 0.095,
+  level: 0.5,
+  thump: [115, 0.11],
 });
-/** A restrained enclosed-switch click, without the contact crash or bass impact. */
+/** A restrained enclosed-switch thock, with a short low body and no metallic crash. */
 const ISOLATOR_CLICK = click({
-  band: 700,
-  q: 0.8,
-  decay: 0.045,
-  level: 0.2,
+  band: 380,
+  q: 0.7,
+  decay: 0.085,
+  level: 0.3,
+  thump: [125, 0.09],
 });
 /**
  * A heavy switch's quick-make mechanism: the handle charges a spring (a
@@ -280,10 +281,10 @@ const CONTACTS_CLOSE: SoundRecipe = {
     },
     {
       at: 0.085,
-      click: { band: 2600, q: 1.1, decay: 0.045, level: 1, thump: [58, 0.16] },
+      click: { band: 500, q: 0.8, decay: 0.09, level: 0.6, thump: [105, 0.12] },
     },
-    { at: 0.093, click: { band: 4200, q: 2.5, decay: 0.02, level: 0.45 } },
-    { at: 0.1, click: { band: 5600, q: 9, decay: 0.16, level: 0.22 } },
+    { at: 0.093, click: { band: 1100, q: 1, decay: 0.018, level: 0.13 } },
+    { at: 0.1, click: { band: 1600, q: 2, decay: 0.06, level: 0.07 } },
   ],
 };
 /** And breaking: the same spring, the contacts flung apart, a little lighter. */
@@ -296,14 +297,14 @@ const CONTACTS_OPEN: SoundRecipe = {
     {
       at: 0.07,
       click: {
-        band: 2200,
-        q: 1.1,
-        decay: 0.04,
-        level: 0.85,
-        thump: [70, 0.12],
+        band: 440,
+        q: 0.8,
+        decay: 0.075,
+        level: 0.5,
+        thump: [120, 0.1],
       },
     },
-    { at: 0.08, click: { band: 5200, q: 9, decay: 0.12, level: 0.16 } },
+    { at: 0.08, click: { band: 1500, q: 2, decay: 0.05, level: 0.06 } },
   ],
 };
 /** A breaker tripping: a sharp spring-loaded snap. */

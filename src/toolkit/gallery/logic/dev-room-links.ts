@@ -29,7 +29,8 @@ export type DevRoomId =
   | 'dev15'
   | 'dev16'
   | 'dev17'
-  | 'dev18';
+  | 'dev18'
+  | 'dev19';
 export type RoomId =
   | DevRoomId
   | 'hall'
@@ -66,6 +67,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev16',
   'dev17',
   'dev18',
+  'dev19',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -77,6 +79,7 @@ export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall', 'level0', 'level2'];
 /** Historic URLs remain usable without changing the address bar. */
 export function resolveRoomId(id: string | null): RoomId | undefined {
   if (id === 'dev5') return 'rhombus';
+  if (id === 'retro-computing') return 'dev19';
   return ROOMS.includes(id as RoomId) ? (id as RoomId) : undefined;
 }
 
@@ -99,6 +102,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev16: 'DEV16 · GRAFFITI GALLERY',
   dev17: 'DEV17 · WAREHOUSE TRAINING ROOM',
   dev18: 'DEV18 · BUILDING FITTINGS',
+  dev19: 'DEV19 · RETRO COMPUTING',
   hall: 'THE HALL',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
@@ -125,6 +129,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev16: '#e8306b',
   dev17: '#a7b4b1',
   dev18: '#b6be9d',
+  dev19: '#b99b6c',
   hall: '#c9c23a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',

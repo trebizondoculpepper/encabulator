@@ -1,3 +1,5 @@
+import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
+import { addMachineWorkstation } from './machine-workstation';
 import {
   Group,
   Mesh,
@@ -67,10 +69,14 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   const kit = createPanelKit();
-  const room = createWarehouseTrainingRoom(kit);
+  const building = createArchitecturalServices();
+  const room = createWarehouseTrainingRoom(kit, false, { lighting: building });
   room.group.scale.setScalar(m);
   scene.add(room.group);
-  addWarehouseLighting(scene, room.lights, m);
+  const lighting = addWarehouseLighting(scene, room.lights, m, {
+    daylight: 0.5,
+    circuit: building.model.lighting.roomLight,
+  });
   const bounds: Footprint = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -89,6 +95,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
   scene.add(mcc.group);
+  const workstation = addMachineWorkstation(kit, LEVEL0_MACHINE, m);
+  scene.add(workstation.group);
 
   // ---- The skip that was always there --------------------------------------
   const tossing = createBinTossing({ camera, metre: m });
@@ -126,7 +134,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
     const hit = raycaster.intersectObjects(
-      [mcc.group, ...room.fittings],
+      [mcc.group, workstation.group, ...room.fittings],
       true,
     )[0];
     if (!hit || hit.distance > 3.2 * m) return null;
@@ -135,7 +143,10 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       object;
       object = object.parent
     ) {
-      const work = mcc.parts.uses.get(object) ?? room.parts.uses.get(object);
+      const work =
+        mcc.parts.uses.get(object) ??
+        workstation.parts.uses.get(object) ??
+        room.parts.uses.get(object);
       if (work) return () => work(knobDirection(object!, hit.point, camera));
     }
     return null;
@@ -188,6 +199,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     start: { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
     solids: () => [
       ...walls,
+      ...workstation.solids(),
       ...roomSolids,
       ...footprints,
       skip
@@ -238,6 +250,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     room.parts.update(delta);
+    lighting.update();
+    workstation.parts.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
@@ -251,6 +265,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     machine.dispose();
     mcc.parts.dispose();
     room.parts.dispose();
+    workstation.dispose();
     skipLamps?.dispose();
     skipGraffiti?.dispose();
     scene.remove(skipModel.group, chairs);
@@ -294,10 +309,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     suspend() {
       mcc.parts.setAudible(false);
       room.parts.setAudible(false);
+      workstation.setAudible(false);
     },
     resume() {
       mcc.parts.setAudible(true);
       room.parts.setAudible(true);
+      workstation.setAudible(true);
     },
   });
 }
