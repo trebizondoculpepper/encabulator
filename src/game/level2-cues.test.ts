@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import lines from '../audio/assets/narration/level2/lines.json';
-import { LEVEL2_BETAFORM, LEVEL2_RESET } from './level2-cues';
+import { LEVEL2_BETAFORM, LEVEL2_RESET, LEVEL2_STARTUP } from './level2-cues';
 
 const recorded = new Set(Object.values(lines));
 
@@ -9,6 +9,7 @@ describe('the Level 2 narration', () => {
   // match a recording exactly or the voice refuses it.
   it('has a recording for every line it plays by its text', () => {
     const all = [
+      ...Object.values(LEVEL2_STARTUP),
       LEVEL2_BETAFORM.intro,
       LEVEL2_BETAFORM.outro,
       LEVEL2_BETAFORM.done,

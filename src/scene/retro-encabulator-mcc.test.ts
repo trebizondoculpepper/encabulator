@@ -633,11 +633,14 @@ it('starts off, and the isolator and main disconnect supply every bucket, includ
   );
   expect(consumers.length).toBeGreaterThan(5);
   expect(consumers.every((d) => !d.active.value)).toBe(true);
+  expect(mcc.supply.value).toBe(false);
+  expect(main.breaker!.closed.value).toBe(false);
   // The main disconnect alone does nothing while the isolator is off.
   main.breaker!.operate();
   mcc.update(3);
   expect(consumers.every((d) => !d.active.value)).toBe(true);
   isolate(mcc);
+  expect(mcc.supply.value).toBe(true);
   mcc.update(3);
   expect(consumers.every((d) => d.active.value)).toBe(true);
   main.breaker!.operate();

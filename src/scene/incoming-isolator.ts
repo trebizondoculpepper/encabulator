@@ -4,34 +4,15 @@ import { disconnectHandle } from '../rendering/parts';
 import type { PanelKit } from './eighties-controls';
 import { createMicroLabel, kitPaint } from './eighties-controls';
 
-/** The enclosure's yellow moulding, and its lid's, a shade lighter. */
-const YELLOW = '#f0c419';
-const LID = '#f5cf2e';
-/**
- * The enclosure, metres: Eaton's P3-100/I5/SVB, a 100 A three-pole main
- * switch in an insulated surface-mounting box, 200 × 280 × 169 mm.
- */
-const W = 0.2;
-const H = 0.28;
-const D = 0.169;
-/** How high its middle hangs, and how far back its face is from the line-up's. */
+/** Steel enclosure after the Square D HU365: 50.25 × 27.63 × 10.13 inches. */
+const W = 0.702;
+const H = 1.276;
+const D = 0.257;
 const Y = 1.45;
 const FACE_Z = -0.3;
-/** The galvanised stand's posts, either side of the box. */
-const POST_X = 0.09;
+const POST_X = 0.25;
 
-/**
- * The incoming supply isolator: an enclosed rotary main switch, yellow,
- * with a red rotary handle (after Eaton's P3-100/I5/SVB, 100 A, three
- * poles, under a maker's name of our own), on a galvanised unistrut stand
- * to the left of the motor control line-up. The 480 V three-phase supply
- * comes down to it in rigid conduit from overhead into a gland in its top
- * and goes on through a short conduit from its side into the line-up's
- * first section, MAIN INCOMING. Its handle turns a quarter turn, 0 (OFF)
- * to I (ON); it starts off, and off, nothing in the line-up is live. Its
- * origin is on the floor, under the middle of its face's plane; its face
- * is at `FACE_Z`.
- */
+/** Floor-fed steel safety switch on a bolted channel stand, beside MAIN INCOMING. */
 export function createIncomingIsolator(
   kit: PanelKit,
   initial: 'off' | 'on' = 'off',
@@ -64,18 +45,38 @@ export function createIncomingIsolator(
     return mesh;
   };
   const galvanised = kitPaint(kit, '#9ea3a4', 0.6);
-  const conduit = kitPaint(kit, '#a7abab', 0.7);
+  const trunking = kitPaint(kit, '#a7abab', 0.7);
   const grey = kitPaint(kit, '#4a4d50');
   const back = FACE_Z - D;
   // Two unistrut posts from the floor, the channels across them, and the
   // box bolted to the channels.
-  for (const x of [-POST_X, POST_X])
+  for (const x of [-POST_X, POST_X]) {
     add(galvanised, 0.041, 2.3, 0.041, x, 1.15, back - 0.021);
-  for (const y of [Y - 0.1, Y + 0.1])
+    add(galvanised, 0.14, 0.012, 0.22, x, 0.006, back - 0.021);
+    for (const dz of [-0.075, 0.075])
+      add(grey, 0.018, 0.012, 0.018, x, 0.018, back - 0.021 + dz);
+  }
+  for (const y of [Y - H / 2 + 0.08, Y + H / 2 - 0.08])
     add(galvanised, 2 * POST_X + 0.06, 0.041, 0.041, 0, y, back - 0.021);
-  // The moulded box, and its lid, screwed at the corners.
-  add(kitPaint(kit, YELLOW), W, H, D - 0.012, 0, Y, FACE_Z - D / 2 - 0.006);
-  add(kitPaint(kit, LID), W - 0.004, H - 0.004, 0.012, 0, Y, FACE_Z - 0.006);
+  // Folded steel case and slightly inset front door.
+  add(
+    kitPaint(kit, '#929697', 0.45),
+    W,
+    H,
+    D - 0.012,
+    0,
+    Y,
+    FACE_Z - D / 2 - 0.006,
+  );
+  add(
+    kitPaint(kit, '#a5a8a8', 0.42),
+    W - 0.004,
+    H - 0.004,
+    0.012,
+    0,
+    Y,
+    FACE_Z - 0.006,
+  );
   for (const sx of [-1, 1])
     for (const sy of [-1, 1]) {
       const screw = new Mesh(
@@ -90,65 +91,90 @@ export function createIncomingIsolator(
       );
       group.add(screw);
     }
-  // Its handle, on the lid, a little below the middle.
+  // Exposed hinge knuckles on the folded steel door's left edge.
+  for (const y of [Y - 0.4, Y + 0.4]) {
+    const hinge = new Mesh(
+      new CylinderGeometry(0.008, 0.008, 0.065, 12),
+      galvanised,
+    );
+    hinge.position.set(-W / 2 + 0.008, y, FACE_Z + 0.004);
+    group.add(hinge);
+  }
+  // Heavy-duty throw handle on the door's free edge.
   const handle = disconnectHandle(kit, {
     name: 'INCOMING ISOLATOR handle',
     initial,
-    style: 'rotary',
+    style: 'heavy-throw',
     sound: 'soft-click',
   });
-  handle.object.position.set(0, Y - 0.015, FACE_Z);
+  handle.object.position.set(W / 2 - 0.07, Y + 0.18, FACE_Z);
   group.add(handle.object);
   // What it is, its rating and a warning, printed on the lid.
   const ink = '#151515';
-  label('INCOMING SUPPLY\nISOLATOR', 0, Y + H / 2 - 0.032, {
-    height: 0.009,
+  label('INCOMING SUPPLY\nISOLATOR', 0, Y + H / 2 - 0.12, {
+    height: 0.024,
     ink,
   });
-  label('MAIN SWITCH', 0, Y - 0.078, { height: 0.006, ink });
-  label('100 A  480 VAC  3 PH  60 Hz', 0, Y - 0.094, {
-    height: 0.0045,
+  label('MAIN SWITCH', 0, Y - 0.078, { height: 0.014, ink });
+  label('100 A FEED  480 VAC  3 PH  60 Hz', 0, Y - 0.094, {
+    height: 0.012,
     ink,
     bold: false,
   });
-  label('DANGER  480 V', 0, Y - H / 2 + 0.022, {
-    height: 0.006,
+  label('DANGER  480 V', 0, Y - H / 2 + 0.13, {
+    height: 0.014,
     ink: '#ffffff',
     plate: '#c42a1e',
   });
-  label('VOLTARA', W / 2 - 0.032, Y + H / 2 - 0.016, { height: 0.004, ink });
+  label('VOLTARA', 0, Y + H / 2 - 0.04, { height: 0.01, ink });
   // A lock-out notice on the channel below.
   const lockout = createMicroLabel(
     kit,
     'LOCK OUT BEFORE\nWORKING ON EQUIPMENT',
     {
-      height: 0.006,
+      height: 0.014,
       ink,
       plate: '#f2c618',
     },
   );
   lockout.position.set(0, Y - H / 2 - 0.06, back + 0.001);
   group.add(lockout);
-  // The supply down from overhead in rigid conduit into a gland in its top,
-  // and on from its side into the line-up through a short nipple.
-  const pipe = (length: number, r = 0.021) =>
-    new Mesh(new CylinderGeometry(r, r, length, 16), conduit);
-  const top = Y + H / 2;
-  const down = pipe(2.6 - top);
-  down.position.set(0, top + (2.6 - top) / 2, FACE_Z - D / 2);
-  group.add(down);
-  const side = pipe(ISOLATOR.gap + 0.02, 0.018);
-  side.rotation.z = Math.PI / 2;
-  side.position.set(W / 2 + ISOLATOR.gap / 2, Y + 0.06, FACE_Z - D / 2);
-  group.add(side);
-  for (const [x, y, z] of [
-    [0, top + 0.008, 0],
-    [W / 2 + 0.008, Y + 0.06, Math.PI / 2],
-  ]) {
-    const gland = new Mesh(new CylinderGeometry(0.028, 0.028, 0.016, 6), grey);
-    gland.rotation.z = z;
-    gland.position.set(x, y, FACE_Z - D / 2);
-    group.add(gland);
+  // 100 × 100 mm galvanised box trunking, after Legrand Salamandre.
+  // Feed rises from the floor; the outgoing branch enters MAIN INCOMING.
+  const bottom = Y - H / 2;
+  const z = FACE_Z - D / 2;
+  const riser = add(trunking, 0.1, bottom + 0.01, 0.1, 0, bottom / 2, z);
+  riser.name = 'Floor supply trunking';
+  add(galvanised, 0.16, 0.018, 0.16, 0, 0.009, z);
+  add(galvanised, 0.14, 0.02, 0.14, 0, bottom, z);
+  add(galvanised, 0.104, bottom, 0.003, 0, bottom / 2, z + 0.052);
+  for (const y of [0.09, bottom - 0.09])
+    add(grey, 0.009, 0.009, 0.004, 0, y, z + 0.055);
+  const end = ISOLATOR.width / 2 + ISOLATOR.gap;
+  const length = end - W / 2 + 0.02;
+  const branchY = Y + 0.5;
+  const branch = add(
+    trunking,
+    length,
+    0.1,
+    0.1,
+    W / 2 + length / 2 - 0.01,
+    branchY,
+    z,
+  );
+  branch.name = 'Machine supply trunking';
+  add(
+    galvanised,
+    length,
+    0.104,
+    0.003,
+    W / 2 + length / 2 - 0.01,
+    branchY,
+    z + 0.052,
+  );
+  for (const x of [W / 2 + 0.015, end - 0.015]) {
+    add(galvanised, 0.025, 0.114, 0.114, x, branchY, z);
+    add(grey, 0.009, 0.009, 0.004, x, branchY, z + 0.06);
   }
   return { group, handle };
 }
@@ -159,8 +185,8 @@ export function createIncomingIsolator(
  * from the line-up's front, for walking into it.
  */
 export const ISOLATOR = {
-  width: 2 * POST_X + 0.06,
+  width: W,
   gap: 0.15,
   front: FACE_Z + 0.12,
-  back: FACE_Z - D - 0.05,
+  back: FACE_Z - D - 0.14,
 };

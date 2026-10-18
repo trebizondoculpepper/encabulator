@@ -3,7 +3,7 @@
   "intro_2": "Since the first Encabulator was switched on, in a converted dairy outside Wolverhampton in nineteen twenty-eight, nobody has been entirely sure what it does. But everyone agrees it must keep on doing it.",
   "intro_3": "Today, an Encabulator stands quietly behind almost everything you rely on. The railways. The shipping forecast. The tides, quite possibly. You will never see one, which is how you know they're working.",
   "intro_4": "On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.",
-  "cue_001": "So. Let's begin. Turn on the master power.",
+  "cue_001": "So. Let's begin. Turn on the incoming isolator. That's the switch in the metal box to the left of the machine.",
   "cue_002": "Excellent. The delta readout on the main bus controller now shows zero point seven two, which means we're ready to prime the oil pumps.",
   "cue_003": "Hmm. That's the right switch. Give it another go?",
   "cue_004": "Never mind. Must be a sticky switch or something. And, as we practised yesterday, let's reboot the betaform amplifier before priming the hydrocoptic pump.",
@@ -167,5 +167,7 @@
   "betaform_stop_remind": "The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.",
   "reset_prompt": "Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.",
   "reset_remind": "The blue button. Automation control. Reset. Please. For all of us.",
-  "skip_appears": "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there."
+  "skip_appears": "Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.",
+  "startup_main": "Good. Now turn on the machine's main power. Turn the red handle marked MAIN DISCONNECT to ON.",
+  "startup_main_reset": "The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second."
 }

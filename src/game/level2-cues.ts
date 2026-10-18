@@ -1,9 +1,17 @@
+export const LEVEL2_STARTUP = {
+  isolator:
+    "So. Let's begin. Turn on the incoming isolator. That's the switch in the metal box to the left of the machine.",
+  main: "Good. Now turn on the machine's main power. Turn the red handle marked MAIN DISCONNECT to ON.",
+  'main-reset':
+    "The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second.",
+} as const;
+
 /** Temporary voice lines, in script order. Replace recordings cue by cue. */
 export const LEVEL2_CUES = [
   {
     section:
       'Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England',
-    text: "So. Let's begin. Turn on the master power.",
+    text: LEVEL2_STARTUP.isolator,
   },
   {
     section:

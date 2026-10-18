@@ -314,6 +314,8 @@ const rod = (
 };
 
 export interface MccView {
+  /** Incoming isolator, upstream of the machine main disconnect. */
+  supply: Readable<boolean>;
   group: Group;
   /**
    * Its parts: every control on its doors, the doors' latches (the only
@@ -1092,6 +1094,7 @@ export function createRetroEncabulatorMcc(
     group,
     parts,
     components,
+    supply,
     world,
     update(delta) {
       clock += delta;

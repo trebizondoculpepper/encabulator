@@ -1,3 +1,4 @@
+import { createLevel2Startup } from '../game/level2-startup';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
 import { addWarehouseLighting } from './warehouse-lighting';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
@@ -28,6 +29,7 @@ import {
   LEVEL2_INTRO,
   LEVEL2_RESET,
   LEVEL2_SKIP,
+  LEVEL2_STARTUP,
 } from '../game/level2-cues';
 import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../game/units';
@@ -90,7 +92,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const hydroTone = signal(false);
   const driveTone = signal(false);
   const mcc = createRetroEncabulatorMcc(kit, {
-    incomingOn: true,
+    incomingOn: false,
     driveTrainWithMains: true,
     bucketFeed: {
       'section3.bucket1': oilFeed,
@@ -309,6 +311,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     pointerEvents: 'none',
   });
   canvas.parentElement?.append(caption);
+  const startup = createLevel2Startup();
   let phase = 0;
   let phaseTime = 0;
   let titleTime = 0;
@@ -601,8 +604,17 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         jingle();
       }, 3000);
     }
-    if (phase === 0 && main.closed.value) advance(1, 2);
-    else if (phase === 1 && oil.closed.value) {
+    if (phase === 0) {
+      const instruction = startup.step(mcc.supply.value, main.closed.value);
+      if (instruction) {
+        window.clearTimeout(introTimer);
+        if (instruction === 'ready') advance(1, 2);
+        else {
+          voice.interrupt();
+          voice.say(LEVEL2_STARTUP[instruction]);
+        }
+      }
+    } else if (phase === 1 && oil.closed.value) {
       priorOil = true;
       // The sticky switch: a hiccup, as a warning of what is to come.
       mcc.fail('hiccup');

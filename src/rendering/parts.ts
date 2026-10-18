@@ -596,7 +596,9 @@ export function disconnectHandle(
   const a = beginPart(kit, props.name ?? 'disconnect handle');
   const view =
     props.style === 'heavy-throw'
-      ? createHeavyDutyThrowHandle(kit)
+      ? createHeavyDutyThrowHandle(kit, {
+          on: (props.initial ?? 'on') === 'on',
+        })
       : props.style === 'rotary'
         ? createRotaryIsolatorHandle(kit, {
             on: (props.initial ?? 'on') === 'on',

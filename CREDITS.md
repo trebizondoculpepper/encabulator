@@ -41,3 +41,5 @@ The cabinet backplane trace generator (`src/scene/vendor/circuit-traces.ts`) is 
 The pre-rendered green PCB textures in `src/assets/pcb/` are generated from that same MIT-licensed trace algorithm by `scripts/bake-pcb-textures.ts`, using [@napi-rs/canvas](https://github.com/Brooooooklyn/canvas) (MIT) as a development-time renderer. The seeds and dimensions are retained in the texture manifest; no reference photographs are included in the game.
 
 The Encabulator drive-train hum (`src/audio/machine-hum.ts`) is original project synthesis, written with OpenAI Codex: three speed-controlled sine partials, with no third-party recording or sample; distributed under the project's licence. [Source](src/audio/machine-hum.ts).
+
+The Level 2 incoming-isolator instruction (`cue_001`) and additional main-power instructions (`startup_main`, `startup_main_reset`) are also rendered from [Hexgrad's Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), `bm_george`, under Apache-2.0. Edits: 0.92 speaking speed, 75 Hz high-pass, -18 LUFS normalisation and mono 24 kHz / 64 kb/s MP3 encoding, matching the existing narrator placeholders.

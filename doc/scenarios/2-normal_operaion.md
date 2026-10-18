@@ -18,7 +18,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 ## Interior — daytime — Training Room 2 — Neumann Dynamik, a German electronics firm, offices on the Guildford Trading Estate, England
 
-**SETTING:** THE ENCABULATOR stands in the middle of the room, installed and plugged into a 450 W industrial power supply. There is no bin anywhere in the room, which is long and bare: the far end is about ten seconds' walk from the machine. The machine is switched off. Its cabinet doors are closed.
+**SETTING:** THE ENCABULATOR stands five metres from the middle of the north wall of a mostly empty, 30 × 30 m warehouse training room on the Guildford Trading Estate. A steel incoming-isolator enclosure stands to the left of the machine, connected to the floor and MAIN INCOMING by thick galvanised trunking. Both the incoming isolator and the machine's MAIN DISCONNECT are initially OFF. There is no bin anywhere in the room; the far end is about ten seconds' walk from the machine. Its cabinet doors are closed.
 
 **VIEW:** The player sees through their own eyes throughout. Actions happen in the room, using the machine's physical controls.
 
@@ -28,7 +28,7 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 ## Introduction
 
-**TRIGGER:** As the caption fades, before the player does anything. If the player turns on the master power during it, it is cut off and the narration moves on.
+**TRIGGER:** As the caption fades, before the player does anything. If the player turns on the incoming isolator during it, it is cut off and the narration moves to the main-power instruction.
 
 **DIRECTION:** Grand, fond and a little misty, like the opening of a corporate history film. He believes every word. There was no day one.
 
@@ -40,9 +40,19 @@ The backplane contains exactly five Pepperdyne expansion cards. The suggested re
 
 **NARRATOR:** On day one, yesterday, we covered the cold start and the basic safety procedures. Today we build on those lessons, with the standard Encabulation procedure. If you understood day one, this will be perfectly easy. And you did understand it. I was there.
 
-## Master power
+## Incoming isolator
 
-**NARRATOR:** So. Let's begin. Turn on the master power.
+**NARRATOR:** So. Let's begin. Turn on the incoming isolator. That's the switch in the metal box to the left of the machine.
+
+**PLAYER ACTION:** Turn the incoming isolator in the metal enclosure to ON. The incoming supply becomes live; the machine remains off. The first instruction waits for this switch.
+
+## Main power
+
+**NARRATOR:** Good. Now turn on the machine's main power. Turn the red handle marked MAIN DISCONNECT to ON.
+
+**CONDITIONAL — MAIN POWER ALREADY ON:** The isolator is on. Now switch the machine's MAIN DISCONNECT off, then on again. Isolator first, main power second.
+
+**SEQUENCE:** The main-power handle must be switched on after the incoming isolator. If the player switched it on prematurely, wait for OFF, then ON. If the incoming isolator is switched off before startup completes, return to its instruction.
 
 **PLAYER ACTION:** Turn the red operating handle on MAIN DISCONNECT to ON. This is the master-power control; the sequence waits for this handle.
 
