@@ -35,3 +35,6 @@ The plan is in `doc/plans/level0-wiring.md`.
 - Hydrocoptic Pump and the other units isolated inside rely on their internal breaker and push-to-test lamps for front-panel input, at the owner's direction on power switching.
 - No review report (`doc/reports/level0-wiring-review.md`) existed to respond to.
 
+## 2026-10-18, feed and auxiliary motor panels
+
+At the owner's request both motors' panels carry an SMC Plus soft starter display (the shared `createSoftStarter`) and an emergency stop, in Level 0 and on the shared line-up. Checked wired by tests: the feed motor's stop stops it, keeps it stopped when pulled out, and lets it run again only after HAND OFF AUTO has gone through OFF (Level 0 and the shared line-up); the auxiliary motor's display follows its motor up to speed and down on its stop, which then needs START; Level 2's emergency-stop task still watches the auxiliary motor's stop. The soft starter view now records what it shows on its group's `userData.shown`. 609 tests pass.

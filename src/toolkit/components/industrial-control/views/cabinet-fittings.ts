@@ -1257,6 +1257,8 @@ export function createSoftStarter(
   return {
     group,
     set(lamps) {
+      // What it shows, for a reader of the scene (a test, say).
+      group.userData.shown = lamps;
       run(lamps.run);
       full(lamps.upToSpeed);
       fault(lamps.fault);

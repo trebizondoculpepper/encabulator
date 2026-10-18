@@ -372,6 +372,7 @@ export function createLevel0Dresser(
       }
       case 'smc': {
         const starter = createSoftStarter(kit);
+        starter.group.name = `${bucket} soft starter display`;
         put(starter.group, cx - 0.045, top - 0.06, 0.95);
         caption('SOFT STARTER', cx - 0.045, top - 0.14);
         place(
@@ -410,6 +411,7 @@ export function createLevel0Dresser(
         // Its soft starter's display, as on the feed motor: the bar fills
         // as each start ramps the motor up.
         const starter = createSoftStarter(kit);
+        starter.group.name = `${bucket} soft starter display`;
         put(starter.group, cx - 0.045, top - 0.06, 0.95);
         caption('SOFT STARTER', cx - 0.045, top - 0.14);
         const softStart = createSoftStarterLogic();

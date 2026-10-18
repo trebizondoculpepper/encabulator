@@ -359,4 +359,76 @@ describe('Level 0 machine wiring', () => {
     expect(machine.plant.faults.value.map((f) => f.code)).toContain('U11-F1');
     dispose();
   });
+
+  it('stops the feed motor on its emergency stop until it is reset through OFF', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    const feed = machine.mcc.circuits.get(UNITS.feed)!;
+    machine.plant.control.feedHoa.set(0);
+    run(6);
+    expect(feed.running.value).toBe(true);
+    const display = machine.mcc.group.getObjectByName(
+      `${UNITS.feed} soft starter display`,
+    )!;
+    expect(display.userData.shown.upToSpeed).toBe(true);
+    const stop = within(machine, 'FEED MOTOR', 'EMERGENCY STOP');
+    machine.mcc.parts.uses.get(stop)!();
+    run(1);
+    expect(feed.running.value).toBe(false);
+    expect(display.userData.shown.run).toBe(false);
+    // Pulled out, it stays stopped in HAND...
+    machine.mcc.parts.uses.get(stop)!();
+    run(1);
+    expect(feed.running.value).toBe(false);
+    // ...until HAND OFF AUTO goes through OFF.
+    machine.plant.control.feedHoa.set(1);
+    run(0.5);
+    machine.plant.control.feedHoa.set(0);
+    run(1);
+    expect(feed.running.value).toBe(true);
+    expect(display.userData.shown.run).toBe(true);
+    dispose();
+  });
+
+  it('shows the auxiliary motor on its own soft starter display', () => {
+    const { machine, powerUp, run, dispose } = sandbox();
+    powerUp();
+    const aux = machine.mcc.circuits.get(UNITS.auxMotor)!;
+    const display = machine.mcc.group.getObjectByName(
+      `${UNITS.auxMotor} soft starter display`,
+    )!;
+    expect(aux.running.value).toBe(true);
+    expect(display.userData.shown.upToSpeed).toBe(true);
+    const stop = within(machine, 'AUXILIARY MOTOR', 'EMERGENCY STOP');
+    machine.mcc.parts.uses.get(stop)!();
+    run(0.5);
+    expect(aux.running.value).toBe(false);
+    expect(display.userData.shown.run).toBe(false);
+    run(5);
+    expect(display.userData.shown.speed).toBe(0);
+    // Released, it needs START.
+    machine.mcc.parts.uses.get(stop)!();
+    run(0.5);
+    expect(aux.running.value).toBe(false);
+    machine.mcc.parts.uses.get(
+      within(machine, 'AUXILIARY MOTOR', 'START push button'),
+    )!();
+    run(1);
+    expect(aux.running.value).toBe(true);
+    expect(display.userData.shown.run).toBe(true);
+    dispose();
+  });
 });
+
+/** The input on a unit's door inside the part named `part`. */
+function within(
+  machine: ReturnType<typeof createLevel0Machine>,
+  unit: string,
+  part: string,
+) {
+  return inputsOn(machine, unit).find((object) => {
+    for (let o: Object3D | null = object; o; o = o.parent)
+      if (o.name === part) return true;
+    return false;
+  })!;
+}

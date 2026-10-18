@@ -1074,3 +1074,49 @@ it('keeps Level 0 machine state separate from another room instance', () => {
   disposeKit(sandboxKit, mcc.group);
   other.dispose();
 });
+
+it('stops the feed motor on its own emergency stop until HAND OFF AUTO goes through OFF', () => {
+  const { mcc, dispose } = fixture();
+  isolate(mcc);
+  mcc.circuits.get('section1.bucket2')!.breaker!.breaker!.operate();
+  const feed = mcc.circuits.get('section2.bucket2')!;
+  mcc.update(3);
+  // AUTO runs it for 30 s in every 40.
+  expect(feed.running.value).toBe(true);
+  const door = (label: string) => {
+    let hinge: Object3D | undefined;
+    mcc.group.traverse((o) => {
+      if (o.name === `Section 2 ${label} door`) hinge = o.parent!;
+    });
+    return hinge!;
+  };
+  const inside = (root: Object3D, part: string) => {
+    let found: Object3D | undefined;
+    root.traverse((o) => {
+      if (found || !mcc.parts.uses.has(o)) return;
+      for (let p: Object3D | null = o; p && p !== root; p = p.parent)
+        if (p.name === part) found = o;
+    });
+    return found!;
+  };
+  const stop = inside(door('FEED MOTOR M-102'), 'EMERGENCY STOP');
+  mcc.parts.uses.get(stop)!();
+  mcc.update(0.5);
+  expect(feed.running.value).toBe(false);
+  mcc.parts.uses.get(stop)!();
+  mcc.update(0.5);
+  expect(feed.running.value).toBe(false);
+  const hoa = inside(door('FEED MOTOR M-102'), 'selector');
+  mcc.parts.uses.get(hoa)!(-1);
+  mcc.update(0.2);
+  expect(mcc.controls.get('feed.hoa')!.position.value).toBe(1);
+  mcc.parts.uses.get(hoa)!(-1);
+  mcc.update(0.5);
+  expect(mcc.controls.get('feed.hoa')!.position.value).toBe(0);
+  expect(feed.running.value).toBe(true);
+  // The auxiliary motor's emergency stop is still the one Level 2 watches.
+  const aux = inside(door('AUXILIARY MOTOR M-103'), 'EMERGENCY STOP');
+  mcc.parts.uses.get(aux)!();
+  expect(mcc.controls.get('auxiliary.stop')!.position.value).toBe(1);
+  dispose();
+});
