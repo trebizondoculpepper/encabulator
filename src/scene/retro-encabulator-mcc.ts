@@ -22,6 +22,7 @@ import {
   createIncomingIsolator,
 } from '../toolkit/components/industrial-control/views/incoming-isolator';
 import { createShortSpark } from '../toolkit/components/core/views/button-effects';
+import { stackLightAt } from '../game/stack-light';
 import { createUnitSmoke } from './mcc-smoke';
 import type { SootedFace } from './mcc-smoke';
 import { createPcbBackplane } from '../toolkit/components/industrial-control/views/pcb-backplane';
@@ -462,6 +463,7 @@ export function createRetroEncabulatorMcc(
   // What a failure brings up on the annunciator (see `Faults`).
   const faults: Faults = {
     active: signal(false),
+    failure: signal<FailureId | null>(null),
     alarms: signal<readonly string[]>([]),
     acknowledged: signal<readonly string[]>([]),
     battery: supply,
@@ -487,6 +489,8 @@ export function createRetroEncabulatorMcc(
   const updates: ((delta: number, clock: number) => void)[] = [];
   const controls = new Map<string, { position: Readable<number> }>();
   let bootNote = 0;
+  /** Every screen that boots, for the stack light to wait on. */
+  const screens: ReturnType<typeof createScreenBoot>[] = [];
   const screenReadyBeep = (
     boot: ReturnType<typeof createScreenBoot>,
     from: Object3D,
@@ -494,6 +498,7 @@ export function createRetroEncabulatorMcc(
   ) => {
     // Rising a semitone at a time from just above the terminal's 880 Hz POST.
     const hz = 880 * 2 ** (++bootNote / 12);
+    screens.push(boot);
     let wasReady = false;
     updates.push(() => {
       const ready = boot.ready.value;
@@ -670,13 +675,21 @@ export function createRetroEncabulatorMcc(
       const stack = createStackLight(kit);
       stack.group.position.set(-0.2, MCC_HEIGHT, -0.15);
       bay.add(stack.group);
+      stack.group.name = 'Machine stack light';
+      // Red flashing in a fault, amber while it boots, green running.
       updates.push((_, clock) => {
-        const warn = Math.sin(clock * 0.21) > 0.6;
-        stack.set([
-          false,
-          lamps.value && warn && Math.floor(clock * 2) % 2 === 0,
-          lamps.value && !warn,
-        ]);
+        const tiers = stackLightAt(
+          {
+            powered: lamps.value,
+            battery: faults.battery.value,
+            fault: faults.active.value,
+            restarting: faults.failure.value === 'restart',
+            booting: screens.some((screen) => screen.booting),
+          },
+          clock,
+        );
+        stack.group.userData.lit = tiers;
+        stack.set(tiers);
       });
     }
     let top = MCC_HEIGHT - WIREWAY;
@@ -1078,6 +1091,7 @@ export function createRetroEncabulatorMcc(
     lampsOk.value = now.lit;
     const raised = faultsAt(failure.id, t);
     faults.active.value = true;
+    faults.failure.value = failure.id;
     faults.alarms.value = raised.alarms;
     faults.acknowledged.value = raised.acknowledged;
     dropped.value = Boolean(
@@ -1113,6 +1127,7 @@ export function createRetroEncabulatorMcc(
       failing = null;
       dropped.value = false;
       faults.active.value = false;
+      faults.failure.value = null;
     }
   };
   /** Start a failure, or a restart, from the beginning. */
@@ -1195,6 +1210,7 @@ export function createRetroEncabulatorMcc(
       lampsOk.value = true;
       dropped.value = false;
       faults.active.value = false;
+      faults.failure.value = null;
       faults.alarms.value = [];
       faults.acknowledged.value = [];
       whining.value = false;
@@ -1213,6 +1229,8 @@ export function createRetroEncabulatorMcc(
 interface Faults {
   /** Whether a failure is playing out or has left the machine down. */
   active: Signal<boolean>;
+  /** Which, while it is. */
+  failure: Signal<FailureId | null>;
   /** Its windows in alarm, and those acknowledged, by one-line legend. */
   alarms: Signal<readonly string[]>;
   acknowledged: Signal<readonly string[]>;

@@ -1,3 +1,4 @@
+import { createLevel0Machine } from '../rendering/level0-machine';
 import { assertDropProfile } from '../toolkit/controls/logic/drop-profile';
 import { signal } from '@preact/signals-core';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
@@ -223,6 +224,7 @@ it('beeps at a distinct pitch as each screen reaches steady state, once per boot
   mcc.update(0);
   isolate(mcc);
   mcc.update(25);
+  mcc.update(0.05);
   expect(beeps()).toHaveLength(first.length * 2);
   dispose();
   play.mockRestore();
@@ -875,6 +877,56 @@ it('brings up fewer faults in the lighter failures', () => {
   dispose();
 });
 
+it('shows amber while booting, green running and red flashing in every fault', () => {
+  const { mcc, dispose } = fixture();
+  const main = mcc.components.find(
+    (d) => d.object.name === 'section1.bucket2: breaker',
+  )!;
+  const stack = mcc.group.getObjectByName('Machine stack light')!;
+  const tiers = () => (stack.userData.lit as boolean[]).join();
+  /** Which tiers light over `seconds`, and whether red flashes. */
+  const watch = (seconds: number) => {
+    const seen = new Set<string>();
+    for (let t = 0; t < seconds; t += 0.1) {
+      mcc.update(0.1);
+      seen.add(tiers());
+    }
+    return [...seen].sort();
+  };
+  mcc.update(0.1);
+  expect(tiers()).toBe('false,false,false');
+  isolate(mcc);
+  main.breaker!.operate();
+  // Past the lamp test, the screens still booting.
+  for (let t = 0; t < 3; t += 0.25) mcc.update(0.25);
+  expect(tiers()).toBe('false,true,false');
+  mcc.update(25);
+  mcc.update(0.05);
+  expect(tiers()).toBe('false,false,true');
+  const redFlashing = ['false,false,false', 'true,false,false'];
+  mcc.fail('hiccup');
+  expect(watch(1.4)).toEqual(redFlashing);
+  mcc.update(0.5);
+  mcc.update(0.5);
+  expect(tiers()).toBe('false,false,true');
+  mcc.fail('sputter');
+  expect(watch(7)).toEqual(redFlashing);
+  mcc.restart();
+  mcc.update(0.5);
+  expect(tiers()).toBe('false,true,false');
+  for (let t = 0; t < 5; t += 0.25) mcc.update(0.25);
+  expect(tiers()).toBe('false,false,true');
+  mcc.fail('kaput');
+  for (let t = 0; t < 9; t += 0.25) mcc.update(0.25);
+  expect(main.active.value).toBe(false);
+  // Still flashing on the battery, the machine dead.
+  expect(watch(3)).toEqual(redFlashing);
+  mcc.recover();
+  mcc.update(0.05);
+  expect(tiers()).not.toContain('true,false,false');
+  dispose();
+});
+
 it('drives the gauge above BOOST into the red band and returns when released', () => {
   const { mcc, dispose } = fixture();
   isolate(mcc);
@@ -932,4 +984,45 @@ it('shows the Automation isolator green on, red off, and dark without upstream p
   mcc.update(1);
   expect(status.userData.indication).toBe('dark');
   dispose();
+});
+
+it('lets Level 0 operate both pumps directly without lesson feed gates or forced faults', () => {
+  const kit = createPanelKit();
+  const { mcc } = createLevel0Machine(kit);
+  const breaker = (id: string) =>
+    mcc.components.find((device) => device.object.name === `${id}: breaker`)!
+      .breaker!;
+  expect(mcc.supply.value).toBe(false);
+  expect(breaker('section1.bucket2').closed.value).toBe(false);
+  expect(breaker('section3.bucket1').closed.value).toBe(false);
+  expect(breaker('section7.bucket2').closed.value).toBe(false);
+  isolate(mcc);
+  breaker('section1.bucket2').operate();
+  mcc.update(3);
+  for (const id of ['section3.bucket1', 'section7.bucket2']) {
+    breaker(id).operate();
+    mcc.update(1);
+    expect(
+      mcc.components.find((device) => device.object.name === `${id}: breaker`)!
+        .active.value,
+    ).toBe(true);
+  }
+  mcc.update(60);
+  expect(mcc.failure).toBeNull();
+  expect(mcc.stalled).toBe(false);
+  mcc.parts.dispose();
+  disposeKit(kit, mcc.group);
+});
+
+it('keeps Level 0 machine state separate from another room instance', () => {
+  const sandboxKit = createPanelKit();
+  const other = fixture();
+  const { mcc } = createLevel0Machine(sandboxKit);
+  expect(mcc.world).not.toBe(other.mcc.world);
+  isolate(mcc);
+  expect(mcc.supply.value).toBe(true);
+  expect(other.mcc.supply.value).toBe(false);
+  mcc.parts.dispose();
+  disposeKit(sandboxKit, mcc.group);
+  other.dispose();
 });

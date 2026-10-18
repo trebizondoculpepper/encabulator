@@ -41,6 +41,8 @@ describe('the rooms', () => {
     expect(DEV_ROOMS).not.toContain('level2');
     expect(CHAIN).not.toContain('level2');
     expect(resolveRoomId('level2')).toBe('level2');
+    expect(resolveRoomId('level0')).toBe('level0');
+    expect(DEV_ROOMS).not.toContain('level0');
     expect(devPortals('level2', bounds, 1)).toEqual([]);
   });
 

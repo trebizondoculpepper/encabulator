@@ -282,6 +282,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let finalTestPrompted = false;
   const finalTest = createLevel2FinalAction();
   const reminderPause = createNarrationPause();
+  const funeralPause = createNarrationPause(20);
   let smokeOn = false;
   const lesson = createLevel2NormalOperations();
   // Draw two distinct controls, then assign them one at a time.
@@ -569,7 +570,14 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       if (griefCountdown < 0) {
         advance(12, 92, 93, 94, 95);
         for (const line of LEVEL2_FAREWELL) voice.say(line);
+      }
+    }
+    // Leave twenty seconds of silence after the final farewell, then Auden.
+    if (phase === 12) {
+      funeralPause.step(delta, voice.busy);
+      if (!voice.busy && funeralPause.take()) {
         voice.queue(96);
+        phase = 13;
       }
     }
     if (phase === 11) {

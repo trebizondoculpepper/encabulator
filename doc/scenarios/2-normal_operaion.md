@@ -524,6 +524,8 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** You'll be encabulating spill-tunions in Valhalla.
 
+**TIMING:** After the last farewell line finishes, hold twenty seconds of silence before beginning the poem. Do not count the farewell speech toward this pause.
+
 **NARRATOR (slowly, with great dignity):** Fade out reciting WH Auden's Funeral Blues
 
 Stop all the clocks, cut off the telephone,\

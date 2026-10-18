@@ -3,10 +3,10 @@ import {
   BoxGeometry,
   CylinderGeometry,
   Group,
-  LatheGeometry,
+  ExtrudeGeometry,
   Mesh,
   PlaneGeometry,
-  Vector2,
+  Shape,
 } from 'three';
 import type {
   BufferGeometry,
@@ -887,38 +887,85 @@ export function createFlangeHandle(
   const pivot = new Group();
   pivot.position.set(0, 0, 0.03);
   group.add(pivot);
+  // Flat painted-metal arm and a squared insulating sleeve, after the
+  // 1494F-M1 operator. The 141.3 mm pivot-to-tip reach follows its drawing.
+  const steel = kitPaint(kit, '#686b6d', 0.5);
   const grip = kitPaint(kit, colour === 'red' ? '#b8231b' : '#16171a', 0.2);
+  const profile = (points: [number, number][]) => {
+    const shape = new Shape();
+    shape.moveTo(...points[0]);
+    for (const point of points.slice(1)) shape.lineTo(...point);
+    shape.closePath();
+    return shape;
+  };
+  const arm = profile([
+    [-0.009, 0.008],
+    [-0.009, 0.078],
+    [-0.014, 0.087],
+    [-0.014, 0.136],
+    [-0.009, 0.1413],
+    [0.009, 0.1413],
+    [0.014, 0.136],
+    [0.014, 0.087],
+    [0.009, 0.078],
+    [0.009, 0.008],
+  ]);
   const lever = add(
     pivot,
-    new LatheGeometry(
-      [
-        [0.008, 0],
-        [0.012, 0.008],
-        [0.012, 0.029],
-        [0.01, 0.044],
-        [0.01, 0.078],
-        [0.014, 0.091],
-        [0.017, 0.108],
-        [0.018, 0.128],
-        [0.014, 0.14],
-        [0.007, 0.147],
-        [0, 0.149],
-      ].map(([radius, height]) => new Vector2(radius, height)),
-      20,
-    ),
+    new ExtrudeGeometry(arm, {
+      depth: 0.007,
+      bevelEnabled: true,
+      bevelThickness: 0.0006,
+      bevelSize: 0.0006,
+      bevelSegments: 1,
+      steps: 1,
+    }),
+    steel,
+  );
+  lever.name = 'Flat disconnect operating arm';
+  // The sleeve has straight sides and clipped corners, never a bulbous end.
+  const sleeve = profile([
+    [-0.014, 0.084],
+    [-0.017, 0.088],
+    [-0.017, 0.135],
+    [-0.012, 0.14],
+    [0.012, 0.14],
+    [0.017, 0.135],
+    [0.017, 0.088],
+    [0.014, 0.084],
+  ]);
+  add(
+    lever,
+    new ExtrudeGeometry(sleeve, {
+      depth: 0.024,
+      bevelEnabled: true,
+      bevelThickness: 0.001,
+      bevelSize: 0.001,
+      bevelSegments: 1,
+      steps: 1,
+    }),
     grip,
   );
-  add(
-    pivot,
-    new CylinderGeometry(0.014, 0.014, 0.01, 20),
-    kitPaint(kit, '#343538', 0.5),
-    0,
-    0.031,
-    0,
-  );
+  const grooves = kitPaint(kit, colour === 'red' ? '#81251d' : '#0d0e10');
+  for (const y of [0.102, 0.11, 0.118, 0.126])
+    add(lever, new BoxGeometry(0.028, 0.0012, 0.001), grooves, 0, y, 0.025);
+  // Flat end cap and visible rivets make the arm's construction readable.
+  add(lever, new BoxGeometry(0.024, 0.003, 0.025), steel, 0, 0.138, 0.012);
+  for (const y of [0.018, 0.131]) {
+    const rivet = add(
+      lever,
+      new CylinderGeometry(0.0024, 0.0024, 0.0015, 10),
+      kitPaint(kit, '#afb2b2', 0.6),
+      0,
+      y,
+      y > 0.1 ? 0.026 : 0.009,
+    );
+    rivet.rotation.x = Math.PI / 2;
+  }
   // Positive X rotation sends +Y toward +Z (out of the cabinet). Both
   // throws, and the entire sweep between them, must stay in front.
-  const angle = (on: boolean) => (on ? 0.55 : Math.PI - 0.55);
+  const stop = (13.5 * Math.PI) / 180;
+  const angle = (on: boolean) => (on ? stop : Math.PI - stop);
   let target = angle(initial);
   pivot.rotation.x = target;
   return {
