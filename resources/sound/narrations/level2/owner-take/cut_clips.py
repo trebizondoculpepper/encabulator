@@ -20,7 +20,7 @@ ROOT = HERE.parents[4]
 ASSETS = ROOT / "src/audio/assets/narration/level2"
 CLIPS = HERE / "clips"
 GAIN_DB = 4.0  # the whole take measures -22.2 LUFS; the game's clips sit at -18
-PRE, POST, FADE, LONG_GAP = 0.15, 0.35, 0.012, 2.5
+PRE, POST, FADE, LONG_GAP = 0.25, 0.4, 0.012, 2.5
 # A speech starts and ends only at a pause this long; shorter ones are breaths.
 EDGE = 0.65
 
@@ -41,7 +41,7 @@ MAP = {
     "cue_005": [(199.9, 202.0)],
     "cue_006": [(204.7, 211.9)],
     "cue_007": [(218.8, 227.0)],
-    "cue_008": [(232.1, 248.2)],
+    "cue_008": [(241.00, 248.51, "exact")],
     "cue_009": [(252.5, 267.2)],
     "cue_010": [(272.8, 281.1)],
     "cue_011": [(285.0, 297.0)],
@@ -75,7 +75,7 @@ MAP = {
     "cue_039": [(568.4, 576.5)],
     "cue_040": [(581.7, 586.6), (588.1, 589.6)],
     "cue_041": [(594.7, 604.1)],
-    "cue_042": [(607.7, 616.6), (625.0, 625.7)],
+    "cue_042": [(607.7, 616.6), (624.9, 625.50, "exact")],
     "cue_043": [(625.8, 629.6)],
     "cue_044": [(632.6, 635.0)],
     "cue_045": [(637.7, 640.0)],
@@ -139,7 +139,7 @@ MAP = {
     "betaform_ack_2": [(1133.2, 1135.6)],
     "betaform_ack_3": [(1136.6, 1140.1)],
     "betaform_isolator_say": [(1146.4, 1149.8)],
-    "betaform_isolator_remind": [(1166.3, 1175.5)],
+    "betaform_isolator_remind": [(1166.40, 1175.79, "exact")],
     "betaform_speed_say": [(1181.6, 1185.0)],
     "betaform_speed_remind": [(1187.1, 1195.4)],
     "betaform_fan_say": [(1210.0, 1213.4)],
@@ -204,14 +204,14 @@ def silences() -> list[tuple[float, float]]:
     return [s for s in spans if s[1] - s[0] >= 0.25]
 
 
-def onset(t: float, quiet: list[tuple[float, float]]) -> float:
+def onset(t: float, end: float, quiet: list[tuple[float, float]]) -> float:
     """Where speech starting near t really starts: the end of its pause."""
-    return max(s[1] for s in quiet if s[1] <= t + 0.4 and s[1] - s[0] >= EDGE)
+    return max(s[1] for s in quiet if s[0] <= t + 0.4 and s[1] < end and s[1] - s[0] >= EDGE)
 
 
-def offset(t: float, quiet: list[tuple[float, float]]) -> float:
+def offset(t: float, start: float, quiet: list[tuple[float, float]]) -> float:
     """Where speech ending near t really ends: the start of the next pause."""
-    return min(s[0] for s in quiet if s[0] >= t - 0.4 and s[1] - s[0] >= EDGE)
+    return min(s[0] for s in quiet if s[1] >= t - 0.4 and s[0] > start and s[1] - s[0] >= EDGE)
 
 
 def main() -> None:
@@ -239,7 +239,11 @@ def main() -> None:
         else:
             spans = []
             for a, b, *exact in MAP[key]:
-                s, e = (a, b) if exact else (onset(a, quiet), offset(b, quiet))
+                if exact:
+                    s, e = a, b
+                else:
+                    s = onset(a, b, quiet)
+                    e = offset(b, s, quiet)
                 # Pad into the pause, never past its middle.
                 before = [q for q in quiet if q[1] == s]
                 after = [q for q in quiet if q[0] == e]
