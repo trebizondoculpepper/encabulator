@@ -432,6 +432,8 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **TRIGGER:** The final fitted Pepperdyne card is pulled free. Play once.
 
+**MACHINE:** The smoke stops as soon as this card leaves its slot. The machine remains stalled until RESET is pressed after all five cards are discarded.
+
 **NARRATOR:** Quickly, it's fading fast.
 
 **NARRATOR:** Power is ebbing.
@@ -466,7 +468,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** It's done.
 
-**MACHINE:** The smoke subsides. The machine is still stalled.
+**MACHINE:** The machine is still stalled.
 
 **NARRATOR:** Now. The reset. The blue button, on the front of the automation control cabinet. Press it. Gently. It's been through a lot.
 
@@ -493,6 +495,10 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 **NARRATOR:** Ahem.
 
 **DELIVERY:** Abruptly recover the bright, assured training-film voice, picking up exactly where the module left off, as though nothing has happened.
+
+**NARRATOR:** Test the annunciator.
+
+**PLAYER ACTION:** Press TEST on the MAIN INCOMING annunciator. The machine appears to have returned to normal while the player walks to and operates this control. An earlier test press does not count.
 
 **NARRATOR:** Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—
 

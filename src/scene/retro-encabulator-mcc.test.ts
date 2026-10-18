@@ -10,7 +10,7 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { Box3, Mesh, Raycaster, Vector3 } from 'three';
+import { Box3, BoxGeometry, Mesh, Raycaster, Vector3 } from 'three';
 import type { Group, Material, Object3D } from 'three';
 import { createPanelKit, disposeKit } from './eighties-controls';
 import {
@@ -879,6 +879,9 @@ it('shows the Automation isolator green on, red off, and dark without upstream p
   const status = mcc.group.getObjectByName(
     'Automation cabinet isolator status',
   )!;
+  const lens = status.getObjectByName('Automation isolator square LED') as Mesh;
+  expect((lens.geometry as BoxGeometry).parameters.width).toBe(0.011);
+  expect((lens.geometry as BoxGeometry).parameters.height).toBe(0.011);
   expect(status.userData.indication).toBe('dark');
   status.traverse((object) => expect(mcc.parts.uses.has(object)).toBe(false));
   isolate(mcc);

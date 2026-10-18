@@ -3,6 +3,7 @@ import {
   drawNormalOperations,
 } from '../game/level2-normal-operations';
 import { createNarrationPause } from '../game/narration-pause';
+import { createLevel2FinalAction } from '../game/level2-final-action';
 import { createLevel2Startup } from '../game/level2-startup';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
 import { addWarehouseLighting } from './warehouse-lighting';
@@ -326,6 +327,8 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   let griefCountdown = -1;
   let restarting = false;
   let revived = false;
+  let finalTestPrompted = false;
+  const finalTest = createLevel2FinalAction();
   const reminderPause = createNarrationPause();
   let smokeOn = false;
   const lesson = createLevel2NormalOperations();
@@ -411,6 +414,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     lastRemoved = index;
     idle = 0;
     const count = removed.size;
+    if (count === cards.length) smokeOn = false;
     if (count === 1) {
       voice.interrupt();
       voice.say(`A Pepperdyne ${cardName(index)}. A modial-interaction board.`);
@@ -434,7 +438,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     binned.add(index);
     idle = 0;
     if (binned.size === 5) {
-      smokeOn = false;
       // The machine is stalled; its RESET will bring it back.
       advance(11, 84);
       voice.say(LEVEL2_RESET.prompt);
@@ -613,7 +616,16 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       else if (restarting && mcc.failure === null) {
         restarting = false;
         revived = true;
-        voice.interrupt(85, 86, 87, 88, 89, 90, 91);
+        voice.interrupt(85, 86, 87, 88, 89, 90);
+      } else if (revived && !finalTestPrompted && !voice.busy) {
+        finalTestPrompted = true;
+        finalTest.arm(control('annunciator.tests').value);
+        voice.say(LEVEL2_BETAFORM.operations.test.say);
+      } else if (
+        finalTestPrompted &&
+        finalTest.take(control('annunciator.tests').value, voice.busy)
+      ) {
+        voice.queue(91);
       } else if (!revived && !restarting && !voice.busy) {
         if (reminderPause.take()) {
           voice.say(LEVEL2_RESET.remind);

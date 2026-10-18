@@ -1,0 +1,3 @@
+# Level 2 recovery and isolator detail
+
+Changed the Automation cabinet isolator indication to an 11 mm square LED in a small bezel beside the breaker handle, while retaining its green, red and unpowered states. The failed cabinet's smoke now stops when the fifth card is removed, even if the card has not yet reached the skip. After RESET and the apparent recovery speech, the narrator asks the player to test the MAIN INCOMING annunciator. A fresh TEST press starts the final training-film line and its terminal KAPUT; prior test presses do not count. Updated the scenario and added a gate test for the final action.

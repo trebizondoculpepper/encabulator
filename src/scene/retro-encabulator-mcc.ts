@@ -1948,7 +1948,8 @@ function populateInterior(
     },
   );
   if (prefix === 'section5.bucket1') {
-    // Auxiliary indication stays fed when this cabinet's own isolator opens.
+    // A small square status LED sits on the grey isolator body beside its
+    // throw handle. Auxiliary indication stays fed when this breaker opens.
     const status = parts.add(
       pilotLight(kit, {
         name: 'Automation cabinet isolator status',
@@ -1959,7 +1960,27 @@ function populateInterior(
         pushToTest: false,
       }),
     );
-    status.object.position.set(x + w / 2 - 0.13, y + h * 0.13, -0.255);
+    for (const child of status.object.children) child.scale.setScalar(0);
+    const bezel = new Mesh(
+      new BoxGeometry(0.016, 0.016, 0.004),
+      kitPaint(kit, '#292b2b'),
+    );
+    const darkLed = kitPaint(kit, '#252b27');
+    const greenLed = kitPaint(kit, '#56845c', 0.45);
+    const redLed = kitPaint(kit, '#8d4440', 0.45);
+    const lens = new Mesh(new BoxGeometry(0.011, 0.011, 0.002), darkLed);
+    lens.name = 'Automation isolator square LED';
+    lens.position.z = 0.003;
+    lens.onBeforeRender = () => {
+      lens.material =
+        status.object.userData.indication === 'green'
+          ? greenLed
+          : status.object.userData.indication === 'red'
+            ? redLed
+            : darkLed;
+    };
+    status.object.add(bezel, lens);
+    status.object.position.set(x + w / 2 - 0.045, y + h * 0.13 + 0.015, -0.255);
     bay.add(status.object);
   }
   const controlFuse = put('fuse', -w * 0.25, h / 2 - 0.075, -0.27, {
