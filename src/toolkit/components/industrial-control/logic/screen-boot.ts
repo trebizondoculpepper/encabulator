@@ -72,6 +72,18 @@ export function bootPace(device: string, slot: number) {
   return { seconds, at };
 }
 
+/** A controller's boot pace: its four self-test lines over 3.5 seconds. */
+export const CONTROLLER_BOOT = {
+  seconds: 3.5,
+  at: [0.35, 1.15, 2.1, 3.15],
+} as const;
+
+/** What a controller's screen shows `elapsed` seconds into its boot. */
+export function controllerBootLines(device: string, elapsed: number) {
+  const count = CONTROLLER_BOOT.at.filter((at) => at <= elapsed).length;
+  return [device, ...CONTROLLER_DIAGNOSTICS.slice(0, count)];
+}
+
 /** Screens made so far: each new one takes the next slot. */
 let made = 0;
 
@@ -83,7 +95,7 @@ export function createScreenBoot(
 ) {
   const pace =
     kind === 'controller'
-      ? { seconds: 3.5, at: [0.35, 1.15, 2.1, 3.15] }
+      ? { seconds: CONTROLLER_BOOT.seconds, at: [...CONTROLLER_BOOT.at] }
       : bootPace(device, made++);
   const diagnostics =
     kind === 'controller' ? CONTROLLER_DIAGNOSTICS : DIAGNOSTICS;
@@ -93,6 +105,10 @@ export function createScreenBoot(
     ready,
     /** How long this screen takes to boot, seconds. */
     seconds: pace.seconds,
+    /** Start its boot again from the beginning, as a reset does. */
+    restart() {
+      elapsed.value = 0;
+    },
     step(delta: number) {
       elapsed.value = supply.value
         ? Math.min(pace.seconds, elapsed.value + delta)

@@ -123,6 +123,9 @@ export function createObjectHandling(
     const portable = records.get(object)!.portable;
     portable.component.drop();
     if (divert?.(object, portable)) {
+      // The room's to move from now on: it is not put back where it was
+      // picked up, even if it is installed again somewhere else.
+      records.delete(object);
       held = null;
       return;
     }

@@ -17,3 +17,4 @@ Work is being committed in milestones, each passing the five checks, so that a s
 ### Milestones
 
 - Milestone 0: planning prompts, diary and this report committed.
+- Milestone 1, toolkit support: the PLC backplane's slots are wired to whichever card is seated in them (`slots`, `spare`, `insert` on the backplane device, tested in `src/toolkit/components/industrial-control/parts/machine-components.test.ts`); a released object the room diverts is forgotten by the shared object handling, so it can be installed somewhere new; potentiometers can be bound to world values; a key switch and a breaker's handle can be latched (for the Kirk key); a screen's boot can be restarted and a controller's boot lines are exported; the annunciator has ISA sequence M (manual RESET, tested); the LCD monitor takes bound signals for its trend and vector traces, and a picture drawn by the room. Level 2, dev0 and dev6 behave as before (all existing tests pass).

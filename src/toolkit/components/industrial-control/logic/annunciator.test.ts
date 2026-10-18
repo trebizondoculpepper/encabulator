@@ -48,4 +48,26 @@ describe('the annunciator', () => {
     a.acknowledge([0, 2]);
     expect(a.states).toEqual(['steady', 'flashing', 'steady']);
   });
+
+  it('holds a cleared, acknowledged window until RESET under sequence M', () => {
+    const a = createAnnunciator(2, { manualReset: true });
+    a.sense([true, true]);
+    a.acknowledge();
+    a.sense([false, true]);
+    expect(a.states).toEqual(['steady', 'steady']);
+    a.reset();
+    // RESET puts out only what has cleared; a standing alarm stays lit.
+    expect(a.states).toEqual(['off', 'steady']);
+    a.sense([false, false]);
+    a.reset();
+    expect(a.states).toEqual(['off', 'off']);
+  });
+
+  it('leaves a flashing window flashing when RESET is pressed', () => {
+    const a = createAnnunciator(1, { manualReset: true });
+    a.sense([true]);
+    a.sense([false]);
+    a.reset();
+    expect(a.states).toEqual(['flashing']);
+  });
 });

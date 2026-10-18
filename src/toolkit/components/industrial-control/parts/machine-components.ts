@@ -12,6 +12,8 @@ import {
 } from '../../core/parts/portable-board';
 import { createCardEdgeSlot, createPcbBackplane } from '../views/pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
+import type { ReadonlySignal } from '@preact/signals-core';
+import type { PortableObject } from '../../../controls/input/object-handling';
 import {
   MACHINE_COMPONENTS,
   BETAFORM_BOARD,
@@ -60,6 +62,18 @@ export interface MachineDevice extends Part {
   test(): void;
   repair(): void;
   cards?: readonly MachineDevice[];
+  /** A card assembly's slots, each with the card now seated in it. */
+  slots?: readonly {
+    kind: MachineComponentKind;
+    occupant: ReadonlySignal<MachineDevice | null>;
+  }[];
+  /**
+   * A healthy spare card for one of its slots, wired to work in the slot
+   * once seated there; the room places it and adds it to its parts.
+   */
+  spare?(kind: (typeof EXPANSION_CARD_KINDS)[number]): MachineDevice;
+  /** Seat a card in an empty slot of its kind; whether it went in. */
+  insert?(card: MachineDevice, slot: number): boolean;
   service?: ReturnType<typeof createServiceComponent>;
   handle?: ReturnType<typeof createOperatingHandle>;
   breaker?: ReturnType<typeof createCircuitBreaker>;
@@ -78,6 +92,8 @@ export function machineComponent(
     breaker?: ReturnType<typeof createCircuitBreaker>;
     /** Main disconnect may use a quieter handle than ordinary bucket breakers. */
     handleSoundLevel?: number;
+    /** An interlock that holds a breaker's handle where it is (a Kirk key). */
+    latch?: Readable<boolean>;
     power?: Readable<boolean>;
     indicatorPower?: Readable<boolean>;
     running?: Readable<boolean>;
@@ -118,6 +134,9 @@ export function machineComponent(
   let repair = () => {
     stress.value = false;
   };
+  let slots: MachineDevice['slots'];
+  let spare: MachineDevice['spare'];
+  let insert: MachineDevice['insert'];
   let handle: ReturnType<typeof createOperatingHandle> | undefined;
   let breaker: ReturnType<typeof createCircuitBreaker> | undefined;
   switch (kind) {
@@ -150,35 +169,123 @@ export function machineComponent(
         attachment,
       );
       a.disposers.push(bus.dispose);
-      let feed: Readable<boolean> = bus.running;
-      let processor: Readable<boolean> = signal(false);
+      // Each slot is wired to whichever card is seated in it, so a card
+      // put back, or a spare of the same kind, takes up the slot's work:
+      // the power card feeds the rest of the rack, the processor enables
+      // the output card.
+      const seats = EXPANSION_CARD_KINDS.map(() =>
+        signal<MachineDevice | null>(null),
+      );
+      const powerSlot = EXPANSION_CARD_KINDS.indexOf('plc-power');
+      const cpuSlot = EXPANSION_CARD_KINDS.indexOf('plc-cpu');
+      const rackFeed = computed(
+        () => seats[powerSlot].value?.active.value ?? false,
+      );
+      const processor = computed(
+        () => seats[cpuSlot].value?.active.value ?? false,
+      );
       let slot = 0;
       const slotCount = EXPANSION_CARD_KINDS.reduce(
         (sum, kind) => sum + (kind === 'plc-cpu' ? 2 : 1),
         0,
       );
-      cards = EXPANSION_CARD_KINDS.map((cardKind, index) => {
+      const centres = EXPANSION_CARD_KINDS.map((cardKind) => {
         const slots = cardKind === 'plc-cpu' ? 2 : 1;
         const centre = (slot + slots / 2 - slotCount / 2) * 0.03175;
         slot += slots;
+        return centre + 0.04;
+      });
+      const known: MachineDevice[] = [];
+      const makeCard = (
+        cardKind: (typeof EXPANSION_CARD_KINDS)[number],
+        cardName: string,
+      ) => {
+        const self: { card: MachineDevice | null } = { card: null };
+        // Every seat is read, so this follows a card going in or out.
+        const seated = computed(() =>
+          seats.map((seat) => seat.value).includes(self.card),
+        );
+        const card = machineComponent(kit, cardKind, {
+          name: cardName,
+          power: computed(
+            () =>
+              seated.value &&
+              (cardKind === 'plc-power' ? bus.running.value : rackFeed.value),
+          ),
+          indicatorPower: props.indicatorPower,
+          running: cardKind === 'plc-output' ? processor : props.running,
+          input: props.input,
+        });
+        self.card = card;
+        known.push(card);
+        return card;
+      };
+      let spares = 0;
+      cards = EXPANSION_CARD_KINDS.map((cardKind, index) => {
         const socket = createCardEdgeSlot(kit, index);
-        socket.position.x = centre + 0.04;
+        socket.position.x = centres[index];
         board.add(socket);
         const card = children.add(
-          machineComponent(kit, cardKind, {
-            name: `${name}: card ${index + 1} ${cardDesignation(cardKind)!.name}`,
-            power: feed,
-            indicatorPower: props.indicatorPower,
-            running: cardKind === 'plc-output' ? processor : props.running,
-            input: props.input,
-          }),
+          makeCard(
+            cardKind,
+            `${name}: card ${index + 1} ${cardDesignation(cardKind)!.name}`,
+          ),
         );
-        card.object.position.set(centre + 0.04, 0, 0.004);
+        card.object.position.set(centres[index], 0, 0.004);
+        card.object.userData.slot = index;
         a.object.add(card.object);
-        if (cardKind === 'plc-power') feed = card.active;
-        if (cardKind === 'plc-cpu') processor = card.active;
+        seats[index].value = card;
         return card;
       });
+      // A card is in its slot while it is installed in this assembly.
+      a.updates.push(() => {
+        for (const card of known) {
+          const at = card.object.userData.slot as number | undefined;
+          const phase = (
+            card.object.userData.portable as PortableObject
+          )?.component.phase.peek();
+          const inPlace =
+            at !== undefined &&
+            phase === 'installed' &&
+            card.object.parent === a.object;
+          if (inPlace && seats[at].peek() === null) seats[at].value = card;
+          if (!inPlace)
+            for (const seat of seats)
+              if (seat.peek() === card) seat.value = null;
+        }
+      });
+      slots = EXPANSION_CARD_KINDS.map((cardKind, index) => ({
+        kind: cardKind,
+        occupant: seats[index],
+      }));
+      spare = (cardKind) => {
+        const card = makeCard(
+          cardKind,
+          `${name}: spare ${++spares} ${cardDesignation(cardKind)!.name}`,
+        );
+        card.object.userData.slot = undefined;
+        return card;
+      };
+      insert = (card, index) => {
+        const portable = card.object.userData.portable as
+          | PortableObject
+          | undefined;
+        if (
+          !known.includes(card) ||
+          !portable ||
+          EXPANSION_CARD_KINDS[index] !== card.kind ||
+          seats[index].peek() !== null
+        )
+          return false;
+        a.object.add(card.object);
+        card.object.position.set(centres[index], 0, 0.004);
+        card.object.quaternion.identity();
+        card.object.scale.setScalar(1);
+        card.object.userData.slot = index;
+        portable.component.reset();
+        seats[index].value = card;
+        return true;
+      };
       children.add(a.part());
       part = { object: a.object, ...children };
       active = computed(() => bus.running.value && processor.value);
@@ -186,7 +293,7 @@ export function machineComponent(
         () =>
           bus.failed.value ||
           !bus.connected.state.value ||
-          cards!.some((card) => card.faulted.value),
+          seats.some((seat) => !seat.value || seat.value.faulted.value),
       );
       value = bus.output;
       test = bus.fail;
@@ -200,7 +307,10 @@ export function machineComponent(
     }
     case 'breaker': {
       breaker = props.breaker ?? createCircuitBreaker();
-      handle = createOperatingHandle({ bound: breaker.position });
+      handle = createOperatingHandle({
+        bound: breaker.position,
+        latch: props.latch,
+      });
       const a = beginPart(kit, name);
       const view = createMachineDeviceView(kit, kind, label);
       a.object.add(view.group);
@@ -541,6 +651,9 @@ export function machineComponent(
     handle,
     breaker,
     cards,
+    slots,
+    spare,
+    insert,
     service,
   };
 }

@@ -101,9 +101,33 @@ export const LCD_MODES: readonly LcdMode[] = [
   'vector',
 ];
 
+/**
+ * Values a room binds an LCD's picture to, instead of its own wandering
+ * demonstration readings: the trend's three pens (0 to 1), the vector
+ * trace's phase (radians) and size (0 to 1), and a line of text under it.
+ */
+export interface LcdSignals {
+  trend?: readonly number[];
+  vectorPhase?: number;
+  vectorGain?: number;
+  caption?: string;
+}
+
+/** A picture a room draws itself, `seconds` its own clock. */
+export type LcdPicture = (
+  c: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  seconds: number,
+) => void;
+
 export interface LcdMonitorView {
   group: Group;
   setMode(mode: LcdMode): void;
+  /** Bind its picture to the room's values; null for its own readings. */
+  setSignals(signals: LcdSignals | null): void;
+  /** Draw a picture of the room's own in place of the mode's; null to stop. */
+  setPicture(picture: LcdPicture | null): void;
   setOn(on: boolean): void;
   /** Distinct KAPUT behaviour; null restores the normal instrument picture. */
   setFailure(kind: LcdFailure | null, seconds?: number): void;
@@ -199,6 +223,8 @@ export function createLcdMonitor(
   );
 
   let mode = initial;
+  let signals: LcdSignals | null = null;
+  let picture: LcdPicture | null = null;
   let on = true;
   let bootLines: readonly string[] | null = null;
   let failure: LcdFailure | null = null;
@@ -264,7 +290,7 @@ export function createLcdMonitor(
     c.fillText(stamp(clock + 43200), W - 92, 18);
     const styles = [ink, '#c8ffd0', '#38c35a'];
     trend.forEach((series, k) => {
-      series.push(wander(clock, seed + k * 2.3));
+      series.push(signals?.trend?.[k] ?? wander(clock, seed + k * 2.3));
       if (series.length > 70) series.shift();
       c.strokeStyle = styles[k];
       c.lineWidth = k === 0 ? 2 : 1.5;
@@ -280,7 +306,8 @@ export function createLcdMonitor(
     c.fillStyle = ink;
     c.font = '13px "Courier New", monospace';
     c.fillText(
-      `PV ${(wander(clock, seed) * 100).toFixed(1)}%   SP 50.0%`,
+      signals?.caption ??
+        `PV ${(wander(clock, seed) * 100).toFixed(1)}%   SP 50.0%`,
       10,
       H - 13,
     );
@@ -398,15 +425,23 @@ export function createLcdMonitor(
     c.beginPath();
     const a = 3;
     const b = 2;
-    const phase = clock * 0.7 + seed;
+    const phase = signals?.vectorPhase ?? clock * 0.7 + seed;
+    const gain = (signals?.vectorGain ?? 1) * 0.85;
     for (let i = 0; i <= 200; i++) {
       const t = (i / 200) * Math.PI * 2;
-      const x = cx + Math.sin(a * t + phase) * r * 0.85;
-      const y = cy + Math.sin(b * t) * r * 0.85;
+      const x = cx + Math.sin(a * t + phase) * r * gain;
+      const y = cy + Math.sin(b * t) * r * gain;
       if (i === 0) c.moveTo(x, y);
       else c.lineTo(x, y);
     }
     c.stroke();
+    if (signals?.caption) {
+      c.fillStyle = '#020a04';
+      c.fillRect(0, H - 24, W, 24);
+      c.fillStyle = '#8dffa0';
+      c.font = 'bold 14px "Courier New", monospace';
+      c.fillText(signals.caption, 8, H - 7);
+    }
   };
 
   const draw = () => {
@@ -425,6 +460,7 @@ export function createLcdMonitor(
       c.fillRect(0, 0, W, H);
     } else if (failure !== 'stuck' || failureTime < 1.3) {
       if (bootLines) drawBootScreen(c, W, H, bootLines);
+      else if (picture) picture(c, W, H, clock);
       else if (mode === 'trend') drawTrend();
       else if (mode === 'mimic') drawMimic();
       else if (mode === 'log') drawLog();
@@ -497,6 +533,14 @@ export function createLcdMonitor(
         c.fillStyle = '#020a04';
         c.fillRect(0, 0, W, H);
       }
+      since = 1;
+    },
+    setSignals(next) {
+      signals = next;
+    },
+    setPicture(next) {
+      if (next === picture) return;
+      picture = next;
       since = 1;
     },
     setBoot(lines) {

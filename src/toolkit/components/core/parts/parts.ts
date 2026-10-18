@@ -545,10 +545,17 @@ export function selector(
 
 // ---- Potentiometer -----------------------------------------------------------
 
-/** A potentiometer, a step of its travel a click, 0 to 1. */
+/**
+ * A potentiometer, a step of its travel a click, 0 to 1. Bound, it shows
+ * and writes a world value: its detent, from 0 to `steps`.
+ */
 export function potentiometer(
   kit: PanelKit,
-  props: Common & { steps?: number; initial?: number },
+  props: Common & {
+    steps?: number;
+    initial?: number;
+    bound?: Binding<number>;
+  },
 ): Part & { share: ReadonlySignal<number>; position: ReadonlySignal<number> } {
   const a = beginPart(
     kit,
@@ -561,6 +568,15 @@ export function potentiometer(
   const part = createSelector({
     positions,
     initial: Math.round((props.initial ?? 0) * (positions - 1)),
+    bound: props.bound
+      ? {
+          get value() {
+            return props.bound!.value / (positions - 1);
+          },
+          set: (share: number) =>
+            props.bound!.set(Math.round(share * (positions - 1))),
+        }
+      : undefined,
   });
   a.voice(part, { detent: KNOB });
   a.uses.set(view.knob, (direction = 1) => part.turn(direction));
@@ -677,10 +693,14 @@ export function disconnectHandle(
 
 // ---- Key switch --------------------------------------------------------------
 
-/** A chrome key switch with its key in it, turned 0 or I. */
+/** A chrome key switch with its key in it, turned 0 or I; latched, it refuses. */
 export function keySwitch(
   kit: PanelKit,
-  props: Common & { initial?: boolean; bound?: Binding<boolean> },
+  props: Common & {
+    initial?: boolean;
+    bound?: Binding<boolean>;
+    latch?: Readable<boolean>;
+  },
 ): Part & { state: ReadonlySignal<boolean> } {
   const a = beginPart(
     kit,
@@ -689,7 +709,11 @@ export function keySwitch(
   const view = createKeySwitch(kit, props.initial ?? false);
   a.object.add(view.group);
   a.legend(props.legend, 0.03);
-  const part = createSwitch({ initial: props.initial, bound: props.bound });
+  const part = createSwitch({
+    initial: props.initial,
+    bound: props.bound,
+    latch: props.latch,
+  });
   a.voice(part, { on: KEY_TURN, off: KEY_TURN, refused: LOCKED });
   a.uses.set(view.key, () => part.flip());
   a.updates.push((delta) => {
