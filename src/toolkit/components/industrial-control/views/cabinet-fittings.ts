@@ -222,6 +222,8 @@ export function createLcdMonitor(
     below,
     0.031,
   );
+  // Lit by changing its paint: not merged with the still parts.
+  lamp.userData.live = true;
 
   let mode = initial;
   let signals: LcdSignals | null = null;
@@ -638,16 +640,19 @@ export function createChartRecorder(
   });
   strip.position.set(0, py + ph / 2 - 0.006, 0.0312);
   group.add(strip);
-  const penMeshes = pens.map((colour) =>
-    add(
+  const penMeshes = pens.map((colour) => {
+    const pen = add(
       group,
       new BoxGeometry(0.005, 0.012, 0.006),
       kitPaint(kit, colour),
       0,
       py + ph / 2 - 0.02,
       0.033,
-    ),
-  );
+    );
+    // The pens move: not to be merged with the still parts (`mergeStatic`).
+    pen.userData.live = true;
+    return pen;
+  });
   const badge = createMicroLabel(kit, title, {
     height: 0.006,
     ink: '#c9cbcd',
@@ -962,6 +967,8 @@ export function createFlangeHandle(
   const pivot = new Group();
   pivot.position.set(0, 0, 0.03);
   group.add(pivot);
+  // It turns: not to be merged with the still parts (`mergeStatic`).
+  pivot.userData.live = true;
   // Flat painted-metal arm and a squared insulating sleeve, after the
   // 1494F-M1 operator. The 141.3 mm pivot-to-tip reach follows its drawing.
   const steel = kitPaint(kit, '#686b6d', 0.5);
@@ -1089,6 +1096,8 @@ export function createHeavyDutyThrowHandle(
   const pivot = new Group();
   pivot.position.set(0, -0.032, 0.032);
   group.add(pivot);
+  // It turns: not to be merged with the still parts (`mergeStatic`).
+  pivot.userData.live = true;
   add(
     pivot,
     new CylinderGeometry(0.019, 0.019, 0.012, 24),
@@ -1167,6 +1176,8 @@ export function createRotaryIsolatorHandle(
   const pivot = new Group();
   pivot.position.z = 0.008;
   group.add(pivot);
+  // It turns: not to be merged with the still parts (`mergeStatic`).
+  pivot.userData.live = true;
   add(
     pivot,
     new CylinderGeometry(0.02, 0.022, 0.016, 28),
@@ -1256,6 +1267,8 @@ export function createSoftStarter(
     });
     label.position.set(x + 0.022, y, 0.0262);
     group.add(label);
+    // Lit by changing its paint: not merged with the still parts.
+    mesh.userData.live = true;
     return (lit: boolean) => (mesh.material = lit ? on : off);
   };
   const run = lamp('#4cff6a', 0.03, 0.03, 'RUN');
@@ -1273,6 +1286,8 @@ export function createSoftStarter(
       0.0275,
     ),
   );
+  // Lit by changing their paint: not merged with the still parts.
+  for (const seg of bar) seg.userData.live = true;
   const rampLabel = createMicroLabel(kit, 'RAMP', {
     height: 0.003,
     ink: '#b8bab5',

@@ -1,5 +1,10 @@
 import { signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
+import type { Object3D } from 'three';
+import {
+  mergeTree,
+  staticMergeEnabled,
+} from '../toolkit/components/core/views/merge-static';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import {
   createMicroLabel,
@@ -342,12 +347,42 @@ export function createScenarioSimulator(
     uses: new Map([[door.hinge, () => void latch.door.flip()]]),
   });
 
+  // For speed, its still meshes are merged (`mergeTree`): what a click
+  // works (the door, each switch), what moves or twinkles stays apart.
+  for (const light of leds) light.led.userData.live = true;
+  const merged: Mesh[] = [];
+  const batches: Mesh[] = [];
+  if (staticMergeEnabled()) {
+    const clickable = new Set<Object3D>(parts.uses.keys());
+    const separate = (object: Object3D) =>
+      !object.visible ||
+      Boolean(object.userData.live || object.userData.portable) ||
+      (clickable.has(object) && !object.userData.still) ||
+      (object instanceof Mesh && Object.keys(object.userData).length > 0);
+    const made = mergeTree(group, separate, 1, {
+      originals: (meshes) => merged.push(...meshes),
+      share: true,
+      solid: true,
+      fine: [0.03, 0.1],
+    });
+    for (const mesh of made) {
+      const within = mesh.parent?.parent;
+      if (within && (clickable.has(within) || within.userData.live))
+        mesh.userData.control = true;
+    }
+    batches.push(...made);
+  }
+
   // Its controls take clicks only with the door open (or swinging).
   let angle = 0;
   controls.raycast = () => (open.value || angle < -0.001 ? undefined : false);
   return {
     group,
     parts,
+    /** Its still meshes merged away, for a development check. */
+    merged,
+    /** The meshes they were merged into, to cull (`detail`). */
+    batches,
     /** Whether its door is open. */
     get open() {
       return open.value;

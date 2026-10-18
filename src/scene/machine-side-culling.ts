@@ -18,11 +18,12 @@ const FACE_MARGIN = 0.05;
 export function createMachineSideCulling(machine: Object3D) {
   const rear = machine.getObjectByName('Encabulator rear enclosure') ?? null;
   // Each unit's door (or fixed cover) hangs from its hinge, with every
-  // fitting on it.
+  // fitting on it; the hinge is named after it (the cover itself may have
+  // been merged away with the still meshes).
   const fronts = new Set<Object3D>();
   machine.traverse((object) => {
-    if (/^Section \d .* (door|cover)$/.test(object.name) && object.parent)
-      fronts.add(object.parent);
+    if (/^Section \d .* (door|cover) hinge$/.test(object.name))
+      fronts.add(object);
   });
   // The raycaster does not honour visibility: a hidden side takes no clicks.
   for (const side of [...fronts, ...(rear ? [rear] : [])])

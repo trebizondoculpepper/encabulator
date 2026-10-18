@@ -287,6 +287,8 @@ export function createRocker(kit: PanelKit, on = false): Rocker {
     0,
     0.005,
   );
+  // It rocks: not to be merged with the still parts (`mergeStatic`).
+  rocker.userData.live = true;
   const mark = kitPaint(kit, '#f2e8de');
   add(rocker, new BoxGeometry(0.0016, 0.006, 0.0008), mark, 0, 0.006, 0.0032);
   const ring = add(

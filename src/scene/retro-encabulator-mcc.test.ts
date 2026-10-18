@@ -25,6 +25,8 @@ import {
 } from '../toolkit/gallery/rooms/machine-gallery';
 import { machineComponent } from '../toolkit/components/industrial-control/parts/machine-components';
 import { MACHINE_COMPONENTS } from '../toolkit/components/industrial-control/logic/machine-components';
+import { watchMerged } from '../toolkit/components/core/views/merge-static';
+import { FAILURES } from '../game/machine-failure';
 import { createRetroEncabulatorMcc } from './retro-encabulator-mcc';
 
 beforeEach(() => {
@@ -1328,3 +1330,47 @@ it('preserves Level2 isolation, five removable cards and RESET after their remov
   expect(mcc.mainBreaker.closed.value).toBe(false);
   dispose();
 });
+
+it('merges only meshes that nothing changes afterwards', () => {
+  const kit = createPanelKit();
+  const mcc = createRetroEncabulatorMcc(kit, { incomingOn: true });
+  expect(mcc.merged.length).toBeGreaterThan(500);
+  const watch = watchMerged(mcc.merged);
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.1) {
+      mcc.update(0.1);
+      watch.check();
+    }
+  };
+  mcc.mainBreaker.operate();
+  for (const [, unit] of mcc.circuits)
+    if (unit.breaker?.breaker?.position.value === 'off')
+      unit.breaker.breaker.operate();
+  run(30);
+  mcc.openAll(true);
+  run(2);
+  // Every input, both ways, then every protective device failed.
+  for (const use of mcc.parts.uses.values()) {
+    use(1);
+    run(0.3);
+    use(-1);
+    run(0.3);
+  }
+  mcc.openAll(true);
+  for (const [, unit] of mcc.circuits)
+    for (const device of unit.devices) device.test();
+  run(10);
+  for (const failure of FAILURES) {
+    mcc.recover();
+    mcc.fail(failure.id);
+    run(failure.seconds + 5);
+  }
+  mcc.recover();
+  mcc.openAll(false);
+  run(30);
+  expect(
+    watch.changed().map((mesh) => mesh.userData.mergedFrom as string),
+  ).toEqual([]);
+  mcc.parts.dispose();
+  disposeKit(kit, mcc.group);
+}, 120_000);

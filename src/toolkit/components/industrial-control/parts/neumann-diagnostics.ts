@@ -35,12 +35,16 @@ export function neumannDiagnostics(
   const ledMaterial = kitPaint(kit, '#18291b');
   const led = new Mesh(new BoxGeometry(0.005, 0.005, 0.002), ledMaterial);
   led.name = 'Neumann Link Controller connection LED';
+  // Lit by changing its paint: not merged with the still parts.
+  led.userData.live = true;
   for (const [i, label, service] of [
     [0, 'NEUMANN LINK\nCONTROLLER', controller],
     [1, 'NEUMANN\nDIAGNOSTICS', diagnostics],
   ] as const) {
     const card = beginPart(kit, label.replace('\n', ' '));
     card.object.userData.attachment = 'fixed';
+    // It slides out when disconnected: not merged with the still parts.
+    card.object.userData.live = true;
     const x = i * 0.065 + 0.005;
     const socket = createCardEdgeSlot(kit, i);
     socket.position.set(x, 0, 0.002);

@@ -8,12 +8,23 @@ import {
 } from 'vite-plus/test';
 import { DirectionalLight, PointLight, Raycaster, Scene, Vector3 } from 'three';
 import { addWarehouseLighting } from '../rendering/warehouse-lighting';
-import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
+import {
+  WAREHOUSE_HEADS,
+  createArchitecturalServices,
+  createWarehouseFire,
+} from '../toolkit/components/architectural/logic/warehouse-services';
 import { ARCHITECTURAL_KINDS } from '../toolkit/components/architectural/logic/architectural-fittings';
 import {
   createPanelKit,
   disposeKit,
 } from '../toolkit/components/core/views/eighties-controls';
+import { watchMerged } from '../toolkit/components/core/views/merge-static';
+import { createGraph } from '../toolkit/components/core/logic/world/graph';
+import {
+  HEAD_OPENS_AT,
+  INVESTIGATION_SECONDS,
+  createFireAlarmSystem,
+} from '../toolkit/components/fire/logic/fire-alarm-system';
 import { createWarehouseTrainingRoom } from './warehouse-training-room';
 import { createDistributionBoard } from '../toolkit/components/architectural/views/building-fittings';
 import {
@@ -42,6 +53,64 @@ beforeEach(() =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('architectural fittings', () => {
+  it('merges only fitting meshes that nothing changes afterwards', () => {
+    const kit = createPanelKit();
+    const services = createArchitecturalServices();
+    // A fire it sets by hand, through every head at once.
+    const g = createGraph();
+    const smoke = g.input('host.smoke', 0);
+    const heat = g.input('host.heat', 20);
+    const fire = createFireAlarmSystem(g, {
+      heads: WAREHOUSE_HEADS.length,
+      mains: g.input('mains', true),
+      smokeTarget: smoke,
+      alight: g.derive('host.alight', [smoke], (s) => s > 0),
+      headTemperatures: g.derive('host.heads', [heat], (t) =>
+        WAREHOUSE_HEADS.map(() => t),
+      ),
+    });
+    const room = createWarehouseTrainingRoom(kit, false, {
+      lighting: services,
+      fire: createWarehouseFire(fire),
+    });
+    expect(room.merged.length).toBeGreaterThan(500);
+    const watch = watchMerged(room.merged);
+    const run = (seconds: number) => {
+      for (let t = 0; t < seconds - 1e-9; t += 0.1) {
+        g.tick(0.1, () => 0.2);
+        room.parts.update(0.1);
+        watch.check();
+      }
+    };
+    // Smoke, the alert, evacuation, every head burst and spraying, reset.
+    smoke.set(0.8);
+    run(INVESTIGATION_SECONDS + 15);
+    heat.set(HEAD_OPENS_AT + 30);
+    run(10);
+    smoke.set(0);
+    heat.set(20);
+    fire.panelKey.set(true);
+    fire.silence();
+    fire.reset();
+    fire.resetSprinklers();
+    run(20);
+    // Every input, both ways, then the lighting supply off and on.
+    for (const use of room.parts.uses.values()) {
+      use(1);
+      run(0.5);
+      use(-1);
+      run(0.5);
+    }
+    services.model.power.lightingBreaker.set(false);
+    run(2);
+    services.model.power.lightingBreaker.set(true);
+    run(2);
+    expect(
+      watch.changed().map((mesh) => mesh.userData.mergedFrom as string),
+    ).toEqual([]);
+    room.parts.dispose();
+    disposeKit(kit, room.group);
+  }, 60_000);
   it('connects both warehouse switches to the lamps while preserving daylight and emergency supply', () => {
     const kit = createPanelKit();
     const services = createArchitecturalServices();

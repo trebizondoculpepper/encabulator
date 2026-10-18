@@ -33,7 +33,11 @@ import type {
   ArchitecturalServices,
   WarehouseFire,
 } from '../toolkit/components/architectural/logic/warehouse-services';
-import { mergeStatic } from '../toolkit/components/core/views/merge-static';
+import {
+  mergeStatic,
+  mergeTree,
+  staticMergeEnabled,
+} from '../toolkit/components/core/views/merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
 
 /** Empty early-1990s Guildford industrial shell. No Level 2 apparatus or utility interiors. */
@@ -505,10 +509,36 @@ export function createWarehouseTrainingRoom(
     );
   for (const z of [12.7, 14.3]) floorMark(createWalkwayTape(kit, 25.7), 0, z);
   floorMark(createHazardTape(kit, 6.4), -12.8, 0, Math.PI / 2);
-  // Batch only the shell; keep architectural components intact for future binding.
+  // Batch the shell, then the still meshes of the fittings, across
+  // fittings, a 6 m cell at a time: each fitting stays a part of its own,
+  // bound to the building's services, but only what a click works, what
+  // moves or hides (`userData.live`) and meshes carrying data are drawn
+  // separately, so a hundred sprinkler heads draw in a few calls.
   for (const mesh of mergeStatic(group, 6, fitted)) {
     mesh.castShadow = !(mesh.material instanceof MeshBasicMaterial);
     mesh.receiveShadow = true;
+  }
+  const merged: Mesh[] = [];
+  const batches: Mesh[] = [];
+  if (staticMergeEnabled()) {
+    const clickable = new Set<Object3D>(parts.uses.keys());
+    const made = mergeTree(
+      group,
+      (object) =>
+        object.name === 'Merged' ||
+        clickable.has(object) ||
+        !object.visible ||
+        Boolean(object.userData.live) ||
+        (object instanceof Mesh && Object.keys(object.userData).length > 0),
+      6,
+      {
+        originals: (meshes) => merged.push(...meshes),
+        share: true,
+        solid: true,
+        fine: [0.05, 0.15],
+      },
+    );
+    batches.push(...made);
   }
   // Compass: the loading gate is SOUTH and the opposing escape is NORTH.
   group.rotation.y = Math.PI / 2;
@@ -516,6 +546,10 @@ export function createWarehouseTrainingRoom(
     group,
     parts,
     fittings: [...fitted],
+    /** The fittings' still meshes merged away, for a development check. */
+    merged,
+    /** The meshes the fittings were merged into, to cull (`detail`). */
+    batches,
     solids: solids.map((s) => ({
       minX: s.minZ,
       maxX: s.maxZ,

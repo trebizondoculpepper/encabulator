@@ -1023,6 +1023,8 @@ export function doorBack(
 ): Part {
   const a = beginPart(kit, props.name ?? 'door rear cover');
   a.object.add(createDoorRearCover(kit, props.layout, props.material));
+  // A click on it moves the door, not it (`mergeTree`).
+  a.object.userData.still = true;
   a.uses.set(a.object, () => {
     if (props.shared.state.value) props.shared.flip();
   });

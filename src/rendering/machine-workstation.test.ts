@@ -10,6 +10,7 @@ import {
   disposeKit,
 } from '../toolkit/components/core/views/eighties-controls';
 import { createRetroEncabulatorMcc } from '../scene/retro-encabulator-mcc';
+import { watchMerged } from '../toolkit/components/core/views/merge-static';
 import { addMachineWorkstation } from './machine-workstation';
 
 vi.mock(
@@ -253,5 +254,42 @@ it('exposes the exact green stack-light indication as the workstation readiness 
   state.fault = true;
   check(false);
   mcc.parts.dispose();
+  disposeKit(kit, mcc.group);
+});
+
+it('merges only workstation meshes that nothing changes afterwards', () => {
+  const kit = createPanelKit();
+  const mcc = createRetroEncabulatorMcc(kit);
+  const workstation = addMachineWorkstation(
+    kit,
+    { x: 0, z: 0 },
+    1,
+    mcc.rear.dataPort,
+  );
+  expect(workstation.merged.length).toBeGreaterThan(50);
+  const watch = watchMerged(workstation.merged);
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds - 1e-9; t += 0.1) {
+      workstation.parts.update(0.1);
+      watch.check();
+    }
+  };
+  // Every input, then a whole boot from the disc, and off again.
+  for (const use of workstation.parts.uses.values()) {
+    use();
+    run(0.5);
+  }
+  run(15);
+  for (const use of workstation.parts.uses.values()) {
+    use();
+    run(0.5);
+  }
+  run(2);
+  expect(
+    watch.changed().map((mesh) => mesh.userData.mergedFrom as string),
+  ).toEqual([]);
+  workstation.dispose();
+  mcc.parts.dispose();
+  disposeKit(kit, workstation.group);
   disposeKit(kit, mcc.group);
 });

@@ -64,6 +64,8 @@ export interface Needle {
 }
 
 function easedNeedle(pivot: Group, sweep: number, start: number) {
+  // The needle turns: not merged with the still parts (`mergeStatic`).
+  pivot.userData.live = true;
   let target = 0;
   let shown = 0;
   return {

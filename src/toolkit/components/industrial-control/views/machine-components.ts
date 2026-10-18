@@ -36,6 +36,8 @@ export function createMachineDeviceView(
   const body = new Group();
   body.name = kind.startsWith('plc-') ? 'Withdrawable card' : 'Device body';
   group.add(body);
+  // A card slides out on it: not merged with the still parts (`mergeTree`).
+  if (kind.startsWith('plc-')) body.userData.live = true;
   const plastic = kitPaint(kit, kind === 'terminal' ? '#b7b6a8' : '#41464a');
   const dark = kitPaint(kit, '#1b1d1e');
   const metal = kitPaint(kit, '#a5aaa9', 0.6);
@@ -132,6 +134,8 @@ export function createMachineDeviceView(
   const service = new Group();
   service.position.set(0, -height * 0.35, face);
   body.add(service);
+  // Its lever or screw turns: not merged with the still parts.
+  service.userData.live = true;
   const handle = new Mesh(
     new BoxGeometry(
       Math.min(0.018, width * 0.7),
@@ -189,18 +193,24 @@ export function createMachineDeviceView(
   }
   const green = kitGlow(kit, '#43b66b');
   const red = kitGlow(kit, '#e34331');
-  const status = box(
-    Math.min(0.008, width * 0.4),
-    0.004,
-    0.002,
-    0,
-    height * 0.12,
-    face + 0.001,
-    dark,
-  );
-  status.visible =
-    kind.startsWith('plc-') || kind === 'relay' || kind === 'breaker';
-  if (kind === 'breaker') {
+  // Lamps a kind does not have are not made at all, rather than made and
+  // hidden: a line-up has hundreds of terminals, and each mesh costs
+  // something every frame, seen or not.
+  const status =
+    kind.startsWith('plc-') || kind === 'relay' || kind === 'breaker'
+      ? box(
+          Math.min(0.008, width * 0.4),
+          0.004,
+          0.002,
+          0,
+          height * 0.12,
+          face + 0.001,
+          dark,
+        )
+      : null;
+  // Its lamps change paint: not merged with the still parts (`mergeTree`).
+  if (status) status.userData.live = true;
+  if (kind === 'breaker' && status) {
     status.name = 'Breaker status indicator';
     const legend = createMicroLabel(kit, 'POWER / ON', {
       height: 0.002,
@@ -219,16 +229,16 @@ export function createMachineDeviceView(
   const activityDark = new Color('#2a0c08');
   activityMaterial.color.copy(activityDark);
   // The same size and shape as the green lamp, just above it.
-  const activity = box(
-    Math.min(0.008, width * 0.4),
-    0.004,
-    0.002,
-    0,
-    height * 0.12 + 0.0075,
-    face + 0.001,
-    activityMaterial,
-  );
-  activity.visible = card;
+  if (card)
+    box(
+      Math.min(0.008, width * 0.4),
+      0.004,
+      0.002,
+      0,
+      height * 0.12 + 0.0075,
+      face + 0.001,
+      activityMaterial,
+    );
   let activityLevel = 0;
   let activityTarget = 0;
   let activityHold = 0;
@@ -260,11 +270,21 @@ export function createMachineDeviceView(
     activityLevel += (activityTarget - activityLevel) * Math.min(1, dt * 40);
     activityMaterial.color.copy(activityDark).lerp(activityLit, activityLevel);
   };
-  const channels = Array.from({ length: 16 }, (_, i) =>
-    box(0.004, 0.003, 0.002, 0, height * 0.02 - i * 0.007, face + 0.001, dark),
-  );
-  if (kind !== 'plc-input' && kind !== 'plc-output')
-    for (const channel of channels) channel.visible = false;
+  const channels =
+    kind === 'plc-input' || kind === 'plc-output'
+      ? Array.from({ length: 16 }, (_, i) =>
+          box(
+            0.004,
+            0.003,
+            0.002,
+            0,
+            height * 0.02 - i * 0.007,
+            face + 0.001,
+            dark,
+          ),
+        )
+      : [];
+  for (const channel of channels) channel.userData.live = true;
   if (kind === 'plc-input' || kind === 'plc-output' || kind === 'plc-analog') {
     // The field wiring arm is distinct from the module's card ejector.
     box(
@@ -325,7 +345,7 @@ export function createMachineDeviceView(
       detached = false,
       supplied = true,
     ) {
-      if (kind === 'breaker') {
+      if (status && kind === 'breaker') {
         const indication = !supplied
           ? 'black'
           : on && !failed
@@ -334,7 +354,7 @@ export function createMachineDeviceView(
         status.material =
           indication === 'black' ? dark : indication === 'green' ? green : red;
         status.userData.indication = indication;
-      } else status.material = failed ? red : on ? green : dark;
+      } else if (status) status.material = failed ? red : on ? green : dark;
       if (card) flicker(on && !failed && inserted, dt);
       service.rotation.x =
         kind === 'breaker'

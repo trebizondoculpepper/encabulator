@@ -1,30 +1,13 @@
-import { createMachineSideCulling } from '../scene/machine-side-culling';
-import { computed, effect, signal } from '@preact/signals-core';
-import {
-  createArchitecturalServices,
-  createWarehouseFire,
-} from '../toolkit/components/architectural/logic/warehouse-services';
-import { voiceAlarm } from '../toolkit/components/fire/parts/fire-parts';
-import { addMachineWorkstation } from './machine-workstation';
-import {
-  Group,
-  Mesh,
-  PerspectiveCamera,
-  Raycaster,
-  Scene,
-  Vector2,
-} from 'three';
+import { Group, Mesh, PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { Object3D } from 'three';
 import {
   LEVEL0_CHAIRS,
-  LEVEL0_MACHINE_HEADS,
   LEVEL0_SCENARIOS,
   LEVEL0_MACHINE,
   LEVEL0_START,
 } from '../game/level0-room-plan';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
 import { ejectCabinetDrop } from '../game/cabinet-drop';
-import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
 import {
   MCC_DEPTH,
   MCC_ISOLATOR_X,
@@ -35,7 +18,6 @@ import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
   createPanelKit,
   disposeKit,
-  kitPaint,
 } from '../toolkit/components/core/views/eighties-controls';
 import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
 import {
@@ -43,10 +25,7 @@ import {
   useEnvironment,
 } from '../toolkit/components/core/parts/render-style';
 import { ISOLATOR } from '../toolkit/components/industrial-control/views/incoming-isolator';
-import {
-  CHAIR_STACK_HALF,
-  createChairStack,
-} from '../toolkit/components/site-dressing/views/chair-stack';
+import { CHAIR_STACK_HALF } from '../toolkit/components/site-dressing/views/chair-stack';
 import {
   addSkipGraffiti,
   addSkipLamps,
@@ -59,16 +38,10 @@ import { createFirstPerson } from '../toolkit/controls/input/first-person';
 import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
-import { createLevel0Machine } from './level0-machine';
-import { createLevel0Scenarios } from './level0-scenarios';
-import { createLevel0Failures } from './level0-failures';
-import { createLevel0Symptoms } from './level0-symptoms';
+import { createDetailCuller } from './detail-culling';
+import { createLevel0Scene, cullLevel0Detail } from './level0-scene';
 import { createLevel0Strangeness } from './level0-strangeness';
-import {
-  createScenarioSimulator,
-  simulatorFootprint,
-} from './scenario-simulator';
-import { addWarehouseLighting } from './warehouse-lighting';
+import { simulatorFootprint } from './scenario-simulator';
 
 /**
  * Level 0, the machine sandbox: Level 2's setting and machine with no
@@ -78,54 +51,30 @@ import { addWarehouseLighting } from './warehouse-lighting';
  */
 export function startLevel0Room(canvas: HTMLCanvasElement) {
   const m = METRE;
-  const scene = new Scene();
+  const kit = createPanelKit();
+  const {
+    scene,
+    machine,
+    symptoms,
+    room,
+    lighting,
+    machineSides,
+    workstation,
+    stopDiagnosticLink,
+    chairs,
+    failures,
+    scenarios,
+    simulator,
+    detail,
+  } = createLevel0Scene(kit, m);
   const renderer = createRenderer(canvas);
   const freeEnvironment = useEnvironment(renderer, scene, 0.3);
   renderer.setClearColor('#cbd3d6');
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
-  const kit = createPanelKit();
-  const building = createArchitecturalServices();
-  const diagnosticsAvailable = signal(false);
-  const machine = createLevel0Machine(kit, { diagnosticsAvailable });
-  // The building's fire alarm: the plant's fire system, heard from a
-  // ceiling speaker over the middle of the floor and the wall sounders,
-  // and every fire fitting in the warehouse working on it together.
-  const { fire } = machine.plant;
-  const voice = voiceAlarm(kit, {
-    voice: fire.voice,
-    announcement: fire.announcement,
-  });
-  voice.object.scale.setScalar(m);
-  voice.object.position.set(0, 6.4 * m, 0);
-  scene.add(voice.object);
-  // The simulator's SYMPTOMS: a failure's effects without its cause. Its
-  // SPRINKLER shows on the heads over the machine, for show only.
-  const symptoms = createLevel0Symptoms(machine);
-  const shownHeads = Object.assign(
-    computed(() =>
-      fire.heads.value.map((head, i) =>
-        symptoms.raining.value && LEVEL0_MACHINE_HEADS.includes(i)
-          ? { burst: true, spraying: true }
-          : head,
-      ),
-    ),
-    { id: 'sprinkler.heads.shown' },
-  );
-  const room = createWarehouseTrainingRoom(kit, false, {
-    lighting: building,
-    fire: createWarehouseFire(
-      { ...fire, heads: shownHeads },
-      voice.evacuationTone,
-    ),
-  });
-  room.parts.add(voice);
-  room.group.scale.setScalar(m);
-  scene.add(room.group);
-  const lighting = addWarehouseLighting(scene, room.lights, m, {
-    daylight: 0.5,
-    circuit: building.model.lighting.roomLight,
-  });
+  // Merged detail too small to see from where the player stands is not drawn.
+  const culler = createDetailCuller(camera);
+  cullLevel0Detail(culler, detail);
   const bounds: Footprint = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -140,39 +89,14 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     maxZ: solid.maxZ * m,
   }));
   const { mcc } = machine;
-  mcc.group.scale.setScalar(m);
-  mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
-  scene.add(mcc.group);
   if (
     import.meta.env.DEV &&
     new URLSearchParams(location.search).get('view') === 'annunciator-open'
   )
     mcc.door(0);
-  // Only the side of the machine in view is drawn.
-  const machineSides = createMachineSideCulling(mcc.group);
-  const workstation = addMachineWorkstation(
-    kit,
-    LEVEL0_MACHINE,
-    m,
-    mcc.rear.dataPort,
-    machine.diagnostics,
-  );
-  const stopDiagnosticLink = effect(() => {
-    diagnosticsAvailable.value = workstation.diagnosticsAvailable.value;
-  });
-  scene.add(workstation.group);
 
   // ---- The skip that was always there --------------------------------------
   const tossing = createBinTossing({ camera, metre: m });
-  const chairs = createChairStack(8, {
-    fabric: kitPaint(kit, '#2c4775'),
-    shell: kitPaint(kit, '#1d1f22'),
-    chrome: kitPaint(kit, '#c9cccc', 0.9),
-  });
-  chairs.scale.setScalar(m);
-  chairs.position.set(LEVEL0_CHAIRS.x * m, 0, LEVEL0_CHAIRS.z * m);
-  chairs.rotation.y = 0.12;
-  scene.add(chairs);
   const skipModel = createSkip(kit);
   skipModel.group.scale.setScalar(m);
   let skip: TossBin | null = null;
@@ -192,23 +116,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // The first board actually taken out of the machine, healthy or not,
   // while the player is looking into the cabinet.
   machine.onBoardRemoved(conjureSkip);
-
-  // What the machine's failures look and sound like: the oil spill, worn
-  // bearings grinding, the seizure, the fire's smoke and soot, the water.
-  const failures = createLevel0Failures(kit, machine);
-  // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
-  const scenarios = createLevel0Scenarios(machine, Math.random, symptoms, () =>
-    failures.clean(),
-  );
-  const simulator = createScenarioSimulator(kit, scenarios);
-  simulator.group.scale.setScalar(m);
-  simulator.group.position.set(
-    LEVEL0_SCENARIOS.x * m,
-    0,
-    LEVEL0_SCENARIOS.z * m,
-  );
-  simulator.group.rotation.y = LEVEL0_SCENARIOS.yaw;
-  scene.add(simulator.group);
 
   const raycaster = new Raycaster();
   const pointer = new Vector2();
@@ -406,6 +313,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     );
     partAudio.listen(camera, m);
     machineSides.update(camera);
+    culler.update();
     strangeness.render();
   });
   const dispose = () => {
@@ -462,6 +370,17 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     /** The scenario simulator's actions (development only). */
     scenarios,
     simulator,
+    /** A frame's draw calls and objects, and how much detail is culled. */
+    stats: () => ({
+      ...renderer.info.render,
+      objects: (() => {
+        let count = 0;
+        scene.traverse(() => count++);
+        return count;
+      })(),
+      culled: culler.hidden(),
+      cullable: culler.count(),
+    }),
   };
   return Object.assign(dispose, {
     suspend() {

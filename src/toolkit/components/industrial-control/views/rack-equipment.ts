@@ -206,6 +206,8 @@ export function createRackStatusIndicator(kit: PanelKit) {
     0.002,
   );
   lens.name = 'Rack status lens';
+  // Lit by changing its paint: not merged with the still parts.
+  lens.userData.live = true;
   return {
     group,
     set(state: RackStatus, seconds: number) {

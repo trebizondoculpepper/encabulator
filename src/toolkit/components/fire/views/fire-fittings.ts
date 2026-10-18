@@ -582,6 +582,8 @@ export function createSprinklerHead(kit: PanelKit, fallDistance = 3) {
     'y',
     8,
   );
+  // It bursts: not merged with the still parts (`mergeTree`).
+  bulb.userData.live = true;
   // The spray: drops falling from the deflector in a cone.
   const count = 600;
   const positions = new Float32Array(count * 3);
@@ -769,6 +771,8 @@ export function createExtinguisher(kit: PanelKit, kind: ExtinguisherKind) {
     'z',
     6,
   );
+  // Pulled out: not merged with the still parts (`mergeTree`).
+  pin.userData.live = true;
   if (kind === 'co2') {
     const horn = t.cyl(
       group,
@@ -1019,6 +1023,8 @@ export function createFireBell(kit: PanelKit) {
     -0.07,
     0.05,
   );
+  // It strikes: not merged with the still parts (`mergeTree`).
+  striker.userData.live = true;
   let time = 0;
   let ringing = false;
   return {

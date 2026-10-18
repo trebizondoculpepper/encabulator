@@ -26,6 +26,9 @@ import {
 } from '../toolkit/components/core/views/eighties-controls';
 import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
 import type { PortableObject } from '../toolkit/controls/input/object-handling';
+import { watchMerged } from '../toolkit/components/core/views/merge-static';
+import { FAILURES } from '../game/machine-failure';
+import { CARD_KINDS } from '../game/level0-plant';
 import { createLevel0Machine } from './level0-machine';
 import { MODULE_OF, UNIT_ROLES } from './level0-wiring';
 import { SCAN_SECONDS_PER_WINDOW } from '../game/level0-status';
@@ -133,16 +136,15 @@ function inputsOn(
   machine: ReturnType<typeof createLevel0Machine>,
   label: string,
 ) {
-  let leaf: Object3D | undefined;
+  let hinge: Object3D | undefined;
   machine.mcc.group.traverse((o) => {
     if (
       o.name.startsWith('Section ') &&
       o.name.includes(label) &&
-      (o.name.endsWith(' door') || o.name.endsWith(' cover'))
+      (o.name.endsWith(' door hinge') || o.name.endsWith(' cover hinge'))
     )
-      leaf = o;
+      hinge = o;
   });
-  const hinge = leaf!.parent!;
   const found: Object3D[] = [];
   for (const object of machine.mcc.parts.uses.keys()) {
     let o: Object3D | null = object;
@@ -151,7 +153,7 @@ function inputsOn(
       if (/ latch$| back$/.test(o.name)) excluded = true;
       o = o.parent;
     }
-    if (o === hinge && !excluded) found.push(object);
+    if (o === hinge! && !excluded) found.push(object);
   }
   return found;
 }
@@ -711,6 +713,63 @@ describe('Level 0 status annunciator', () => {
     expect(seen(machine, 'PLC', run)).toEqual(new Set([RED]));
     dispose();
   });
+});
+
+describe('Level 0 machine merging', () => {
+  it('merges only meshes that nothing changes afterwards', () => {
+    const { machine, room, breaker, powerUp, dispose } = sandbox();
+    const { mcc } = machine;
+    expect(mcc.merged.length).toBeGreaterThan(500);
+    const watch = watchMerged(mcc.merged);
+    const step = (seconds: number) => {
+      for (let t = 0; t < seconds - 1e-9; t += 0.1) {
+        machine.update(0.1);
+        watch.check();
+      }
+    };
+    powerUp();
+    step(30);
+    mcc.openAll(true);
+    step(2);
+    // Every input, both ways, and every protective device and card failed.
+    for (const use of mcc.parts.uses.values()) {
+      use(1);
+      step(0.3);
+      use(-1);
+      step(0.3);
+    }
+    mcc.openAll(true);
+    for (const kind of CARD_KINDS) machine.inflict(`card:${kind}`);
+    for (const [, unit] of mcc.circuits)
+      for (const device of unit.devices) device.test();
+    step(10);
+    // Every board out of its isolated cabinet and back in.
+    for (const id of [UNITS.automation, UNITS.vfd])
+      if (breaker(id).closed.value) breaker(id).operate();
+    step(1);
+    const boards = [
+      ...machine.assembly.slots!.map((slot) => slot.occupant.value!),
+      machine.capacitors,
+    ];
+    for (const board of boards) pull(board, room);
+    step(2);
+    for (const board of boards) machine.reseat(board);
+    step(2);
+    powerUp();
+    for (const failure of FAILURES) {
+      mcc.recover();
+      powerUp();
+      mcc.fail(failure.id);
+      step(failure.seconds + 5);
+    }
+    mcc.recover();
+    mcc.openAll(false);
+    step(30);
+    expect(
+      watch.changed().map((mesh) => mesh.userData.mergedFrom as string),
+    ).toEqual([]);
+    dispose();
+  }, 120_000);
 });
 
 /** The input on a unit's door inside the part named `part`. */

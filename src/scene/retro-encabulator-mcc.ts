@@ -34,6 +34,10 @@ import { createPcbBackplane } from '../toolkit/components/industrial-control/vie
 import { computed, signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
+import {
+  mergeTree,
+  staticMergeEnabled,
+} from '../toolkit/components/core/views/merge-static';
 import type { Material, Object3D } from 'three';
 import { createCircuitBreaker } from '../toolkit/components/industrial-control/logic/machine-components';
 import { createGraph } from '../toolkit/components/core/logic/world/graph';
@@ -406,6 +410,13 @@ export interface MccView {
   doors: ReadonlyMap<string, Readable<boolean>>;
   /** The main breaker, which a failure may trip. */
   mainBreaker: ReturnType<typeof createCircuitBreaker>;
+  /**
+   * The still meshes merged away when it was built (none with `merge`
+   * off), for a development check that nothing still changes them.
+   */
+  merged: readonly Mesh[];
+  /** The meshes they were merged into, which a room may cull (`detail`). */
+  batches: readonly Mesh[];
 }
 
 /** Smooth wandering readings for the displays, 0 to 1. */
@@ -460,6 +471,11 @@ export interface MccOptions {
   driveTrain?: { running: Readable<boolean>; rate: Readable<number> };
   /** What the stack light shows, instead of the line-up's own failures. */
   stackLight?: (screensBooting: boolean) => MachineState;
+  /**
+   * Whether to merge its still meshes for speed once it is built (on
+   * unless the page asks for `?merge=off`).
+   */
+  merge?: boolean;
 }
 
 /** What a room's `dress` is given to fit a door with. */
@@ -569,6 +585,7 @@ export function createRetroEncabulatorMcc(
     centre: number;
   }[] = [];
   const rearBuckets: RearBucket[] = [];
+  const interiors: Group[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
   const controls = new Map<string, { position: Readable<number> }>();
   const circuits = new Map<string, BucketCircuit>();
@@ -844,6 +861,7 @@ export function createRetroEncabulatorMcc(
       // hidden interiors so closed buckets cannot expose clickable parts.
       interior.raycast = () => (interior.visible ? undefined : false);
       bay.add(interior);
+      interiors.push(interior);
       box(
         interior,
         liner,
@@ -910,6 +928,8 @@ export function createRetroEncabulatorMcc(
           ? { x: 0, y: -h * 0.23, width: faceW * 0.74, height: h * 0.42 }
           : null;
       const name = `Section ${bayIndex + 1} ${spec.label.replace('\n', ' ')} ${spec.fixed ? 'cover' : 'door'}`;
+      // Named, as its leaf may be merged away (`merged`) and its hinge not.
+      hinge.name = `${name} hinge`;
       // The pan behind the face, set over to the hinge side.
       const panelW = faceW - 0.006 - PANEL_INSET - LATCH_SIDE;
       const panelX = faceW / 2 + (PANEL_INSET - LATCH_SIDE) / 2;
@@ -1298,6 +1318,47 @@ export function createRetroEncabulatorMcc(
   let clock = 0;
   for (const update of updates) update(0, 0);
   parts.update(0);
+  // For speed, once built: every still mesh is merged with those in the
+  // same paint into one, separately within each door (which swings), each
+  // unit's contents (shown only while its door is open) and anything else
+  // that moves (`userData.live`), hides or is carried, so the line-up
+  // draws in hundreds of calls rather than thousands. What a click works
+  // is taken to move when worked, as a button or a knob does, and merged
+  // only within itself; one whose part says it stays still (`userData
+  // .still`, a terminal block, a door's back) is merged with what it is
+  // on, its own meshes left in place, hidden, for clicks to find. A mesh
+  // carrying data for the room (a shelf, a lamp's state) is kept as it is.
+  const merged: Mesh[] = [];
+  const batches: Mesh[] = [];
+  if (options.merge ?? staticMergeEnabled()) {
+    const clickable = new Set<Object3D>(parts.uses.keys());
+    const moving = new Set<Object3D>([
+      ...interiors,
+      ...hinges.map((hinge) => hinge.group),
+    ]);
+    const separate = (object: Object3D) =>
+      moving.has(object) ||
+      !object.visible ||
+      Boolean(object.userData.live || object.userData.portable) ||
+      (clickable.has(object) && !object.userData.still) ||
+      (object instanceof Mesh && Object.keys(object.userData).length > 0);
+    const made = mergeTree(group, separate, 1, {
+      originals: (meshes) => merged.push(...meshes),
+      share: true,
+      solid: true,
+      // Screws, lamps, legends and the like, culled once too small to see.
+      fine: [0.03, 0.1],
+      targets: new Set([...clickable].filter((object) => !separate(object))),
+    });
+    // A control's own (a button's cap, a lamp's lens) are what a door is
+    // recognised by, so a room keeps them longer than passive detail.
+    for (const mesh of made) {
+      const within = mesh.parent?.parent;
+      if (within && (clickable.has(within) || within.userData.live))
+        mesh.userData.control = true;
+    }
+    batches.push(...made);
+  }
   return {
     group,
     parts,
@@ -1396,6 +1457,8 @@ export function createRetroEncabulatorMcc(
     circuits,
     doors,
     mainBreaker,
+    merged,
+    batches,
   };
 }
 
@@ -2263,7 +2326,12 @@ function populateInterior(
         pushToTest: false,
       }),
     );
-    for (const child of status.object.children) child.scale.setScalar(0);
+    // The pilot light's own works stay, unseen, for it to drive; they and
+    // the square LED it shows through change, so are never merged.
+    for (const child of status.object.children) {
+      child.scale.setScalar(0);
+      child.userData.live = true;
+    }
     const bezel = new Mesh(
       new BoxGeometry(0.016, 0.016, 0.004),
       kitPaint(kit, '#292b2b'),
@@ -2273,6 +2341,7 @@ function populateInterior(
     const redLed = kitPaint(kit, '#8d4440', 0.45);
     const lens = new Mesh(new BoxGeometry(0.011, 0.011, 0.002), darkLed);
     lens.name = 'Automation isolator square LED';
+    lens.userData.live = true;
     lens.position.z = 0.003;
     lens.onBeforeRender = () => {
       lens.material =

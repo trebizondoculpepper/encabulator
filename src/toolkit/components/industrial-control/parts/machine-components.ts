@@ -610,6 +610,8 @@ export function machineComponent(
         if (!portable || portable.phase.value === 'installed')
           module.connected.flip();
       });
+      // Its lever or screw turns (`service`), not the device itself.
+      view.group.userData.still = true;
       a.updates.push((dt) => {
         module.tick(dt);
         view.set(

@@ -102,6 +102,9 @@ export function createPs1Material(
   material.userData.ps1Pi = { value: 1 };
   material.userData.ps1PiAxis = { value: new Vector3(0, 1, 0) };
   material.userData.ps1Glow = glow;
+  // A glowing material is lit and dimmed by changing its colour: never
+  // shared with another of the same paint when merging (`likeness`).
+  if (glow) material.userData.live = true;
   material.onBeforeCompile = function (this: typeof material, shader) {
     shader.uniforms.ps1Resolution = ps1Uniforms.resolution;
     shader.uniforms.ps1SnapPixels = ps1Uniforms.snapPixels;

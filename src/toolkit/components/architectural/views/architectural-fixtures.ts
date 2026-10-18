@@ -93,6 +93,8 @@ export function createArchitecturalFixture(
     lensOn = kitGlow(kit, '#edf1e5');
     lensOff = kitPaint(kit, '#b7bdb2');
     lens = box(group, lensOn, 1.55, 0.025, 0.08, 0, -0.05, 0);
+    // Lit by changing its paint: not merged with the still parts.
+    lens.userData.live = true;
     for (const x of [-0.69, 0.69])
       box(group, steel, 0.025, 0.035, 0.1, x, -0.025, 0);
   } else if (kind === 'heater') {

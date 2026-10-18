@@ -187,6 +187,8 @@ export function createTwinSocket(
     const pivot = new Group();
     pivot.position.set(x + 0.026, 0.026, 0.01);
     front.add(pivot);
+    // The rocker rocks: not merged with the still parts (`mergeTree`).
+    pivot.userData.live = true;
     const rocker = t.box(
       pivot,
       t.paint('#ecebe4', 0.3),
@@ -207,6 +209,8 @@ export function createTwinSocket(
       0.005,
       0.0062,
     );
+    // Shown only while switched on.
+    flag.userData.live = true;
     // A plug-in socket tester: three LEDs that light when the socket is live.
     const tester = new Group();
     tester.position.set(x, -0.006, 0.01);
@@ -393,6 +397,8 @@ export function createDistributionBoard(kit: PanelKit, circuits: string[]) {
   const cover = new Group();
   cover.position.set(-0.222, 0, 0.1255);
   group.add(cover);
+  // It swings open: not merged with the still parts (`mergeTree`).
+  cover.userData.live = true;
   const leaf = t.box(cover, shell, 0.444, 0.476, 0.014, 0.222, 0, 0);
   const latch = t.box(
     cover,

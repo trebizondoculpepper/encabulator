@@ -340,6 +340,8 @@ export function createContactorView(kit: PanelKit): ContactorView {
     0.003,
     0.0845,
   );
+  // The armature tab moves: not merged with the still parts (`mergeTree`).
+  tab.userData.live = true;
   let target = 0.003;
   return {
     group,
@@ -486,6 +488,8 @@ export function createFuseHolderView(
   const cartridge = new Group();
   cartridge.position.z = 0.03;
   group.add(cartridge);
+  // It is pulled out: not to be merged with the still parts.
+  cartridge.userData.live = true;
   const barrel = rod(cartridge, 0.00515, 0.0251, kitPaint(kit, '#c9b48a'), 'x');
   barrel.name = 'Fuse cartridge';
   for (const x of [-0.0158, 0.0158])

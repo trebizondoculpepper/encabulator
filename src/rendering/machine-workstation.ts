@@ -18,6 +18,10 @@ import { createPartSet } from '../toolkit/components/core/parts/parts';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { MCC_ISOLATOR_X } from '../scene/retro-encabulator-mcc';
+import {
+  mergeTree,
+  staticMergeEnabled,
+} from '../toolkit/components/core/views/merge-static';
 
 /** Left of the isolator, forward of it, facing the machine's operator. */
 export function addMachineWorkstation(
@@ -40,6 +44,30 @@ export function addMachineWorkstation(
   let station = parts.add(bbcWorkstation(kit, false, link));
   const active = signal(station.model);
   group.add(station.object);
+  // For speed, its still meshes are merged (`mergeTree`); what a click
+  // works, what moves, lights or hides, stays as it is.
+  const merged: Mesh[] = [];
+  const batches: Mesh[] = [];
+  if (staticMergeEnabled()) {
+    const clickable = new Set<Object3D>(station.uses.keys());
+    const separate = (object: Object3D) =>
+      !object.visible ||
+      Boolean(object.userData.live || object.userData.portable) ||
+      (clickable.has(object) && !object.userData.still) ||
+      (object instanceof Mesh && Object.keys(object.userData).length > 0);
+    const made = mergeTree(station.object, separate, 1, {
+      originals: (meshes) => merged.push(...meshes),
+      share: true,
+      solid: true,
+      fine: [0.03, 0.1],
+    });
+    for (const mesh of made) {
+      const within = mesh.parent?.parent;
+      if (within && (clickable.has(within) || within.userData.live))
+        mesh.userData.control = true;
+    }
+    batches.push(...made);
+  }
   let sit: Parameters<typeof station.onSit>[0] = () => {};
   station.onSit((pose) => sit(pose));
   const connection = new Group();
@@ -175,6 +203,10 @@ export function addMachineWorkstation(
       () => active.value.diagnosticsAvailable.value,
     ),
     parts,
+    /** Its still meshes merged away, for a development check. */
+    merged,
+    /** The meshes they were merged into, to cull (`detail`). */
+    batches,
     solids,
     onSit(callback: typeof sit) {
       sit = callback;

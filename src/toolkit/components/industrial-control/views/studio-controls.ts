@@ -134,6 +134,8 @@ export function createStudioSwitch(
   const holder = new Group();
   holder.add(cap);
   group.add(holder);
+  // It goes in when pressed: not merged with the still parts (`mergeTree`).
+  holder.userData.live = true;
   const top = 0.0038 + 0.0005;
   // The LED window, set into the cap's top near its upper edge.
   const off: Material = kitPaint(kit, '#141516', 0.6);
@@ -155,6 +157,8 @@ export function createStudioSwitch(
     off,
   );
   window.position.set(-0.002, 0.0045, top);
+  // Lit by changing its paint: not merged with the still parts.
+  window.userData.live = true;
   holder.add(window);
   if (legend) {
     const label = createMicroLabel(kit, legend, {

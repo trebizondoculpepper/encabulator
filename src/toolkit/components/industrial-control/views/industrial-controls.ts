@@ -491,6 +491,8 @@ export function createCamSelector(kit: PanelKit): LeverSelectorView {
   );
   disc(group, 0.014, 0.006, kitPaint(kit, '#18191a'), 0.002);
   const handle = new Group();
+  // It turns: not to be merged with the still parts (`mergeStatic`).
+  handle.userData.live = true;
   group.add(handle);
   add(
     handle,
@@ -538,6 +540,8 @@ export function createPotentiometer(kit: PanelKit): LeverSelectorView {
   group.add(ticks);
   const knob = new Group();
   group.add(knob);
+  // It turns: not merged with the still parts (`mergeTree`).
+  knob.userData.live = true;
   disc(knob, 0.017, 0.004, kitPaint(kit, '#2a2b2d', 0.2), 0.004, 28);
   disc(knob, 0.012, 0.012, kitPaint(kit, '#1b1b1c'), 0.008, 28, 0.011);
   add(
