@@ -11,7 +11,10 @@ import {
   doorLatch,
   studioSwitch,
 } from '../toolkit/components/core/parts/parts';
-import type { StudioLedColour } from '../toolkit/components/industrial-control/views/studio-controls';
+import type {
+  StudioCapColour,
+  StudioLedColour,
+} from '../toolkit/components/industrial-control/views/studio-controls';
 import {
   createRackCabinet,
   createRackUnit,
@@ -29,6 +32,7 @@ export const SIMULATOR_HALF = 0.5;
 
 const BUTTONS: readonly {
   legend: string;
+  cap: StudioCapColour;
   led: StudioLedColour;
   act:
     | 'fullOff'
@@ -39,13 +43,13 @@ const BUTTONS: readonly {
     | 'glitch'
     | 'kaput';
 }[] = [
-  { legend: 'FULL OFF', led: 'red', act: 'fullOff' },
-  { legend: 'FULL ON', led: 'green', act: 'fullOn' },
-  { legend: 'SLOW START', led: 'green', act: 'slowStart' },
-  { legend: 'RESET', led: 'blue', act: 'reset' },
-  { legend: 'HICCUP', led: 'amber', act: 'hiccup' },
-  { legend: 'GLITCH', led: 'amber', act: 'glitch' },
-  { legend: 'KAPUT', led: 'red', act: 'kaput' },
+  { legend: 'FULL OFF', cap: 'red', led: 'white', act: 'fullOff' },
+  { legend: 'FULL ON', cap: 'white', led: 'green', act: 'fullOn' },
+  { legend: 'SLOW START', cap: 'white', led: 'green', act: 'slowStart' },
+  { legend: 'RESET', cap: 'blue', led: 'white', act: 'reset' },
+  { legend: 'HICCUP', cap: 'yellow', led: 'amber', act: 'hiccup' },
+  { legend: 'GLITCH', cap: 'yellow', led: 'red', act: 'glitch' },
+  { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
 ];
 
 /**
@@ -100,11 +104,16 @@ export function createScenarioSimulator(
       { u: 3, style: 'handles', colour: 'black', label: 'POWER DISTRIBUTION' },
     ],
   ];
+  const driveUnits: ReturnType<typeof createRackUnit>[] = [];
   const units = fill.flatMap(([at, options]) => {
     const unit = createRackUnit(kit, options);
     cabinet.mount(unit, at);
-    // A patch panel is passive: no status lights among its sockets.
-    return options.style === 'patch' ? [] : [unit];
+    if (options.style === 'drives') driveUnits.push(unit);
+    // A patch panel is passive, and drive bays have their own activity
+    // lights: neither needs a cluster of status lights over its own.
+    return options.style === 'patch' || options.style === 'drives'
+      ? []
+      : [unit];
   });
   // Rows of tiny status LEDs on every unit, twinkling green and amber at
   // their own rates, as a busy rack of about 2015 does.
@@ -119,20 +128,32 @@ export function createScenarioSimulator(
     seed = (seed * 16807) % 2147483647;
     return seed / 2147483647;
   };
-  const leds = units.flatMap((unit) =>
-    Array.from({ length: 8 }, (_, i) => {
-      const led = new Mesh(ledShape, ledOff);
-      led.name = 'Simulator status LED';
-      led.position.set(
-        unit.faceWidth / 2 - 0.012 - (i % 4) * 0.008,
-        unit.u * 0.0222 - 0.012 - Math.floor(i / 4) * 0.008,
-        0.002,
-      );
-      unit.face.add(led);
-      // Some blink with every access, some only now and then.
-      return { led, next: 0, busy: 0.04 + random() * (i % 3 ? 0.25 : 1.5) };
-    }),
+  const leds: { led: Mesh; next: number; busy: number }[] = units.flatMap(
+    (unit) =>
+      Array.from({ length: 8 }, (_, i) => {
+        const led = new Mesh(ledShape, ledOff);
+        led.name = 'Simulator status LED';
+        led.position.set(
+          unit.faceWidth / 2 - 0.012 - (i % 4) * 0.008,
+          unit.u * 0.0222 - 0.012 - Math.floor(i / 4) * 0.008,
+          0.002,
+        );
+        unit.face.add(led);
+        // Some blink with every access, some only now and then.
+        return { led, next: 0, busy: 0.04 + random() * (i % 3 ? 0.25 : 1.5) };
+      }),
   );
+  // Each drive's own activity light flickers green and amber, quickly and
+  // at random, as drives busy with random access do.
+  for (const unit of driveUnits)
+    unit.face.traverse((object) => {
+      if (object.name !== 'Drive activity light') return;
+      leds.push({
+        led: object as Mesh,
+        next: 0,
+        busy: 0.03 + random() * 0.09,
+      });
+    });
   let clock = 0;
   const twinkle = (delta: number) => {
     clock += delta;
@@ -163,7 +184,8 @@ export function createScenarioSimulator(
   title.position.set(0, 0.075, 0.002);
   panel.face.add(title);
   // Studio switches, two years newer than the line-up's controls: one
-  // row of graphite caps, each LED showing its press; SLOW START's stays
+  // row of coloured caps that stand out against the black rack, each LED
+  // showing its press; SLOW START's stays
   // lit while the start goes on.
   const starting = signal(false);
   const pitch = 0.052;
@@ -173,7 +195,7 @@ export function createScenarioSimulator(
         name: `${spec.legend} scenario switch`,
         legend: spec.legend,
         led: spec.led,
-        cap: 'graphite',
+        cap: spec.cap,
         lamp: spec.act === 'slowStart' ? starting : undefined,
         action: () => scenarios[spec.act](),
       }),

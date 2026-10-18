@@ -497,14 +497,17 @@ export function createRackUnit(
           -height / 2 + 0.016,
           0.007,
         );
-        add(
+        const light = add(
           face,
           new CylinderGeometry(0.002, 0.002, 0.002, 8),
           kitGlow(kit, i % 2 ? '#ffb43a' : '#4bff5a'),
           x + bayWidth * 0.32,
           height / 2 - 0.016,
           0.007,
-        ).rotation.x = Math.PI / 2;
+        );
+        light.rotation.x = Math.PI / 2;
+        // Named, so a room can flicker it as the drive is busy.
+        light.name = 'Drive activity light';
       }
       break;
     }

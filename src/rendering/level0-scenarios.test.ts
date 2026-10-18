@@ -136,6 +136,18 @@ describe('the Hyperplasc Scenario Simulator', () => {
       before = leds.map((led) => led.material);
     }
     expect(changes).toBeGreaterThan(100);
+    // The drives' own activity lights flicker too.
+    const drives: Mesh[] = [];
+    panel.group.traverse((o) => {
+      if (o.name === 'Drive activity light') drives.push(o as Mesh);
+    });
+    expect(drives).toHaveLength(4);
+    const seen = drives.map(() => new Set<unknown>());
+    for (let i = 0; i < 20; i++) {
+      run(0.1);
+      drives.forEach((drive, k) => seen[k].add(drive.material));
+    }
+    for (const materials of seen) expect(materials.size).toBeGreaterThan(1);
     expect(colours).toContain('3dff6a');
     expect(colours).toContain('ffb21e');
     dispose();
