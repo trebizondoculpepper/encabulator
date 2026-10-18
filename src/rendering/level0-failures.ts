@@ -1,6 +1,7 @@
 import { computed, effect } from '@preact/signals-core';
 import { Mesh, MeshStandardMaterial, Shape, ShapeGeometry } from 'three';
 import type { Object3D } from 'three';
+import { FIRE_SEATS } from '../game/level0-plant';
 import { sootAfter } from '../game/machine-failure';
 import { UNITS } from '../scene/level0-faces';
 import { createUnitSmoke } from '../scene/mcc-smoke';
@@ -36,6 +37,23 @@ const SEIZE: SoundRecipe = {
         repeat: [8, 0.03],
       },
     },
+  ],
+};
+
+/** DISTRIBUTION giving way: a fizzing crackle of small arcs. */
+const CRACKLE: SoundRecipe = {
+  sequence: [
+    {
+      at: 0,
+      click: {
+        band: 3200,
+        q: 1.2,
+        decay: 0.02,
+        level: 0.4,
+        repeat: [18, 0.11],
+      },
+    },
+    { at: 1.9, click: { band: 700, q: 0.8, decay: 0.12, level: 0.6 } },
   ],
 };
 
@@ -199,27 +217,51 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     return spark;
   });
   // ---- The fire: smoke from three lower cabinets, soot on the faces above.
-  const burning = [UNITS.auxMotor, UNITS.panMonitor, UNITS.grammeter].map(
-    (id, i) => {
-      const source = mcc.unitFaces.get(id)!;
-      const faces = [...mcc.unitFaces.values()]
-        .filter(
-          (u) => u.bay === source.bay && u.face.bottom >= source.face.bottom,
-        )
-        .map((u) => u.face);
-      return {
-        soot: 0,
-        view: createUnitSmoke(source.section, {
-          x: source.centre,
-          width: source.face.width,
-          seam: source.face.top + 0.003,
-          z: mcc.doorFront,
-          seed: 6100 + i,
-          faces,
-        }),
-      };
-    },
+  const burning = FIRE_SEATS.map(({ unit: id }, i) => {
+    const source = mcc.unitFaces.get(id)!;
+    const faces = [...mcc.unitFaces.values()]
+      .filter(
+        (u) => u.bay === source.bay && u.face.bottom >= source.face.bottom,
+      )
+      .map((u) => u.face);
+    return {
+      soot: 0,
+      view: createUnitSmoke(source.section, {
+        x: source.centre,
+        width: source.face.width,
+        seam: source.face.top + 0.003,
+        z: mcc.doorFront,
+        seed: 6100 + i,
+        faces,
+      }),
+    };
+  });
+  // DISTRIBUTION, holding out after the water, fails in its turn: it
+  // crackles and flashes over as the annunciator sputters, then its
+  // breaker trips and everything it feeds goes dark.
+  const distribution = mcc.unitFaces.get(UNITS.distribution)!;
+  const distributionSpark = createShortSpark(kit, 14);
+  distributionSpark.group.scale.setScalar(2.5);
+  distributionSpark.group.position.set(
+    distribution.centre,
+    (distribution.face.bottom + distribution.face.top) / 2,
+    mcc.doorFront + 0.04,
   );
+  distribution.section.add(distributionSpark.group);
+  let distributionFlashes = 0;
+  let fate = plant.distributionFate.peek();
+  const stopDistribution = effect(() => {
+    const now = plant.distributionFate.value;
+    if (now === 'sputtering' && fate === 'holding') {
+      distributionFlashes = 6;
+      partAudio.play(CRACKLE, distributionSpark.group);
+    }
+    if (now === 'dead') {
+      const breaker = mcc.circuits.get(UNITS.distribution)?.breaker?.breaker;
+      if (breaker?.position.peek() === 'on') breaker.trip();
+    }
+    fate = now;
+  });
   let flashes = 0;
   let wasDrowned = plant.drowned.peek();
   const stopDrowning = effect(() => {
@@ -275,6 +317,11 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         flashes--;
       }
       for (const spark of shorting) spark.update(delta, reducedMotion());
+      if (distributionFlashes > 0 && Math.random() < delta * 4) {
+        distributionSpark.fire();
+        distributionFlashes--;
+      }
+      distributionSpark.update(delta, reducedMotion());
       // The fire's smoke, thicker as it grows, and the soot it leaves.
       // Plainly smoking from the start, pouring as it takes hold.
       const size = plant.fireSize.value;
@@ -299,6 +346,7 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     dispose() {
       stop();
       stopDrowning();
+      stopDistribution();
       for (const seat of burning) seat.view.dispose();
       waterMaterial.dispose();
       oil.dispose();

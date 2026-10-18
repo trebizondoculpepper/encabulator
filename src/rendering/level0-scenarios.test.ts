@@ -295,7 +295,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
       'OIL SEAL faults switch',
       'KAPUT faults switch',
       'OIL LEAK symptoms switch',
-      'FIRE symptoms switch',
+      'SMOKING symptoms switch',
       'DIMENSIONAL WARP symptoms switch',
       'HICCUP symptoms switch',
     ])
@@ -308,7 +308,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     useOf(panel, 'FULL ON states switch')();
     run(30, 0.5);
     useOf(panel, 'OIL LEAK symptoms switch')();
-    useOf(panel, 'FIRE symptoms switch')();
+    useOf(panel, 'SMOKING symptoms switch')();
     useOf(panel, 'DIMENSIONAL WARP symptoms switch')();
     run(LEAK_SECONDS, 0.5);
     // The oil spreads and the fire burns, but nothing is wrong underneath.
@@ -320,7 +320,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(symptoms.soot).toBeGreaterThan(0.3);
     // The warp built and has gone again of itself.
     expect(symptoms.strain).toBe(0);
-    useOf(panel, 'FIRE symptoms switch')();
+    useOf(panel, 'SMOKING symptoms switch')();
     useOf(panel, 'DIMENSIONAL WARP symptoms switch')();
     run(10, 0.5);
     expect(symptoms.burning).toBe(true);
@@ -405,11 +405,22 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
     expect(machine.plant.electrical.mains.value).toBe(false);
     expect(faulted()).toBeGreaterThan(before);
+    // DISTRIBUTION, better shielded, holds out about 20 s, sputters, dies.
+    const distribution = machine.mcc.circuits.get('section1.bucket3')!;
+    expect(distribution.powered.value).toBe(true);
+    expect(machine.plant.distributionFate.value).toBe('holding');
+    step(12);
+    expect(machine.plant.distributionFate.value).toBe('sputtering');
+    step(3);
+    expect(machine.plant.distributionFate.value).toBe('dead');
+    expect(distribution.powered.value).toBe(false);
     // RESET: dried out, repaired, the heads replaced.
     useOf(panel, 'RESET states switch')();
     step(1);
     expect(machine.plant.drowned.value).toBe(false);
     expect(machine.plant.fire.discharging.value).toBe(false);
+    expect(machine.plant.distributionFate.value).toBe('holding');
+    expect(distribution.powered.value).toBe(true);
     failures.dispose();
     dispose();
   });

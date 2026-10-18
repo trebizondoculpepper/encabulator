@@ -31,3 +31,9 @@ Completion notes for `doc/plans/level0-failures.md`, for the owner and the next 
 - **The realistic save** (the owner's choice): cut the machine's power early (the isolator or the main disconnect) and the fire, no longer fed, dies down before the heads burst. Left with the sprinkler main valve shut, the fire rages on and burns the machine out (S05 MACHINE BURNT OUT, also ruined).
 - **RESET** puts the fire out, dries and repairs the machine, restores the sprinklers and cleans the soot.
 - **Not yet**: the CO₂ extinguishers cannot be carried to the machine (they stand on their stands by the far wall), so putting the fire out by hand waits on a carryable extinguisher; ruined components inside are still to be modelled (the owner's plan); the machine's smoke does not yet fill the warehouse visibly (the detectors work from the model's smoke).
+
+## 2026-10-19, after the water: DISTRIBUTION's dramatic end; the burning units' windows; SMOKING
+
+- **DISTRIBUTION holds out, then fails** (owner: realistically it would be the most sensitive, but for drama it is better shielded): 20 s after the water shorts the bus (`distributionHolds`), DISTRIBUTION gives way with a fizzing crackle and flashovers at its unit. The annunciator it feeds sputters for 2.5 s (lamps stuttering on and off at random, now and then surging white), then goes dark, and DISTRIBUTION's breaker trips (`plant.distributionFate`: holding, sputtering, dead). RESET recloses it.
+- **Burning units go red** at once: each of the three seats (`FIRE_SEATS` in `level0-plant.ts`, shared with the smoke) raises a failure on its own window (F11 M-103 AUX MOTOR BURNING, F12 PAN MONITOR BURNING, F13 GRAMMETER BURNING), besides S04 on EARTH/DOORS.
+- **The FIRE symptom is now SMOKING** (owner's name), so that FIRE means only the real fault.

@@ -26,7 +26,7 @@ export const SLOW_START_STEP_SECONDS = 2.5;
  *   PRESSURE SWITCH, GLITCH (a fuse blows or an overload trips) and KAPUT
  *   (the rack's power card fails).
  * - SYMPTOMS, effects alone, without a cause, to try them out: OIL LEAK,
- *   FIRE, DIMENSIONAL WARP and HICCUP.
+ *   SMOKING, DIMENSIONAL WARP, HICCUP and SPRINKLER.
  */
 export function createLevel0Scenarios(
   machine: Level0Machine,
@@ -160,8 +160,8 @@ export function createLevel0Scenarios(
     rain: () => symptoms?.rain(),
     /** SYMPTOMS: oil spreading over the floor, the pressure untouched. */
     oilLeak: () => symptoms?.oilLeak(),
-    /** SYMPTOMS: flames and smoke on top of the drive's section. */
-    fire: () => symptoms?.fire(),
+    /** SYMPTOMS: smoke from the drive's units, and soot. */
+    smoking: () => symptoms?.smoking(),
     /** SYMPTOMS: the strangeness, almost to breakdown, then normality. */
     warp: () => symptoms?.warp(),
     /** A brief stumble that recovers by itself. */

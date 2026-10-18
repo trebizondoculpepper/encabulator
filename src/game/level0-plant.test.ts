@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { BUILD_SECONDS } from './dimensionality';
 import { LEVEL0_MACHINE_HEADS } from './level0-room-plan';
-import { PLANT, WINDOWS, createLevel0Plant } from './level0-plant';
+import { FIRE_SEATS, PLANT, WINDOWS, createLevel0Plant } from './level0-plant';
 import type { Electrical } from './level0-plant';
 
 const RUNNING: Partial<Electrical> = {
@@ -596,6 +596,11 @@ describe('a fire in the machine', () => {
     run(p, 5, 0.5);
     p.ignite();
     expect(p.faults.value.map((f) => f.code)).toContain('S04');
+    // Each burning unit's window goes red at once.
+    for (const seat of FIRE_SEATS)
+      expect(
+        p.windowStates.value.find((w) => w.window === seat.window)?.worst,
+      ).toBe('failure');
     run(p, 10, 0.5);
     expect(p.fire.detector.value).toBe(true);
     expect(p.fire.stage.value).toBe('alert');

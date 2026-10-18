@@ -312,8 +312,24 @@ export function createLevel0Dresser(
               acknowledged: acknowledged.has(state.window),
             });
           });
-          const shown = scanner.step(delta, powered.value, targets);
-          if (powered.value && clock < testUntil) {
+          // Drowned, DISTRIBUTION holds out a while, then fails: the panel
+          // sputters, lamps stuttering on and off at random, and dies.
+          const fate = p.distributionFate.value;
+          const alive = powered.value && fate !== 'dead';
+          const shown = scanner.step(delta, alive, targets);
+          if (alive && fate === 'sputtering') {
+            const surge = Math.random() < 0.35;
+            panel.show(
+              shown.map((light) => {
+                if (Math.random() < (surge ? 0.15 : 0.7)) return null;
+                if (surge) return '#fff2d8';
+                const colour = statusColour(light, clock);
+                return colour ? LAMP[colour] : LAMP.amber;
+              }),
+            );
+            return;
+          }
+          if (alive && clock < testUntil) {
             panel.show(labels.map(() => '#fff2d8'));
             return;
           }

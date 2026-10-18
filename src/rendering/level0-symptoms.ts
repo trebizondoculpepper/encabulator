@@ -9,8 +9,8 @@ type Level0Machine = ReturnType<typeof createLevel0Machine>;
 
 /** Seconds an oil leak symptom takes to spread its full width. */
 export const LEAK_SECONDS = 60;
-/** A fire symptom: seconds its smoke thickens, pours, then clears. */
-export const FIRE_SECONDS = { catching: 4, burning: 25, dying: 10 } as const;
+/** The SMOKING symptom: seconds its smoke thickens, pours, then clears. */
+export const SMOKING_SECONDS = { catching: 4, burning: 25, dying: 10 } as const;
 /** The units a fire symptom smokes out of: the drive's section. */
 const BURNING = [UNITS.driveIsolator, UNITS.auxDrive] as const;
 /** A dimensional warp symptom: seconds building, holding, then gone. */
@@ -22,7 +22,7 @@ const WARP_STRAIN = 0.95;
  * The scenario simulator's SYMPTOMS: a failure's effects alone, without
  * the cause that would bring them in play, for trying them out. OIL LEAK
  * spreads oil over the floor from the lube section without any loss of
- * pressure; FIRE pours smoke out of the seams of the drive's units,
+ * pressure; SMOKING pours smoke out of the seams of the drive's units,
  * sooting the faces above them, until it clears (the soot stays); and
  * DIMENSIONAL WARP builds the strangeness almost to breakdown, holds it,
  * and stops abruptly. RESET puts each away.
@@ -59,7 +59,7 @@ export function createLevel0Symptoms(machine: Level0Machine) {
   });
   let clock = 0;
   const fireSize = () => {
-    const { catching, burning, dying } = FIRE_SECONDS;
+    const { catching, burning, dying } = SMOKING_SECONDS;
     if (fireAge < 0) return 0;
     if (fireAge < catching) return fireAge / catching;
     if (fireAge < catching + burning) return 1;
@@ -70,8 +70,8 @@ export function createLevel0Symptoms(machine: Level0Machine) {
     oilLeak() {
       leaking = true;
     },
-    /** FIRE: smoke from the drive's units, soot on the faces above. */
-    fire() {
+    /** SMOKING: smoke from the drive's units, soot on the faces above. */
+    smoking() {
       fireAge = 0;
     },
     /** DIMENSIONAL WARP: strangeness almost to breakdown, then gone. */
@@ -114,7 +114,7 @@ export function createLevel0Symptoms(machine: Level0Machine) {
       if (leaking) leak = Math.min(1, leak + delta / LEAK_SECONDS);
       if (fireAge >= 0) {
         fireAge += delta;
-        const { catching, burning, dying } = FIRE_SECONDS;
+        const { catching, burning, dying } = SMOKING_SECONDS;
         if (fireAge > catching + burning + dying) fireAge = -1;
       }
       if (warpAge >= 0) {

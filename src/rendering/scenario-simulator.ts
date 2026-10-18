@@ -100,7 +100,7 @@ const GROUPS: readonly {
     title: 'SYMPTOMS',
     switches: [
       { legend: 'OIL\nLEAK', cap: 'yellow', led: 'amber', act: 'oilLeak' },
-      { legend: 'FIRE', cap: 'red', led: 'red', act: 'fire' },
+      { legend: 'SMOKING', cap: 'red', led: 'red', act: 'smoking' },
       {
         legend: 'DIMENSIONAL\nWARP',
         cap: 'white',

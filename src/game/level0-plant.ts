@@ -88,6 +88,8 @@ export const PLANT = {
    * `fireHeat` × size °C above the room, less with distance (metres).
    */
   fireHeat: 130,
+  distributionHolds: 20,
+  sputterSeconds: 2.5,
   leakSeconds: 60,
   dryWearSeconds: 90,
   wearGrinding: 0.3,
@@ -277,6 +279,16 @@ export function severityOf(code: string): Severity {
  * line-up's order, and one for the machine's safety (earth fault, doors).
  * Each is a module's id and the legend engraved on its window.
  */
+/**
+ * Where a machine fire burns: three of the lower cabinets, each with its
+ * unit (by bucket id) and its annunciator window, red while it burns.
+ */
+export const FIRE_SEATS = [
+  { unit: 'section2.bucket3', window: 'M-103', name: 'M-103 AUX MOTOR' },
+  { unit: 'section4.bucket4', window: 'PAN MONITOR', name: 'PAN MONITOR' },
+  { unit: 'section7.bucket4', window: 'GRAMMETER', name: 'GRAMMETER' },
+] as const;
+
 export const MODULE_WINDOWS = [
   ['INCOMING', 'INCOMING'],
   ['MAIN', 'MAIN\nDISCONNECT'],
@@ -468,6 +480,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     fireSize: g.state('machine.fire', 0),
     /** Seconds the fire has raged at its fiercest: long enough, burnt out. */
     burnedFor: g.state('machine.burnedFor', 0),
+    /**
+     * Seconds since the water shorted the bus. DISTRIBUTION, better
+     * shielded than the rest (for drama), holds out for
+     * `distributionHolds`, then fails, and the annunciator it feeds
+     * sputters out over `sputterSeconds`.
+     */
+    shortedFor: g.state('machine.shortedFor', 0),
     hydraulic: g.state('hydraulic.pressure', 0, { note: 'psi' }),
     flow: g.state('hydro.flow', 0, { note: 'share of rated flow' }),
     fan: g.state('fan.pressure', 0, { note: 'inWC' }),
@@ -1115,8 +1134,18 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         else if (wear >= PLANT.wearGrinding)
           add({ code: warn, text: `${name} WORN`, window });
       }
-      if (fireNow > 0)
+      if (fireNow > 0) {
         add({ code: 'S04', text: 'FIRE IN CABINETS', window: 'SAFETY' });
+        // Each burning unit's own window, red at once.
+        FIRE_SEATS.forEach((seat, i) =>
+          add({
+            code: `F1${i + 1}`,
+            text: `${seat.name} BURNING`,
+            window: seat.window,
+            severity: 'failure',
+          }),
+        );
+      }
       if (burned >= PLANT.burnOutSeconds)
         add({ code: 'S05', text: 'MACHINE BURNT OUT', window: 'SAFETY' });
       if (drowned)
@@ -1430,6 +1459,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       if (next >= PLANT.fireFierce) s.burnedFor.set(s.burnedFor.peek() + dt);
     },
   );
+  g.process('drowned distribution', [s.drowned], [s.shortedFor], (dt) => {
+    if (s.drowned.peek()) s.shortedFor.set(s.shortedFor.peek() + dt);
+  });
   g.process('water ingress', [raining, e.mains], [s.water, s.drowned], (dt) => {
     const wet = s.water.peek();
     s.water.set(
@@ -1449,6 +1481,22 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const drowned = g.output('machine.shorted', [s.drowned], (d) => d, {
     where: 'the shutdown and its sparks',
   });
+  /**
+   * DISTRIBUTION after the water: 'holding' (still working), 'sputtering'
+   * (failing: the annunciator it feeds flickers wildly) or 'dead' (its
+   * supply gone: the annunciator dark).
+   */
+  const distributionFate = g.output(
+    'distribution.fate',
+    [s.shortedFor],
+    (t): 'holding' | 'sputtering' | 'dead' =>
+      t < PLANT.distributionHolds
+        ? 'holding'
+        : t < PLANT.distributionHolds + PLANT.sputterSeconds
+          ? 'sputtering'
+          : 'dead',
+    { where: 'DISTRIBUTION and the annunciator it feeds' },
+  );
   /** How big the fire is, 0 to 1: its smoke and soot. */
   const fireSize = g.output('machine.fireShown', [s.fireSize], (f) => f, {
     where: 'smoke from the burning cabinets',
@@ -1609,9 +1657,11 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.drowned,
       s.fireSize,
       s.burnedFor,
+      s.shortedFor,
     ],
     () => {
       // The fire out, dried out, and its shorted bus and burnt works repaired.
+      s.shortedFor.set(0);
       s.fireSize.set(0);
       s.burnedFor.set(0);
       s.water.set(0);
@@ -1997,6 +2047,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     drowned,
     sprinklerFailure,
     ignite,
+    distributionFate,
     fireSize,
     ruined,
     strain,
