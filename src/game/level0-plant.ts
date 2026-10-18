@@ -306,8 +306,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     controlPhase: g.input('incoming.controlPhase', 0, {
       where: 'MAIN INCOMING PHASE selector',
     }),
-    /** The main disconnect's Kirk key, in and turned (true); it starts out. */
-    kirk: g.input('main.kirk', false, { where: 'MAIN DISCONNECT Kirk key' }),
+    /**
+     * The main disconnect's POWER INTERLOCK SECURITY key, in and turned
+     * (true); it starts out, locking the disconnect off.
+     */
+    interlockKey: g.input('main.interlockKey', false, {
+      where: 'MAIN DISCONNECT power interlock security key',
+    }),
     /** The PanelView's page, 1 to 8. */
     terminalPage: g.input('terminal.page', 1, {
       where: 'AUTOMATION CONTROL PanelView keys',
@@ -603,10 +608,15 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     { where: 'MAIN DISCONNECT power monitor; MAIN INCOMING voltmeters' },
   );
 
-  /** The Kirk key's interlock: the main disconnect closes only with it in. */
-  const closePermit = g.output('main.closePermit', [control.kirk], (k) => k, {
-    where: 'MAIN DISCONNECT handle latch',
-  });
+  /** The power interlock: the main disconnect closes only with its key in. */
+  const closePermit = g.output(
+    'main.closePermit',
+    [control.interlockKey],
+    (k) => k,
+    {
+      where: 'MAIN DISCONNECT handle latch',
+    },
+  );
   /** What the grammeter's display shows: its reading, or CAL while calibrating. */
   const gramDisplay = g.output(
     'gram.display',

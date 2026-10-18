@@ -76,7 +76,8 @@ export function createLevel0Machine(
     dress: createLevel0Dresser(plant, ref, wiring),
     interlock,
     breakerLatch: {
-      // The Kirk key: turned out, the main disconnect will not close.
+      // The power interlock: its key turned out, the main disconnect will
+      // not close.
       [UNITS.main]: computed(
         () =>
           !plant.closePermit.value &&

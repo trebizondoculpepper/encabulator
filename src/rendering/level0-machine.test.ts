@@ -56,7 +56,7 @@ function sandbox() {
   };
   /** The incoming isolator and the main disconnect on, and the lube pump. */
   /**
-   * Start the machine by hand, as a player would: the isolator, the Kirk
+   * Start the machine by hand, as a player would: the isolator, the power interlock
    * key, the main disconnect, every unit's breaker but the hydrocoptic
    * pump's, START on each motor that has one, and its knobs and selectors
    * set to run.
@@ -64,7 +64,7 @@ function sandbox() {
   const powerUp = () => {
     isolate(machine);
     const { control } = machine.plant;
-    control.kirk.set(true);
+    control.interlockKey.set(true);
     breaker(UNITS.main).operate();
     for (const [id, unit] of machine.mcc.circuits)
       if (
@@ -189,7 +189,7 @@ describe('Level 0 machine wiring', () => {
         expect(position, id).toBe(id === UNITS.incoming ? 'on' : 'off');
     }
     const { control } = plant;
-    expect(control.kirk.value).toBe(false);
+    expect(control.interlockKey.value).toBe(false);
     expect(control.feedHoa.value).toBe(1);
     expect(control.hydraulicKey.value).toBe(1);
     // PHASE has no OFF: it chooses the control supply's phase.
@@ -224,7 +224,7 @@ describe('Level 0 machine wiring', () => {
     expect(mcc.circuits.get(UNITS.incoming)!.powered.value).toBe(true);
     expect(plant.electrical.mains.value).toBe(false);
     // Its lamp, fed from the incoming side, shows the interlock locked.
-    const locked = mcc.group.getObjectByName('Kirk key locked lamp')!;
+    const locked = mcc.group.getObjectByName('Power interlock locked lamp')!;
     const lamp = mcc.parts.uses.get(
       [...mcc.parts.uses.keys()].find((o) => {
         for (let x: Object3D | null = o; x; x = x.parent)
@@ -234,14 +234,25 @@ describe('Level 0 machine wiring', () => {
     );
     expect(lamp).toBeDefined();
     run(0.1);
-    expect(kirkLampLit(machine)).toBe(true);
-    // The Kirk key out holds the main disconnect's handle open.
+    expect(interlockLampLit(machine)).toBe(true);
+    // Locked, the main disconnect's door handle will not move: it shudders
+    // against its stop instead.
+    const doorHandle = within(machine, 'MAIN DISCONNECT', 'disconnect handle');
+    let lever: Object3D = doorHandle;
+    while (lever.name !== 'disconnect handle') lever = lever.parent!;
+    mcc.parts.uses.get(doorHandle)!();
+    run(0.05);
+    expect(breaker(UNITS.main).position.value).toBe('off');
+    expect(Math.abs(lever.children[0].rotation.z)).toBeGreaterThan(0);
+    run(1);
+    expect(lever.children[0].rotation.z).toBe(0);
+    // The power interlock key out holds the main disconnect's handle open.
     const handle = mcc.circuits.get(UNITS.main)!.breaker!.handle!;
     expect(handle.operate()).toBe(false);
     expect(breaker(UNITS.main).position.value).toBe('off');
-    plant.control.kirk.set(true);
+    plant.control.interlockKey.set(true);
     run(0.1);
-    expect(kirkLampLit(machine)).toBe(false);
+    expect(interlockLampLit(machine)).toBe(false);
     expect(handle.operate()).toBe(true);
     run(1);
     expect(plant.electrical.mains.value).toBe(true);
@@ -564,8 +575,8 @@ function within(
   })!;
 }
 
-/** Whether the Kirk key's locked lamp is lit. */
-function kirkLampLit(machine: ReturnType<typeof createLevel0Machine>) {
-  return machine.mcc.group.getObjectByName('Kirk key locked lamp')!.userData
-    .lit as boolean;
+/** Whether the power interlock key's locked lamp is lit. */
+function interlockLampLit(machine: ReturnType<typeof createLevel0Machine>) {
+  return machine.mcc.group.getObjectByName('Power interlock locked lamp')!
+    .userData.lit as boolean;
 }

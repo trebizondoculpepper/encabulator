@@ -225,12 +225,12 @@ export function createLevel0Dresser(
           const { volts, amps, kilowatts } = p.monitor.value;
           monitor.show(volts, amps, kilowatts, lit.value);
         });
-        // The Kirk key: trapped while the disconnect is closed, and with it
-        // turned out the disconnect cannot be closed.
+        // The power interlock security key: trapped while the disconnect is
+        // closed, and with it turned out the disconnect cannot be closed.
         const breaker = circuit.breaker!.breaker!;
         place(
           keySwitch(kit, {
-            bound: p.control.kirk,
+            bound: p.control.interlockKey,
             latch: breaker.closed,
           }),
           cx - 0.1,
@@ -242,9 +242,9 @@ export function createLevel0Dresser(
         // with the disconnect open; push to test.
         place(
           pilotLight(kit, {
-            name: 'Kirk key locked lamp',
+            name: 'Power interlock locked lamp',
             colour: 'red',
-            drive: computed(() => !p.control.kirk.value),
+            drive: computed(() => !p.control.interlockKey.value),
             power: computed(() => machine.value?.supply.value ?? false),
           }),
           cx - 0.01,
@@ -253,7 +253,7 @@ export function createLevel0Dresser(
         );
         legend('ILLUMINATED IF LOCKED', cx - 0.01, top - 0.33, 0.085);
         caption(
-          'KIRK KEY INTERLOCK\nIN = CLOSE PERMITTED',
+          'POWER INTERLOCK SECURITY\nKEY IN = POWER PERMITTED',
           cx - 0.1,
           top - 0.42,
         );

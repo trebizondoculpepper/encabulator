@@ -1045,8 +1045,8 @@ it('lets Level 0 operate both pumps directly without lesson feed gates or forced
   expect(breaker('section3.bucket1').closed.value).toBe(false);
   expect(breaker('section7.bucket2').closed.value).toBe(false);
   isolate(mcc);
-  // Level 0's Kirk key starts out; turn it in to close the main disconnect.
-  plant.control.kirk.set(true);
+  // Level 0's power interlock key starts out; turn it in to close the main disconnect.
+  plant.control.interlockKey.set(true);
   breaker('section1.bucket2').operate();
   mcc.update(3);
   for (const id of ['section3.bucket1', 'section7.bucket2']) {

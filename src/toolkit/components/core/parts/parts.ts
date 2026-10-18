@@ -237,6 +237,18 @@ const LOCKED = click({
   repeat: [2, 0.05],
   thump: [80, 0.04],
 });
+/**
+ * A disconnect's handle against its interlock: the heavy mechanism thrown
+ * hard against a stop it cannot pass, rattling back.
+ */
+const BLOCKED = click({
+  band: 520,
+  q: 0.9,
+  decay: 0.07,
+  level: 0.55,
+  repeat: [3, 0.045],
+  thump: [70, 0.09],
+});
 /** A mushroom head struck home, or pulled back with a snap. */
 const MUSHROOM = click({
   band: 1900,
@@ -687,17 +699,32 @@ export function disconnectHandle(
       : heavy
         ? CONTACTS_OPEN
         : HANDLE;
-  if (!props.shared)
-    a.voice(handle, {
-      on: onSound,
-      off: offSound,
-      trip: TRIP,
-      refused: LOCKED,
-    });
+  // A handle sharing a breaker's mechanism leaves that breaker to sound
+  // its moves; a refusal is the handle's own, felt at the lever.
+  a.voice(
+    handle,
+    props.shared
+      ? { refused: BLOCKED }
+      : { on: onSound, off: offSound, trip: TRIP, refused: BLOCKED },
+  );
   a.uses.set(view.lever, () => handle.operate());
+  // Latched, a throw only shudders the lever against its stop.
+  const SHUDDER = 0.4;
+  let shudder = SHUDDER;
+  a.disposers.push(
+    handle.onEvent((event) => {
+      if (event === 'refused') shudder = 0;
+    }),
+  );
   a.updates.push((delta) => {
     view.set(handle.on.value);
     view.update(delta);
+    const shaking = shudder < SHUDDER;
+    if (shaking) shudder = Math.min(SHUDDER, shudder + delta);
+    const fade = 1 - shudder / SHUDDER;
+    const offset = shaking ? Math.sin(shudder * 75) * 0.0018 * fade : 0;
+    view.group.position.x = offset;
+    view.group.rotation.z = offset * 3;
   });
   if (!props.shared) a.disposers.push(handle.dispose);
   return {
