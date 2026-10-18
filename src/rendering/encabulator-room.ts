@@ -11,13 +11,16 @@ import {
   Vector2,
 } from 'three';
 import type { Object3D } from 'three';
-import { devPortals, devWalls } from '../game/dev-room-links';
-import type { Footprint } from '../game/walk-collision';
-import { METRE } from '../game/units';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { createPortals } from '../scene/portals';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { METRE } from '../toolkit/components/core/logic/units';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { createPortals } from '../toolkit/gallery/views/portals';
 import type { FailureId } from '../game/machine-failure';
-import { ISOLATOR } from '../scene/incoming-isolator';
+import { ISOLATOR } from '../toolkit/components/industrial-control/views/incoming-isolator';
 import { FAILURE_CONSOLE_HALF, createFailureConsole } from './failure-console';
 import {
   createRetroEncabulatorMcc,
@@ -25,11 +28,17 @@ import {
   MCC_ISOLATOR_X,
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
-import { createFirstPerson } from './first-person';
-import { knobDirection } from '../scene/rotary-knob';
-import { partAudio } from '../audio/part-audio';
-import { createPs1Material, ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { knobDirection } from '../toolkit/controls/input/knob-turning';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
+import {
+  createPs1Material,
+  ps1Uniforms,
+} from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 /** Dev6 displays the credible electrical control system behind the fiction. */
 export function startEncabulatorRoom(canvas: HTMLCanvasElement) {

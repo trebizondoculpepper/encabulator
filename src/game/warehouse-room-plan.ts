@@ -1,4 +1,4 @@
-import type { Footprint } from './walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 
 /** The empty Guildford workshop shell, independent of the Level 2 scenario. */
 export const WAREHOUSE_BOUNDS: Footprint = {

@@ -5,7 +5,7 @@ import {
   MeshStandardMaterial,
 } from 'three';
 import type { Material } from 'three';
-import { createInstancer } from './instancer';
+import { createInstancer } from '../toolkit/components/core/views/instancer';
 import {
   HALL_LENGTH,
   HALL_WIDTH,

@@ -148,7 +148,7 @@ Each operation has two lines to record: its instruction, used in the list, and i
 
 **NARRATOR (instruction):** Press the emergency stop on the auxiliary motor, then pull it out again.
 
-**NARRATOR (reminder):** The big red mushroom, on the auxiliary motor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.
+**NARRATOR (reminder):** The big red mushroom, on the auxiliary mot veor. Second section, at the bottom. Push it in. Then pull it out again. It is not an emergency. It is never an emergency.
 
 **MACHINE / SOUND:** The response is unmistakable. The indicators show a steady normal state, the main machine note shifts pitch, and a new industrial rhythm locks into the existing hum. Let this sound and appearance establish what normal operation looks like. There has been no fault yet; the oil pump has not been primed.
 
@@ -502,7 +502,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **NARRATOR:** Normal operation. That's it. Now we can recalibrate the helical flange pellets. If you'd like to turn your attention to the—
 
-**MACHINE / SOUND:** Cut him off mid-word. The final failure, the most dramatic of all (the KAPUT): the machine winds itself up, hopefully, for one more go; gives way with a bang and a shower of sparks from the drive and the automation cabinet, its note collapsing in a wobbling, sad wah; tries again, desperately; sparks again; manages one last feeble turn; and slides away to nothing. Its main breaker trips with a clunk. The indicator lights flicker and go out; the last one holds for a moment, flickers once, and goes. Then nothing: no hum, no burble, no ticking. Only the quiet room. It is clearly, finally kaput.
+**MACHINE / SOUND:** Cut him off mid-word. The final failure, the most dramatic of all (the KAPUT): the machine winds itself up, hopefully, for one more go; gives way with a bang and a shower of sparks from the drive and the automation cabinet, its note collapsing in a wobbling, sad wah; tries again, desperately; sparks again; manages one last feeble turn; and slides away to nothing. Its main breaker trips with a clunk. The indicator lights flicker and go out; the last one holds for a moment, flickers once, and goes. One LCD remains lit on a frozen image while vertical bands pulse and shift across it, as though its panel connection or controller has failed; after several more seconds its backlight dies too. Then nothing: no hum, no burble, no ticking. Only the quiet room. It is clearly, finally kaput.
 
 **BEAT:** A long silence. Let it be uncomfortable.
 

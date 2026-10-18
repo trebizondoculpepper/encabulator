@@ -1,12 +1,18 @@
 import { BoxGeometry, Color, Group, Mesh } from 'three';
 import type { MeshStandardMaterial, Object3D, Texture } from 'three';
-import { createPs1Material } from './ps1-material';
-import { createMicroLabel } from '../scene/eighties-controls';
-import type { PanelKit } from '../scene/eighties-controls';
-import { createKnob, createToggle } from '../scene/panel-switchgear';
-import { stepKnob, stepSelector } from '../scene/rotary-knob';
-import { createSmokeEmitter } from '../scene/smoke-emitter';
-import { createEmbers } from '../scene/embers';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
+import { createMicroLabel } from '../toolkit/components/core/views/eighties-controls';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import {
+  createKnob,
+  createToggle,
+} from '../toolkit/components/industrial-control/views/panel-switchgear';
+import {
+  stepKnob,
+  stepSelector,
+} from '../toolkit/components/core/views/rotary-knob';
+import { createSmokeEmitter } from '../toolkit/components/core/views/smoke-emitter';
+import { createEmbers } from '../toolkit/components/fire/views/embers';
 
 /** A surface the TEXTURE selector can put on an exhibit. */
 export interface ExhibitTexture {

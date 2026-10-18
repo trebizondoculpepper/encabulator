@@ -15,31 +15,37 @@ import {
   Vector3,
 } from 'three';
 import type { Object3D } from 'three';
-import { partAudio } from '../audio/part-audio';
-import { devPortals, devWalls } from '../game/dev-room-links';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createDreamRooms } from '../game/dream-rooms';
 import type { DreamRoom, NinetiesPattern } from '../game/dream-rooms';
 import { createWaking } from '../game/waking';
-import { METRE } from '../game/units';
-import type { Footprint } from '../game/walk-collision';
-import { createSectionBoard } from '../scene/building-fittings';
+import { METRE } from '../toolkit/components/core/logic/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { createSectionBoard } from '../toolkit/components/core/views/signage';
 import {
   createPanelKit,
   disposeKit,
   kitGlow,
   kitPaint,
-} from '../scene/eighties-controls';
+} from '../toolkit/components/core/views/eighties-controls';
 import {
   PATTERN_TILE_METRES,
   createNinetiesPattern,
 } from '../scene/nineties-patterns';
-import { createPortals } from '../scene/portals';
-import { knobDirection } from '../scene/rotary-knob';
+import { createPortals } from '../toolkit/gallery/views/portals';
+import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import { createEyelidOverlay } from './eyelid-overlay';
-import { createFirstPerson } from './first-person';
-import { createPartSet } from './parts';
-import { createPs1Material, ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { createPartSet } from '../toolkit/components/core/parts/parts';
+import {
+  createPs1Material,
+  ps1Uniforms,
+} from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 const FLOOR = { minX: -8, maxX: 8, minZ: -6, maxZ: 6 };
 const CEILING = 2.8;

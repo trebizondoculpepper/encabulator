@@ -13,18 +13,24 @@ import {
   SphereGeometry,
   Vector2,
 } from 'three';
-import { devPortals, devWalls } from '../game/dev-room-links';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { CEILING, TRAINING_BOUNDS } from '../game/training-room-plan';
-import { METRE } from '../game/units';
-import type { Footprint } from '../game/walk-collision';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { createPortals } from '../scene/portals';
-import { createCanvasTexture } from '../scene/screens';
+import { METRE } from '../toolkit/components/core/logic/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { createPortals } from '../toolkit/gallery/views/portals';
+import { createCanvasTexture } from '../toolkit/components/core/views/screens';
 import { createTrainingRoom } from '../scene/training-room';
-import { seeded } from '../scene/worn-paint';
-import { createFirstPerson } from './first-person';
-import { ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { seeded } from '../toolkit/components/core/views/worn-paint';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 /** A grey English sky: low, even overcast with darker cloud in it. */
 function createSky(radius: number) {

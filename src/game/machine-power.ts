@@ -1,5 +1,5 @@
 import { computed, signal } from '@preact/signals-core';
-import type { Readable } from './world/components';
+import type { Readable } from '../toolkit/components/core/logic/world/components';
 
 /** A short, repeatable lamp/display self-test after the supply returns. */
 export function createMachinePower(supply: Readable<boolean>) {

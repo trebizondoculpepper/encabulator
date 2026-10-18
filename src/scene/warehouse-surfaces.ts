@@ -1,9 +1,9 @@
 import { RepeatWrapping } from 'three';
 import type { MeshStandardMaterialParameters } from 'three';
-import type { PanelKit } from './eighties-controls';
-import { createPs1Material } from '../rendering/ps1-material';
-import { createCanvasTexture } from './screens';
-import { seeded } from './worn-paint';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
+import { createCanvasTexture } from '../toolkit/components/core/views/screens';
+import { seeded } from '../toolkit/components/core/views/worn-paint';
 
 /** Original, deterministic material artwork, at the scale of real building finishes. */
 export function warehouseSurfaces(kit: PanelKit) {

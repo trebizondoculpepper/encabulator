@@ -17,19 +17,19 @@ import {
 import type { Material, Texture } from 'three';
 import { MeshStandardNodeMaterial, PMREMGenerator } from 'three/webgpu';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { devPortals, devWalls } from '../game/dev-room-links';
-import type { Footprint } from '../game/walk-collision';
-import { METRE } from '../game/units';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { METRE } from '../toolkit/components/core/logic/units';
 import { PLINTHS, createPlinthTracker, spotlightLevels } from '../game/plinths';
 import type { Arrival, ExhibitId } from '../game/plinths';
 import { createPlinthNarration } from '../game/plinth-narration';
 import { createPlinthDrones } from '../audio/plinth-drones';
 import { createPlinthNarrationPlayer } from '../audio/plinth-narration';
 import type { DroneKind } from '../audio/plinth-drones';
-import { createPortals } from '../scene/portals';
+import { createPortals } from '../toolkit/gallery/views/portals';
 import { EXHIBIT_CENTRE, createExhibit } from '../scene/plinth-exhibits';
-import { createLabelTexture } from '../scene/screens';
-import { createFirstPerson } from './first-person';
+import { createLabelTexture } from '../toolkit/components/core/views/screens';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
 import { createNodePipeline, createNodeRenderer } from './node-pipeline';
 
 /** The room's half width and depth, metres, and its height. */

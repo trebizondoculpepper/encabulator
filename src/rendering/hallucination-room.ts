@@ -1,6 +1,9 @@
-import { createRenderer, useEnvironment } from './render-style';
-import { devPortals, devWalls } from '../game/dev-room-links';
-import { createPortals } from '../scene/portals';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import { createPortals } from '../toolkit/gallery/views/portals';
 import {
   AmbientLight,
   BoxGeometry,
@@ -32,8 +35,8 @@ import type {
   Texture,
 } from 'three';
 import { TeapotGeometry } from 'three/addons/geometries/TeapotGeometry.js';
-import { METRE as RACK_METRE } from '../game/units';
-import type { Footprint } from '../game/walk-collision';
+import { METRE as RACK_METRE } from '../toolkit/components/core/logic/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import {
   effectFrame,
   effectRecording,
@@ -48,17 +51,23 @@ import type {
   EffectRecording,
   EffectSettings,
 } from '../game/effect-settings';
-import { createTeleprinter } from '../scene/teleprinter';
-import { createCanvasTexture } from '../scene/screens';
-import { createFirstPerson } from './first-person';
-import { createPs1Material, ps1Uniforms } from './ps1-material';
+import { createTeleprinter } from '../toolkit/components/industrial-control/views/teleprinter';
+import { createCanvasTexture } from '../toolkit/components/core/views/screens';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import {
+  createPs1Material,
+  ps1Uniforms,
+} from '../toolkit/components/core/parts/ps1-material';
 import { createChromaticDivergence } from './chromatic-divergence';
 import { createEffectsConsole } from './effects-console';
 import { createExhibitPanel } from './exhibit-panel';
 import type { ExhibitTexture } from './exhibit-panel';
 import type { ConsoleDial } from './effects-console';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { knobDirection } from '../scene/rotary-knob';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import {
   createHallucinations,
   defaultHallucinationSettings,

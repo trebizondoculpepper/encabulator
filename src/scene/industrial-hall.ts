@@ -13,11 +13,11 @@ import {
   Vector3,
 } from 'three';
 import type { BufferGeometry, InstancedMesh, Material } from 'three';
-import type { Footprint } from '../game/walk-collision';
-import { buildTiled } from './instancer';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { buildTiled } from '../toolkit/components/core/views/instancer';
 import type { HallSurface, Surface } from './hall-surfaces';
-import { createPendantLamps } from './pendant-lamps';
-import type { PendantPlace } from './pendant-lamps';
+import { createPendantLamps } from '../toolkit/components/architectural/views/pendant-lamps';
+import type { PendantPlace } from '../toolkit/components/architectural/views/pendant-lamps';
 
 /**
  * The great hall the game takes place in: a vast enclosed American

@@ -5,6 +5,7 @@ import {
 import { createNarrationPause } from '../game/narration-pause';
 import { createLevel2FinalAction } from '../game/level2-final-action';
 import { createLevel2Startup } from '../game/level2-startup';
+import { ejectCabinetDrop } from '../game/cabinet-drop';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
 import { addWarehouseLighting } from './warehouse-lighting';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
@@ -27,8 +28,8 @@ import {
 import type { Object3D } from 'three';
 import { signal } from '@preact/signals-core';
 import { createLevel2Voice } from '../audio/level2-voice';
-import { partAudio } from '../audio/part-audio';
-import { devWalls } from '../game/dev-room-links';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
+import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import {
   LEVEL2_BETAFORM,
   LEVEL2_CUES,
@@ -39,11 +40,14 @@ import {
   LEVEL2_NORMAL,
 } from '../game/level2-cues';
 import type { BetaformId } from '../game/level2-cues';
-import { METRE } from '../game/units';
-import type { Footprint } from '../game/walk-collision';
-import type { PortableObject } from './object-handling';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { ISOLATOR } from '../scene/incoming-isolator';
+import { METRE } from '../toolkit/components/core/logic/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import type { PortableObject } from '../toolkit/controls/input/object-handling';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { ISOLATOR } from '../toolkit/components/industrial-control/views/incoming-isolator';
 import {
   BAY_WIDTHS,
   createRetroEncabulatorMcc,
@@ -51,15 +55,22 @@ import {
   MCC_ISOLATOR_X,
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
-import { knobDirection } from '../scene/rotary-knob';
-import { addSkipGraffiti, addSkipLamps, createSkip } from '../scene/skip';
-import { hiddenSpot, offSight } from '../game/hidden-spot';
-import { dressSkip } from '../game/skip-dressing';
-import { createBinTossing } from './bin-tossing';
-import type { TossBin } from './bin-tossing';
-import { createFirstPerson } from './first-person';
-import { ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { knobDirection } from '../toolkit/controls/input/knob-turning';
+import {
+  addSkipGraffiti,
+  addSkipLamps,
+  createSkip,
+} from '../toolkit/components/site-dressing/views/skip';
+import { hiddenSpot, offSight } from '../toolkit/controls/logic/hidden-spot';
+import { dressSkip } from '../toolkit/components/site-dressing/logic/skip-dressing';
+import { createBinTossing } from '../toolkit/components/site-dressing/parts/bin-tossing';
+import type { TossBin } from '../toolkit/components/site-dressing/parts/bin-tossing';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 /** Module 2 adds its scenario and apparatus to the shared Guildford warehouse. */
 const SKIP_SPOTS = LEVEL2_SKIP_SPOTS;
@@ -553,6 +564,13 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         : []),
     ],
     divert: (object, portable) => tossing.divert(object, portable),
+    redirectDrop: (placement) =>
+      ejectCabinetDrop(placement, {
+        minX: LEVEL2_MACHINE.x - MCC_WIDTH / 2 - 0.05,
+        maxX: LEVEL2_MACHINE.x + MCC_WIDTH / 2 + 0.05,
+        back: LEVEL2_MACHINE.z - MCC_DEPTH - 0.05,
+        front: LEVEL2_MACHINE.z + 0.08,
+      }),
     use: (x, y) => {
       if (liveCardAt(x, y)) {
         // Once, and again only if they keep trying.

@@ -39,7 +39,7 @@ import {
   vec3,
 } from 'three/tsl';
 import type { ExhibitId } from '../game/plinths';
-import { createLabelTexture } from './screens';
+import { createLabelTexture } from '../toolkit/components/core/views/screens';
 
 /**
  * The plinth room's exhibits, built in metres for WebGPURenderer (node

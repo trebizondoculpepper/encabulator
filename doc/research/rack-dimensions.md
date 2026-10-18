@@ -1,6 +1,6 @@
 # Rack dimensions
 
-The racks room (dev3) and `src/scene/rack-equipment.ts` are built to these figures, taken from the EIA-310 standard as summarised by secondary sources and from manufacturers' and distributors' catalogue listings. Where sources disagree, the figure used is noted.
+The racks room (dev3) and `src/toolkit/components/industrial-control/views/rack-equipment.ts` are built to these figures, taken from the EIA-310 standard as summarised by secondary sources and from manufacturers' and distributors' catalogue listings. Where sources disagree, the figure used is noted.
 
 ## The 19-inch standard (EIA-310)
 

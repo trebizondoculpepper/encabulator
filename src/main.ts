@@ -1,6 +1,6 @@
 import './styles/main.css';
-import { ROOMS, resolveRoomId } from './game/dev-room-links';
-import type { RoomId } from './game/dev-room-links';
+import { ROOMS, resolveRoomId } from './toolkit/gallery/logic/dev-room-links';
+import type { RoomId } from './toolkit/gallery/logic/dev-room-links';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene');
 if (!canvas) throw new Error('Scene canvas is missing.');
@@ -25,7 +25,8 @@ const rooms = new Map<string, { root: HTMLElement; handle: RoomHandle }>();
 let current: string | undefined;
 let revision = 0;
 const resetEffects = async () => {
-  const { ps1Uniforms } = await import('./rendering/ps1-material');
+  const { ps1Uniforms } =
+    await import('./toolkit/components/core/parts/ps1-material');
   ps1Uniforms.roomLight.value = 1;
   ps1Uniforms.plantLight.value = 1;
   ps1Uniforms.channels.value.set(1, 1, 1);
@@ -51,42 +52,48 @@ const openRoom = async () => {
   else if (room === 'dev6')
     start = (await import('./rendering/encabulator-room')).startEncabulatorRoom;
   else if (room === 'dev12')
-    start = (await import('./rendering/tones-room')).startTonesRoom;
+    start = (await import('./toolkit/gallery/rooms/tones-room')).startTonesRoom;
   else if (room === 'dev18')
-    start = (await import('./rendering/architectural-room'))
+    start = (await import('./toolkit/gallery/rooms/architectural-room'))
       .startArchitecturalGalleryRoom;
   else if (room === 'dev17')
     start = (await import('./rendering/warehouse-room')).startWarehouseRoom;
   else if (room === 'dev4')
-    start = (await import('./rendering/brands-room')).startBrandsRoom;
+    start = (await import('./toolkit/gallery/rooms/brands-room'))
+      .startBrandsRoom;
   else if (room === 'dev16')
-    start = (await import('./rendering/graffiti-room')).startGraffitiRoom;
+    start = (await import('./toolkit/gallery/rooms/graffiti-room'))
+      .startGraffitiRoom;
   else if (room === 'dev15')
-    start = (await import('./rendering/appearing-skip-room'))
+    start = (await import('./toolkit/gallery/rooms/appearing-skip-room'))
       .startAppearingSkipRoom;
   else if (room === 'dev14')
-    start = (await import('./rendering/bin-room')).startBinRoom;
+    start = (await import('./toolkit/gallery/rooms/bin-room')).startBinRoom;
   else if (room === 'dev13')
-    start = (await import('./rendering/beeps-room')).startBeepsRoom;
+    start = (await import('./toolkit/gallery/rooms/beeps-room')).startBeepsRoom;
   else if (room === 'dev11')
-    start = (await import('./rendering/button-gallery-room'))
+    start = (await import('./toolkit/gallery/rooms/button-gallery-room'))
       .startButtonGalleryRoom;
   else if (room === 'dev10')
     start = (await import('./rendering/waking-room')).startWakingRoom;
   else if (room === 'dev9')
-    start = (await import('./rendering/wandering-room')).startWanderingRoom;
+    start = (await import('./toolkit/gallery/rooms/wandering-room'))
+      .startWanderingRoom;
   else if (room === 'dev8')
-    start = (await import('./rendering/fittings-room')).startFittingsRoom;
+    start = (await import('./toolkit/gallery/rooms/fittings-room'))
+      .startFittingsRoom;
   else if (room === 'dev7')
     start = (await import('./rendering/corridor-room')).startCorridorRoom;
   else if (room === 'dev3')
-    start = (await import('./rendering/racks-room')).startRacksRoom;
+    start = (await import('./toolkit/gallery/rooms/racks-room')).startRacksRoom;
   else if (room === 'dev2')
     start = (await import('./rendering/hallucination-room'))
       .startHallucinationRoom;
   else if (room === 'dev1')
     start = (await import('./rendering/effects-room')).startEffectsRoom;
-  else start = (await import('./rendering/controls-room')).startControlsRoom;
+  else
+    start = (await import('./toolkit/gallery/rooms/controls-room'))
+      .startControlsRoom;
   await resetEffects();
   if (ownRevision !== revision) return;
   if (document.pointerLockElement) document.exitPointerLock();

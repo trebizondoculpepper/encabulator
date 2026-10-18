@@ -1,11 +1,17 @@
 import { BoxGeometry, Group, Mesh } from 'three';
 import { FAILURES } from '../game/machine-failure';
 import type { FailureId } from '../game/machine-failure';
-import type { OperatorColour } from '../scene/industrial-controls';
-import { createNameplate } from '../scene/industrial-controls';
-import type { PanelKit } from '../scene/eighties-controls';
-import { createMicroLabel, kitPaint } from '../scene/eighties-controls';
-import { createPartSet, pushButton } from './parts';
+import type { OperatorColour } from '../toolkit/components/industrial-control/views/industrial-controls';
+import { createNameplate } from '../toolkit/components/industrial-control/views/industrial-controls';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import {
+  createMicroLabel,
+  kitPaint,
+} from '../toolkit/components/core/views/eighties-controls';
+import {
+  createPartSet,
+  pushButton,
+} from '../toolkit/components/core/parts/parts';
 
 /** What the console works: the line-up's failures. */
 interface Failing {

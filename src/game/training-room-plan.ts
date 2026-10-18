@@ -1,4 +1,4 @@
-import type { Footprint } from './walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 
 /**
  * The training room: a large, empty meeting room on the ground floor of

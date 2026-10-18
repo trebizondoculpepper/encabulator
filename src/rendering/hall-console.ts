@@ -1,10 +1,10 @@
 import { BoxGeometry, Group, Mesh } from 'three';
 import { FINISHES, HALL_SURFACES } from '../scene/hall-surfaces';
 import type { HallSurface } from '../scene/hall-surfaces';
-import type { PanelKit } from '../scene/eighties-controls';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import { createEffectsConsole } from './effects-console';
 import type { ConsoleRow } from './effects-console';
-import { createPs1Material } from './ps1-material';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
 
 /** Everything the hall's console sets. */
 export interface HallSettings {

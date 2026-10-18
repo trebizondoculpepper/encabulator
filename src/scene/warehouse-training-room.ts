@@ -1,9 +1,9 @@
-import { createKeepClearMarking } from './keep-clear-markings';
+import { createKeepClearMarking } from '../toolkit/components/general-safety/views/keep-clear-markings';
 import {
   createFireKeepClear,
   createHazardTape,
   createWalkwayTape,
-} from './floor-safety-markings';
+} from '../toolkit/components/general-safety/views/floor-safety-markings';
 import {
   BoxGeometry,
   Group,
@@ -18,15 +18,18 @@ import {
   WAREHOUSE_TRUSSES,
   WAREHOUSE_UTILITIES,
 } from '../game/warehouse-room-plan';
-import type { Footprint } from '../game/walk-collision';
-import type { PanelKit } from './eighties-controls';
-import { createMicroLabel, kitGlow } from './eighties-controls';
-import { architecturalPart } from '../rendering/architectural-parts';
-import { createPartSet } from '../rendering/parts';
-import type { ArchitecturalKind } from '../game/architectural-fittings';
-import { ARCHITECTURAL_FITTINGS } from '../game/architectural-fittings';
-import { WAREHOUSE_HEADS } from '../game/warehouse-services';
-import { mergeStatic } from './merge-static';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import {
+  createMicroLabel,
+  kitGlow,
+} from '../toolkit/components/core/views/eighties-controls';
+import { architecturalPart } from '../toolkit/components/architectural/parts/architectural-parts';
+import { createPartSet } from '../toolkit/components/core/parts/parts';
+import type { ArchitecturalKind } from '../toolkit/components/architectural/logic/architectural-fittings';
+import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
+import { WAREHOUSE_HEADS } from '../toolkit/components/architectural/logic/warehouse-services';
+import { mergeStatic } from '../toolkit/components/core/views/merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
 
 /** Empty early-1990s Guildford industrial shell. No Level 2 apparatus or utility interiors. */

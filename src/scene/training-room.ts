@@ -36,13 +36,16 @@ import {
   bays,
   isFireExitBay,
 } from '../game/training-room-plan';
-import type { Footprint } from '../game/walk-collision';
-import { createPs1Material } from '../rendering/ps1-material';
-import type { PanelKit } from './eighties-controls';
-import { mergeStatic } from './merge-static';
-import { createCanvasTexture } from './screens';
-import { seeded } from './worn-paint';
-import { CHAIR_STACK_HALF, createChairStack } from './chair-stack';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import { mergeStatic } from '../toolkit/components/core/views/merge-static';
+import { createCanvasTexture } from '../toolkit/components/core/views/screens';
+import { seeded } from '../toolkit/components/core/views/worn-paint';
+import {
+  CHAIR_STACK_HALF,
+  createChairStack,
+} from '../toolkit/components/site-dressing/views/chair-stack';
 
 const SANS = 'Arial, Helvetica, sans-serif';
 const { minX, maxX, minZ, maxZ } = TRAINING_BOUNDS;

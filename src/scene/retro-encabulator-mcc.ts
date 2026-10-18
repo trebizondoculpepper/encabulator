@@ -1,10 +1,13 @@
-import { createScreenBoot } from '../game/screen-boot';
-import { drawBootScreen } from './boot-screen';
-import { machineTone } from '../audio/machine-tones';
-import type { MachineToneId } from '../audio/machine-tones';
-import { partAudio } from '../audio/part-audio';
-import type { SoundRecipe } from '../audio/part-audio';
-import { bootBeep, postBeep } from '../audio/boot-beep';
+import { createScreenBoot } from '../toolkit/components/industrial-control/logic/screen-boot';
+import { drawBootScreen } from '../toolkit/components/industrial-control/views/boot-screen';
+import { machineTone } from '../toolkit/components/sound/audio/machine-tones';
+import type { MachineToneId } from '../toolkit/components/sound/audio/machine-tones';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
+import type { SoundRecipe } from '../toolkit/components/core/audio/part-audio';
+import {
+  bootBeep,
+  postBeep,
+} from '../toolkit/components/sound/audio/boot-beep';
 import { createMachinePower } from '../game/machine-power';
 import {
   FAILURES,
@@ -14,21 +17,27 @@ import {
   sootAfter,
 } from '../game/machine-failure';
 import type { Failure, FailureId } from '../game/machine-failure';
-import { ISOLATOR, createIncomingIsolator } from './incoming-isolator';
-import { createShortSpark } from './button-effects';
+import {
+  ISOLATOR,
+  createIncomingIsolator,
+} from '../toolkit/components/industrial-control/views/incoming-isolator';
+import { createShortSpark } from '../toolkit/components/core/views/button-effects';
 import { createUnitSmoke } from './mcc-smoke';
 import type { SootedFace } from './mcc-smoke';
-import { createPcbBackplane } from './pcb-backplane';
+import { createPcbBackplane } from '../toolkit/components/industrial-control/views/pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
 import type { Signal } from '@preact/signals-core';
 import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import type { Material, Object3D } from 'three';
-import { createCircuitBreaker } from '../game/machine-components';
-import { createGraph } from '../game/world/graph';
-import type { Binding, Readable } from '../game/world/components';
-import { machineComponent } from '../rendering/machine-components';
-import type { MachineDevice } from '../rendering/machine-components';
-import { createAnnunciator } from '../game/annunciator';
+import { createCircuitBreaker } from '../toolkit/components/industrial-control/logic/machine-components';
+import { createGraph } from '../toolkit/components/core/logic/world/graph';
+import type {
+  Binding,
+  Readable,
+} from '../toolkit/components/core/logic/world/components';
+import { machineComponent } from '../toolkit/components/industrial-control/parts/machine-components';
+import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
+import { createAnnunciator } from '../toolkit/components/industrial-control/logic/annunciator';
 import {
   beginPart,
   createPartSet,
@@ -45,33 +54,37 @@ import {
   pushButton,
   pushbuttonStation,
   selector as selectorPart,
-} from '../rendering/parts';
-import type { Part, PartSet } from '../rendering/parts';
+} from '../toolkit/components/core/parts/parts';
+import type { Part, PartSet } from '../toolkit/components/core/parts/parts';
 import {
   createAnnunciatorPanel,
   createChartRecorder,
-  createCrtMonitor,
+  createLcdMonitor,
   createDoorLeaf,
   createLouvres,
   createPowerMonitor,
   createSoftStarter,
   createViewingWindow,
-} from './cabinet-fittings';
-import type { CrtMode } from './cabinet-fittings';
-import type { PanelKit } from './eighties-controls';
+} from '../toolkit/components/industrial-control/views/cabinet-fittings';
+import type { LcdMode } from '../toolkit/components/industrial-control/views/cabinet-fittings';
+import { createBrandBadge } from '../toolkit/components/core/views/brand-badge';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import {
   createBarGraph,
   createMicroLabel,
   createSevenSegment,
   kitPaint,
-} from './eighties-controls';
-import { createLegendPlate, createNameplate } from './industrial-controls';
-import type { OperatorColour } from './industrial-controls';
+} from '../toolkit/components/core/views/eighties-controls';
+import {
+  createLegendPlate,
+  createNameplate,
+} from '../toolkit/components/industrial-control/views/industrial-controls';
+import type { OperatorColour } from '../toolkit/components/industrial-control/views/industrial-controls';
 import {
   createHourMeterView,
   createMessageDisplay,
   createStackLight,
-} from './industrial-displays';
+} from '../toolkit/components/industrial-control/views/industrial-displays';
 
 import {
   createCharacterLcd,
@@ -79,8 +92,11 @@ import {
   createLedMatrix,
   createPanelMeter,
   createRoundGauge,
-} from './panel-instruments';
-import { MCC_BLUE, createWornPaint } from './worn-paint';
+} from '../toolkit/components/industrial-control/views/panel-instruments';
+import {
+  MCC_BLUE,
+  createWornPaint,
+} from '../toolkit/components/core/views/worn-paint';
 
 /** CENTERLINE 2100 envelope: 90 in high, 20 in standard width, 20 in deep. */
 export const MCC_HEIGHT = 2.286;
@@ -120,9 +136,9 @@ type Face =
   | 'small-key'
   | 'small-lcd'
   | 'blank'
-  | 'crt-trend'
-  | 'crt-log'
-  | 'crt-vector'
+  | 'lcd-trend'
+  | 'lcd-log'
+  | 'lcd-vector'
   | 'chart'
   | 'bars'
   | 'plc'
@@ -140,7 +156,7 @@ type Bucket = {
   face: Face;
   /**
    * What it sounds like while the machine has power, if anything: one of
-   * the machine tones (`src/audio/machine-tones.ts`, heard in dev12), at a
+   * the machine tones (`src/toolkit/components/sound/audio/machine-tones.ts`, heard in dev12), at a
    * rate (slower for a bigger machine) and a level, held from inside the
    * bucket, so it is heard from there. Only what would have cooling or
    * something turning sounds; the rest are quiet.
@@ -213,7 +229,7 @@ const BAYS: Bucket[][] = [
       spaces: 3,
       label: 'ENCABULATOR\nCONTROL',
       kind: 'control',
-      face: 'crt-trend',
+      face: 'lcd-trend',
       tone: { id: 'cabinet-fan', rate: 0.85, level: 0.045 },
     },
     { spaces: 3, label: 'MODIAL\nINTERACTION', kind: 'control', face: 'chart' },
@@ -221,7 +237,7 @@ const BAYS: Bucket[][] = [
       spaces: 3,
       label: 'PHASE\nREFERENCE',
       kind: 'control',
-      face: 'crt-vector',
+      face: 'lcd-vector',
     },
     { spaces: 3, label: 'PANENDERMIC\nMONITOR', kind: 'control', face: 'bars' },
   ],
@@ -260,7 +276,7 @@ const BAYS: Bucket[][] = [
       spaces: 3,
       label: 'RECIPROCATING\nDINGLE ARM',
       kind: 'aux',
-      face: 'crt-log',
+      face: 'lcd-log',
     },
     {
       spaces: 3,
@@ -616,21 +632,21 @@ export function createRetroEncabulatorMcc(
         MCC_HEIGHT / 2,
         -0.4,
       );
-    // Fixed manufacturer plaques sit on the upper trim, clear of the
-    // wireway display and every moving door. The hardware inside retains
-    // its own supplier markings (including the rival Pepperdyne cards).
-    const brand = createNameplate(kit, 'NEUMAN DYNAMIK', {
-      width: 0.36,
-      height: 0.042,
-      colour: '#202b32',
-      ink: '#f0eee5',
-    });
-    brand.name = `Section ${bayIndex + 1} Neuman Dynamik manufacturer plaque`;
-    brand.userData.manufacturer = 'Neuman Dynamik';
-    brand.position.set(0, MCC_HEIGHT - 0.025, 0.001);
-    // A restrained red keyline gives the repeated wordmark a house style.
-    box(brand, kitPaint(kit, '#a52a22'), 0.003, 0.03, 0.0004, -0.168, 0, 0.002);
-    bay.add(brand);
+    // The maker's logo, from its one definition (dev4), on a dark plate
+    // in the middle of each section's top wireway cover, as a line-up's
+    // maker marks every section; not on the section whose cover carries
+    // the message display. The hardware inside keeps its own makers'
+    // marks (including the rival Pepperdyne cards).
+    if (bayIndex !== 3) {
+      const brand = createBrandBadge(kit, 'neumann-dynamik', {
+        height: 0.024,
+        ink: '#f0eee5',
+        plate: '#202b32',
+      });
+      brand.name = `Section ${bayIndex + 1} Neumann Dynamik manufacturer plaque`;
+      brand.position.set(0, MCC_HEIGHT - WIREWAY / 2, 0.0065);
+      bay.add(brand);
+    }
     if (bayIndex === 3) {
       // The plant message display over the control section, as in the film.
       const message = createMessageDisplay(kit, { caption: 'DATALINE 1500' });
@@ -726,6 +742,7 @@ export function createRetroEncabulatorMcc(
         incoming || bucketId === 'section1.bucket2' ? supply : feed,
         incoming ? supply : lamps,
         plcReady,
+        faults.active,
       );
       const hinge = new Group();
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
@@ -822,6 +839,7 @@ export function createRetroEncabulatorMcc(
         screenReadyBeep,
         (name, part) => controls.set(name, part),
         faults,
+        () => (failing?.failure.id === 'kaput' ? failing.t : null),
       );
       if (!spec.fixed) {
         // Quarter-turn wing latches on the flange, by the free edge: the
@@ -957,18 +975,34 @@ export function createRetroEncabulatorMcc(
       repeat: [3, 0.055],
     },
   };
-  // Sparks fly from the drive and Automation Control in the final kaput,
-  // with a bang.
+  // Discharge at the edges of the actual door controls, where a loose
+  // connection or damaged contact could arc, rather than panel centres.
+  const upperBucketCentre = MCC_HEIGHT - WIREWAY - 4 * SPACE;
+  const controlX = -0.105 / 2 + (PANEL_INSET - LATCH_SIDE) / 2;
   const sparks = (
     [
-      [driveBay!, -0.12, 1.55],
-      [driveBay!, 0.16, 0.95],
-      [plcBay!, 0.05, 1.4],
+      // Upper right of the drive LCD; lower left of its keypad.
+      [
+        driveBay!,
+        controlX + 0.34 * 0.4,
+        upperBucketCentre + 4 * SPACE - 0.27 + 0.34 * 0.3,
+      ],
+      [
+        driveBay!,
+        controlX - 0.1 - 0.075 / 2,
+        upperBucketCentre + 0.02 - 0.115 / 2,
+      ],
+      // Upper right of Automation Control's operator terminal.
+      [
+        plcBay!,
+        controlX + 0.25 / 2,
+        upperBucketCentre + 8 * SPACE * 0.2 + 0.17 / 2,
+      ],
     ] as const
   ).map(([bay, x, y]) => {
     const spark = createShortSpark(kit, 14);
-    spark.group.scale.setScalar(6);
-    spark.group.position.set(x, y, 0.02);
+    spark.group.scale.setScalar(3);
+    spark.group.position.set(x, y, DOOR_FRONT + 0.035);
     bay.add(spark.group);
     updates.push((delta) => spark.update(delta, false));
     return spark;
@@ -1217,6 +1251,7 @@ function dressDoor(
   /** Name a control a scenario may watch (see `MccView.controls`). */
   register: (name: string, part: { position: Readable<number> }) => void,
   faults: Faults,
+  kaputTime: () => number | null,
 ) {
   // The raised panel's middle, where the fittings are centred.
   const lit = computed(() => circuit.powered.value && startup.value);
@@ -1334,15 +1369,31 @@ function dressDoor(
       view.update(delta);
     });
   };
-  const crt = (mode: CrtMode, w: number, y: number, title?: string) => {
-    const view = createCrtMonitor(kit, { width: w, mode, seed, title });
+  const lcd = (mode: LcdMode, w: number, y: number, title?: string) => {
+    const view = createLcdMonitor(kit, { width: w, mode, seed, title });
     put(view.group, cx - 0.005, y);
     const boot = screenBoot(title ?? mode);
     onScreenReady(boot, view.group);
     onBoot(boot.ready);
     updates.push((delta) => {
-      view.setOn(lit.value);
-      view.setBoot(boot.booting ? boot.lines() : null);
+      const kaput = kaputTime();
+      const kind =
+        mode === 'trend'
+          ? 'corrupt'
+          : mode === 'vector'
+            ? 'banding'
+            : mode === 'log'
+              ? 'stuck'
+              : 'backlight';
+      view.setFailure(kaput === null ? null : kind, kaput ?? 0);
+      view.setOn(
+        kaput === null
+          ? lit.value
+          : kind === 'banding'
+            ? kaput < 14
+            : kaput < 7.8,
+      );
+      view.setBoot(kaput === null && boot.booting ? boot.lines() : null);
       view.update(delta);
     });
   };
@@ -1605,14 +1656,14 @@ function dressDoor(
     case 'blank':
       louvres(0.24, 0.09, cx - 0.02, -0.04);
       break;
-    case 'crt-trend':
-      crt('trend', 0.3, -0.035, 'ENCABULATOR SYSTEMS');
+    case 'lcd-trend':
+      lcd('trend', 0.3, -0.035, 'ENCABULATOR SYSTEMS');
       break;
-    case 'crt-vector':
-      crt('vector', 0.3, -0.035, 'PHASE REFERENCE SCOPE');
+    case 'lcd-vector':
+      lcd('vector', 0.3, -0.035, 'PHASE REFERENCE SCOPE');
       break;
-    case 'crt-log':
-      crt('log', 0.3, -0.035, 'DINGLE ARM LOGGER');
+    case 'lcd-log':
+      lcd('log', 0.3, -0.035, 'DINGLE ARM LOGGER');
       break;
     case 'chart': {
       const chart = createChartRecorder(kit);
@@ -1743,7 +1794,7 @@ function dressDoor(
       break;
     }
     case 'drive': {
-      crt('mimic', 0.34, height / 2 - 0.27, 'VFD-601 PROCESS');
+      lcd('mimic', 0.34, height / 2 - 0.27, 'VFD-601 PROCESS');
       const keypadPart = place(driveKeypad(kit, {}), cx - 0.1, 0.02);
       const keypad = keypadPart.view;
       const boot = screenBoot('VFD-601 HIM');
@@ -1894,6 +1945,7 @@ function populateInterior(
   feed: Readable<boolean>,
   indicatorPower: Readable<boolean>,
   plcReady: Readable<boolean>,
+  failureActive: Readable<boolean>,
 ): BucketCircuit {
   const request = world.input(`${prefix}.run`, true, {
     where: 'START / STOP station',
@@ -2026,7 +2078,7 @@ function populateInterior(
         status: computed(() =>
           !controlFeed.value
             ? 'off'
-            : assembly.faulted.value
+            : failureActive.value || assembly.faulted.value
               ? 'fault'
               : plcReady.value
                 ? 'running'

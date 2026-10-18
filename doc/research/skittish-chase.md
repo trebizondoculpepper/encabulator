@@ -1,6 +1,6 @@
 # The skittish button: an uncatchable escape
 
-Dev9's SKITTISH button should never be caught. Before 2026-10-16 it fled greedily, each frame stepping to whichever nearby spot was furthest from the player, and that strategy loses: it runs to a wall, then into a corner, and is pinned there. This note records what the mathematics of pursuit says, what the stand now does (`src/game/mobile-pedestal.ts`) and how its speed was chosen.
+Dev9's SKITTISH button should never be caught. Before 2026-10-16 it fled greedily, each frame stepping to whichever nearby spot was furthest from the player, and that strategy loses: it runs to a wall, then into a corner, and is pinned there. This note records what the mathematics of pursuit says, what the stand now does (`src/toolkit/gallery/logic/mobile-pedestal.ts`) and how its speed was chosen.
 
 ## The literature
 

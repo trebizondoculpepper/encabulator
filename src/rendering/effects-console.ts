@@ -3,12 +3,15 @@ import type { Object3D } from 'three';
 import {
   createEightiesButton,
   createMicroLabel,
-} from '../scene/eighties-controls';
-import type { CapColour, PanelKit } from '../scene/eighties-controls';
-import { createKnob } from '../scene/panel-switchgear';
-import { createCharacterLcd } from '../scene/panel-instruments';
-import { stepKnob } from '../scene/rotary-knob';
-import { createPs1Material } from './ps1-material';
+} from '../toolkit/components/core/views/eighties-controls';
+import type {
+  CapColour,
+  PanelKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { createKnob } from '../toolkit/components/industrial-control/views/panel-switchgear';
+import { createCharacterLcd } from '../toolkit/components/industrial-control/views/panel-instruments';
+import { stepKnob } from '../toolkit/components/core/views/rotary-knob';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
 
 /** One knob on the console: a named value swept between two limits. */
 export interface ConsoleDial {

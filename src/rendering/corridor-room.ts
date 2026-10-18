@@ -11,19 +11,22 @@ import {
   Vector2,
 } from 'three';
 import { CORRIDOR_BOUNDS } from '../game/corridor-plan';
-import { devPortals, devWalls } from '../game/dev-room-links';
-import { METRE } from '../game/units';
-import type { Footprint } from '../game/walk-collision';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import { METRE } from '../toolkit/components/core/logic/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import {
   createPanelKit,
   disposeKit,
   kitPaint,
-} from '../scene/eighties-controls';
-import { createPortals } from '../scene/portals';
+} from '../toolkit/components/core/views/eighties-controls';
+import { createPortals } from '../toolkit/gallery/views/portals';
 import { createUndergroundCorridor } from '../scene/underground-corridor';
-import { createFirstPerson } from './first-person';
-import { ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 /** Dev7: a walkable dogleg of service passages and connected plant spaces. */
 export function startCorridorRoom(canvas: HTMLCanvasElement) {

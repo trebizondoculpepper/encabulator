@@ -11,11 +11,15 @@ import {
   SRGBColorSpace,
 } from 'three';
 import type { Material, Object3D } from 'three';
-import type { Footprint } from '../game/walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { corridorWalls } from '../game/corridor-plan';
-import { createMicroLabel, kitGlow, kitPaint } from './eighties-controls';
-import type { PanelKit } from './eighties-controls';
-import { createPs1Material } from '../rendering/ps1-material';
+import {
+  createMicroLabel,
+  kitGlow,
+  kitPaint,
+} from '../toolkit/components/core/views/eighties-controls';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import { createPs1Material } from '../toolkit/components/core/parts/ps1-material';
 
 /** Painted service passages seen in the owner's 24 underground photographs. */
 export function createUndergroundCorridor(kit: PanelKit) {

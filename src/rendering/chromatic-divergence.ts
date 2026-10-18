@@ -8,7 +8,7 @@ import {
 } from 'three';
 import type { Camera, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
-import { ps1Uniforms } from './ps1-material';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
 
 /**
  * Chromatic divergence: red, green and blue stop agreeing about where

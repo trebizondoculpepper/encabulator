@@ -1,5 +1,5 @@
 import { addWarehouseLighting } from './warehouse-lighting';
-import { partAudio } from '../audio/part-audio';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
   Group,
   Mesh,
@@ -9,15 +9,21 @@ import {
   Vector2,
 } from 'three';
 import type { Object3D } from 'three';
-import { devPortals, devWalls } from '../game/dev-room-links';
-import { METRE } from '../game/units';
+import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import { METRE } from '../toolkit/components/core/logic/units';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { createPortals } from '../scene/portals';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { createPortals } from '../toolkit/gallery/views/portals';
 import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
-import { createFirstPerson } from './first-person';
-import { ps1Uniforms } from './ps1-material';
-import { createRenderer, useEnvironment } from './render-style';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
+import {
+  createRenderer,
+  useEnvironment,
+} from '../toolkit/components/core/parts/render-style';
 
 /** Dev17 previews the empty architectural shell for a future training scenario. */
 export function startWarehouseRoom(canvas: HTMLCanvasElement, gallery = false) {

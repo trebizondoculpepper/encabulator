@@ -11,7 +11,7 @@ import {
   SRGBColorSpace,
 } from 'three';
 import type { BufferGeometry, Material, Texture } from 'three';
-import type { Footprint } from '../game/walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 
 /**
  * The facility administrators' office: an in-plant office of the 1990s

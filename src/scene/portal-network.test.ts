@@ -1,10 +1,14 @@
 import { Texture } from 'three';
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { CHAIN, devPortals, devWalls } from '../game/dev-room-links';
-import { slide } from '../game/walk-collision';
-import { createPortals } from './portals';
+import {
+  CHAIN,
+  devPortals,
+  devWalls,
+} from '../toolkit/gallery/logic/dev-room-links';
+import { slide } from '../toolkit/controls/logic/walk-collision';
+import { createPortals } from '../toolkit/gallery/views/portals';
 
-vi.mock('./screens', () => ({
+vi.mock('../toolkit/components/core/views/screens', () => ({
   createLabelTexture: () => ({
     texture: new Texture(),
     width: 256,

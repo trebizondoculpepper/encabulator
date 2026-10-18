@@ -14,15 +14,15 @@ import {
 } from 'three';
 import type { Object3D } from 'three';
 import { kelvinToRgb } from '../game/colour-temperature';
-import type { Footprint } from '../game/walk-collision';
-import { METRE } from '../game/units';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { METRE } from '../toolkit/components/core/logic/units';
 import {
   DOOR_STYLES,
   createBigDoor,
   createPersonnelDoor,
 } from '../scene/hall-doors';
 import { createHallServices } from '../scene/hall-services';
-import { createFloorMarkings } from '../scene/floor-markings';
+import { createFloorMarkings } from '../toolkit/components/general-safety/views/floor-markings';
 import { OFFICE, createPlantOffice } from '../scene/plant-office';
 import {
   createAmenityBlock,
@@ -44,16 +44,22 @@ import {
   disposeFinishTextures,
 } from '../scene/hall-surfaces';
 import type { HallSurface, Surface } from '../scene/hall-surfaces';
-import { CONTAINER, createProps } from '../scene/warehouse-props';
+import {
+  CONTAINER,
+  createProps,
+} from '../toolkit/components/site-dressing/views/warehouse-props';
 import { createCompliance } from '../scene/code-compliance';
-import { createFirstPerson } from './first-person';
+import { createFirstPerson } from '../toolkit/controls/input/first-person';
 import { createDetailCuller } from './detail-culling';
-import { mergeStatic } from '../scene/merge-static';
-import { ps1Uniforms } from './ps1-material';
+import { mergeStatic } from '../toolkit/components/core/views/merge-static';
+import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
 import { createHallConsole, loadHallSettings } from './hall-console';
 import type { HallSettings } from './hall-console';
-import { createPanelKit, disposeKit } from '../scene/eighties-controls';
-import { knobDirection } from '../scene/rotary-knob';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
+import { knobDirection } from '../toolkit/controls/input/knob-turning';
 
 /**
  * Dev4, the Hall: the great enclosed concrete hall the game will take

@@ -7,11 +7,18 @@ import {
   vi,
 } from 'vite-plus/test';
 import { Raycaster, Vector3 } from 'three';
-import { ARCHITECTURAL_KINDS } from '../game/architectural-fittings';
-import { createPanelKit, disposeKit } from './eighties-controls';
+import { ARCHITECTURAL_KINDS } from '../toolkit/components/architectural/logic/architectural-fittings';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
 import { createWarehouseTrainingRoom } from './warehouse-training-room';
-import { createDistributionBoard } from './building-fittings';
-import { createArchitecturalElectricalGallery } from '../rendering/architectural-gallery';
+import { createDistributionBoard } from '../toolkit/components/architectural/views/building-fittings';
+import {
+  FIRE_KINDS,
+  SHARED_KINDS,
+} from '../toolkit/gallery/rooms/catalogue-specimens';
+import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
 
 beforeEach(() =>
   vi.stubGlobal('document', {
@@ -63,17 +70,19 @@ describe('architectural fittings', () => {
     room.parts.dispose();
     disposeKit(kit, room.group);
   });
-  it('also exhibits the same distribution board and UK socket in dev0', () => {
-    const kit = createPanelKit(),
-      board = createArchitecturalElectricalGallery(kit);
-    const kinds: string[] = [];
-    board.group.traverse((o) => {
-      if (o.userData.architectural) kinds.push(o.userData.architectural.kind);
-    });
-    expect(kinds).toEqual(['distribution', 'socket', 'switch']);
-    expect(board.parts.uses.size).toBeGreaterThan(5);
-    board.dispose();
-    disposeKit(kit, board.group);
+  it('splits the catalogue: active fire safety to dev8, building fittings to dev18, lighting in both', () => {
+    const kinds = Object.keys(ARCHITECTURAL_FITTINGS);
+    for (const kind of FIRE_KINDS) expect(kinds).toContain(kind);
+    expect(new Set(FIRE_KINDS).size).toBe(FIRE_KINDS.length);
+    // Building fittings keep the electrics and the doors; fire keeps the rest.
+    for (const kind of ['distribution', 'socket', 'switch', 'escapedoor'])
+      expect(FIRE_KINDS).not.toContain(kind);
+    for (const kind of ['callpoint', 'detector', 'sprinkler', 'valves'])
+      expect(FIRE_KINDS).toContain(kind);
+    // Emergency lighting and exit signs are lighting as well: in both.
+    for (const kind of SHARED_KINDS) expect(FIRE_KINDS).toContain(kind);
+    for (const kind of ['panic', 'lever', 'pull'])
+      expect(FIRE_KINDS).not.toContain(kind);
   });
   it('keeps the distribution-board breakers behind the closed cover', () => {
     const kit = createPanelKit(),

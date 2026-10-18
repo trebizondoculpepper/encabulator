@@ -7,7 +7,7 @@ import {
   SRGBColorSpace,
 } from 'three';
 import type { Object3D } from 'three';
-import { createSmokeEmitter } from './smoke-emitter';
+import { createSmokeEmitter } from '../toolkit/components/core/views/smoke-emitter';
 
 /** A small seeded random number generator (mulberry32). */
 function rng(seed: number) {

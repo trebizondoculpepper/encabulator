@@ -6,7 +6,7 @@ import {
   WAREHOUSE_TRUSSES,
   WAREHOUSE_UTILITIES,
 } from './warehouse-room-plan';
-import { devPortals } from './dev-room-links';
+import { devPortals } from '../toolkit/gallery/logic/dev-room-links';
 
 describe('the warehouse training shell', () => {
   it('keeps ten rooflights between the trusses and inside the thirty-metre room', () => {

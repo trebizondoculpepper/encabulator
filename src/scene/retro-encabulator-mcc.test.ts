@@ -1,7 +1,7 @@
-import { assertDropProfile } from '../game/drop-profile';
+import { assertDropProfile } from '../toolkit/controls/logic/drop-profile';
 import { signal } from '@preact/signals-core';
-import { partAudio } from '../audio/part-audio';
-import type { PortableObject } from '../rendering/object-handling';
+import { partAudio } from '../toolkit/components/core/audio/part-audio';
+import type { PortableObject } from '../toolkit/controls/input/object-handling';
 import {
   afterEach,
   beforeEach,
@@ -12,15 +12,18 @@ import {
 } from 'vite-plus/test';
 import { Box3, BoxGeometry, Mesh, Raycaster, Vector3 } from 'three';
 import type { Group, Material, Object3D } from 'three';
-import { createPanelKit, disposeKit } from './eighties-controls';
+import {
+  createPanelKit,
+  disposeKit,
+} from '../toolkit/components/core/views/eighties-controls';
 import {
   createMachineGallery,
   createEmptyMachinePlinths,
   EMPTY_GALLERY_LAYOUT,
   MACHINE_GALLERY_LAYOUT,
-} from '../rendering/machine-gallery';
-import { machineComponent } from '../rendering/machine-components';
-import { MACHINE_COMPONENTS } from '../game/machine-components';
+} from '../toolkit/gallery/rooms/machine-gallery';
+import { machineComponent } from '../toolkit/components/industrial-control/parts/machine-components';
+import { MACHINE_COMPONENTS } from '../toolkit/components/industrial-control/logic/machine-components';
 import { createRetroEncabulatorMcc } from './retro-encabulator-mcc';
 
 beforeEach(() => {
@@ -138,6 +141,34 @@ it('shows two rack status lamps through Automation Control startup and fault', (
   mcc.components.find((device) => device.kind === 'backplane')!.test();
   mcc.update(0.1);
   expect(lamps.map((lamp) => lamp.userData.status)).toEqual(['fault', 'fault']);
+  dispose();
+});
+
+it('flashes the rack indicators red during failure and extinguishes them when main power trips', () => {
+  const { mcc, dispose } = fixture();
+  const lamps: Object3D[] = [];
+  mcc.group.traverse((object) => {
+    if (object.name === 'Rack status lens') lamps.push(object);
+  });
+  isolate(mcc);
+  mcc.components
+    .find((device) => device.object.name === 'section1.bucket2: breaker')!
+    .breaker!.operate();
+  mcc.update(3.5);
+  mcc.fail('kaput');
+  const seen = new Set<boolean>();
+  for (let i = 0; i < 8; i++) {
+    mcc.update(0.13);
+    expect(lamps.map((lamp) => lamp.userData.status)).toEqual([
+      'fault',
+      'fault',
+    ]);
+    seen.add(Boolean(lamps[0].userData.lit));
+  }
+  expect(seen).toEqual(new Set([true, false]));
+  for (let i = 0; i < 80; i++) mcc.update(0.13);
+  expect(lamps.map((lamp) => lamp.userData.status)).toEqual(['off', 'off']);
+  expect(lamps.every((lamp) => lamp.userData.lit === false)).toBe(true);
   dispose();
 });
 

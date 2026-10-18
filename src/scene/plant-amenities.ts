@@ -1,7 +1,7 @@
 import { Color, Group } from 'three';
 import type { Mesh } from 'three';
 import type { Material } from 'three';
-import type { Footprint } from '../game/walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { createBuildKit } from './build-kit';
 import type { BuildKit } from './build-kit';
 

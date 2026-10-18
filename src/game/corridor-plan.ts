@@ -1,4 +1,4 @@
-import type { Footprint } from './walk-collision';
+import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 
 /** Metre-grid floor plan of the photographed service-corridor language. */
 export const CORRIDOR_BOUNDS: Footprint = {

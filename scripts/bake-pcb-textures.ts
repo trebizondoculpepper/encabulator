@@ -3,7 +3,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { circuitTraces } from '../src/scene/vendor/circuit-traces.ts';
 
-const output = new URL('../src/assets/pcb/', import.meta.url);
+const output = new URL(
+  '../src/toolkit/components/industrial-control/assets/pcb/',
+  import.meta.url,
+);
 mkdirSync(output, { recursive: true });
 const variants = [
   {
