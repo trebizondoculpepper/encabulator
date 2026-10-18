@@ -1,12 +1,12 @@
 # BBC Micro Model B diagnostic terminal
 
-Bring back the existing VX3 Simulator BBC Micro setup as the Encabulator's diagnostic terminal: BBC Micro Model B, Microvitec Cub monitor, floppy disk drive and desk. This is a future implementation prompt only. Do not build or import the feature merely because this prompt has been written.
+Bring back the existing VX3 Simulator BBC Micro setup as the Encabulator's diagnostic terminal: BBC Micro Model B, Microvitec Cub monitor, floppy disk drive and desk. The standalone workstation has been implemented; the live diagnostic link is planned separately in [the annunciator diagnostics prompt](bbc-micro-annunciator-diagnostics.md). That follow-up remains planning-only until the owner agrees the behaviour.
 
 ## In-world role and placement
 
 A BBC Micro Model B is used as a diagnostic terminal for the Encabulator. Place the existing setup on a desk nearby to the left of the machine as viewed from its front, at an angle so it feels like a workstation positioned for an engineer. Preserve access around the machine and to the cabinet backs; choose the precise position and angle against the current warehouse layout rather than moving the Encabulator.
 
-A ribbon cable leads from underneath the BBC Micro to the rear of one of the cabinets. Give it a deliberate supported route and a plausible interface/strain-relief connection at each end. Inspect the original computer's interfaces before choosing its function; do not imply that a bare ribbon plugs directly into a mains terminal. Coordinate the destination with `doc/plans/encabulator-cabinet-backs.md` and record which cabinet and interface it uses. Do not leave a cable crossing a walking route unsupported.
+The original design proposed a ribbon cable from underneath the BBC Micro to the rear of one of the cabinets. The owner subsequently deferred the machine data cable until cabinet backs were modelled; follow the newer [diagnostic-link prompt](bbc-micro-annunciator-diagnostics.md) and its pending physical-interface decision rather than adding this cable automatically. If subsequently authorized, route it as follows: Give it a deliberate supported route and a plausible interface/strain-relief connection at each end. Inspect the original computer's interfaces before choosing its function; do not imply that a bare ribbon plugs directly into a mains terminal. Coordinate the destination with `doc/plans/encabulator-cabinet-backs.md` and record which cabinet and interface it uses. Do not leave a cable crossing a walking route unsupported.
 
 ## Reuse the existing design
 
