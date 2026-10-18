@@ -1321,9 +1321,11 @@ export function createPowerMonitor(kit: PanelKit): PowerMonitorView {
   return {
     group,
     show(volts, amps, kilowatts, powered = true) {
+      // Four digits, the decimal point taking one: a tenth only below 100.
+      const fit = (n: number) => (n >= 99.95 ? n.toFixed(0) : n.toFixed(1));
       rows[0].show(powered ? volts.toFixed(0) : '');
-      rows[1].show(powered ? amps.toFixed(1) : '');
-      rows[2].show(powered ? kilowatts.toFixed(1) : '');
+      rows[1].show(powered ? fit(amps) : '');
+      rows[2].show(powered ? fit(kilowatts) : '');
     },
   };
 }
