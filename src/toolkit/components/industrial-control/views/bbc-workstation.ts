@@ -102,5 +102,60 @@ export function createBbcWorkstation(kit: PanelKit) {
   );
   cable.position.copy(bbc.group.position);
   group.add(cable);
+  const lead = (name: string, points: Vector3[], radius = 0.0035) => {
+    const wire = new Mesh(
+      new TubeGeometry(new CatmullRomCurve3(points), 24, radius, 6, false),
+      kitPaint(kit, '#242622'),
+    );
+    wire.name = name;
+    group.add(wire);
+  };
+  const bx = bbc.group.position.x;
+  const rear = bbc.group.position.z - 0.174;
+  // Cords leave the rear connectors, clear the desk edge, then descend.
+  lead('BBC mains flex — cabinet supply', [
+    new Vector3(bx - 0.14, top + 0.035, rear),
+    new Vector3(bx - 0.14, top + 0.02, -0.28),
+    new Vector3(bx - 0.16, top - 0.04, -0.39),
+    new Vector3(bx - 0.17, 0.13, -0.4),
+    new Vector3(bx - 0.08, 0.008, -0.46),
+  ]);
+  lead('Cub monitor mains flex', [
+    new Vector3(bx + 0.11, top + 0.16, -0.4),
+    new Vector3(bx + 0.13, top + 0.04, -0.43),
+    new Vector3(bx + 0.12, 0.12, -0.45),
+    new Vector3(bx - 0.08, 0.008, -0.46),
+  ]);
+  lead(
+    'Cub RGB signal cable to BBC RGB socket',
+    [
+      new Vector3(bx - 0.04, top + 0.18, -0.4),
+      new Vector3(bx - 0.12, top + 0.08, -0.43),
+      new Vector3(bx - 0.16, top + 0.025, -0.23),
+      new Vector3(bx + 0.03, top + 0.045, rear),
+    ],
+    0.003,
+  );
+  box(0.025, 0.018, 0.018, '#242622', bx + 0.03, top + 0.045, rear - 0.004);
+  // Four-way BS 1363 floor extension, based on Masterplug EXS1342W-01.
+  box(0.321, 0.033, 0.06, '#d3d0c4', bx - 0.02, 0.0165, -0.46);
+  for (const x of [-0.12, -0.04, 0.04, 0.12]) {
+    for (const [dx, dz] of [
+      [0, -0.009],
+      [-0.007, 0.007],
+      [0.007, 0.007],
+    ])
+      box(
+        0.004,
+        0.001,
+        0.006,
+        '#252620',
+        bx - 0.02 + x + dx,
+        0.0335,
+        -0.46 + dz,
+      );
+  }
+  for (const x of [-0.08, 0.02])
+    box(0.035, 0.018, 0.029, '#262720', bx + x, 0.043, -0.46);
   return { group, bbc, cub, disk, chair, width, depth, top };
 }

@@ -170,10 +170,7 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
       [deskHalf, deskDepth],
     ].map(([x, z]) => exhibit.object.localToWorld(new Vector3(x, 0, z))),
   );
-  const solids = [
-    footprint(deskBox),
-    footprint(new Box3().setFromObject(exhibit.view.chair.group)),
-  ];
+  const solids = [footprint(deskBox)];
   let disposed = false;
   let candidate: Awaited<ReturnType<typeof bbcImportedWorkstation>> = null;
   let audible = true;
@@ -187,9 +184,17 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
       candidate = parts.add(loaded);
       candidate.setAudible(audible);
       candidate.object.position.set(2.3, 0, -0.7);
+      candidate.onSit((pose) =>
+        walk.place(pose.x, pose.z, pose.yaw, pose.pitch, pose.y),
+      );
       candidate.object.rotation.y = -0.15;
       room.add(candidate.object);
       powerPanel(candidate);
+      if (
+        import.meta.env.DEV &&
+        new URLSearchParams(location.search).get('view') === 'boot'
+      )
+        candidate.model.power.flip();
       const tag = createMicroLabel(kit, 'ANT MERCER / VIRTUALBEEB', {
         height: 0.008,
         ink: '#1d302c',
@@ -210,10 +215,7 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
           [deskHalf, deskDepth],
         ].map(([x, z]) => candidate!.object.localToWorld(new Vector3(x, 0, z))),
       );
-      solids.push(
-        footprint(box),
-        footprint(new Box3().setFromObject(candidate.view.chair.group)),
-      );
+      solids.push(footprint(box));
     })
     .catch((error: unknown) =>
       console.error('BBC comparison model could not load', error),
@@ -239,6 +241,8 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
     return null;
   };
   const views = {
+    power: { x: 1.84 * m, z: -0.1 * m, yaw: 0, pitch: -0.64, y: 1.2 * m },
+    boot: { x: 1.85 * m, z: 0.45 * m, yaw: 0.48, pitch: -0.1, y: 1.18 * m },
     room: { x: 1.3 * m, z: 2.5 * m, yaw: 0, pitch: -0.18 },
     candidate: {
       x: 1.85 * m,
@@ -271,6 +275,9 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
     use: (x, y) => usableAt(x, y)?.(),
     aimed: () => Boolean(usableAt(0, 0)),
   });
+  exhibit.onSit((pose) =>
+    walk.place(pose.x, pose.z, pose.yaw, pose.pitch, pose.y),
+  );
   const go = (name: string) => {
     const pose = views[name as ViewName];
     if (pose)

@@ -6,7 +6,7 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { Box3 } from 'three';
+import { Box3, Mesh } from 'three';
 import { partAudio } from '../../core/audio/part-audio';
 import { createPanelKit, disposeKit } from '../../core/views/eighties-controls';
 import { bbcWorkstation } from './bbc-workstation';
@@ -48,6 +48,30 @@ describe('BBC workstation exhibit', () => {
     expect(exhibit.view.cub.screen.visible).toBe(false);
     const bbc = new Box3().setFromObject(exhibit.view.bbc.group);
     expect(bbc.max.x - bbc.min.x).toBeCloseTo(0.41, 2);
+    exhibit.dispose();
+    disposeKit(kit, exhibit.object);
+  });
+
+  it('uses one unlettered keyboard mesh and seats the player facing the monitor', () => {
+    const kit = createPanelKit();
+    const exhibit = bbcWorkstation(kit);
+    const keyboard = exhibit.view.bbc.group.getObjectByName(
+      'BBC keyboard — unlettered',
+    ) as Mesh;
+    expect(keyboard).toBeInstanceOf(Mesh);
+    expect(Array.isArray(keyboard.material)).toBe(false);
+    expect('map' in keyboard.material && keyboard.material.map).toBe(null);
+    const seat = vi.fn();
+    exhibit.onSit(seat);
+    exhibit.uses.get(exhibit.view.chair.group)!();
+    expect(seat).toHaveBeenCalledOnce();
+    const pose = seat.mock.calls[0][0];
+    expect(pose.y).toBeCloseTo(1.18);
+    expect(pose.yaw).toBeCloseTo(0);
+    expect(pose.pitch).toBeLessThan(0);
+    expect(
+      exhibit.object.getObjectByName('Cub RGB signal cable to BBC RGB socket'),
+    ).toBeDefined();
     exhibit.dispose();
     disposeKit(kit, exhibit.object);
   });

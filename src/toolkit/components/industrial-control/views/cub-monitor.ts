@@ -1,3 +1,4 @@
+import { createCrtSurface } from './crt-surface';
 /** Ported from VX3 Simulator; original hardware geometry retained. */
 import {
   BoxGeometry,
@@ -21,12 +22,12 @@ import {
 
 /** Mode 7 text as the BBC Micro's calibration program draws it. */
 function createScreen() {
-  const width = 320;
-  const height = 240;
+  const width = 640;
+  const height = 500;
   const { context, texture } = createCanvasTexture(width, height);
   let shown: string | undefined;
-  const draw = (lines: readonly ScreenLine[]) => {
-    const key = JSON.stringify(lines);
+  const draw = (lines: readonly ScreenLine[], cursor: boolean) => {
+    const key = JSON.stringify([lines, cursor]);
     if (key === shown) return;
     shown = key;
     // The tube's rounded face, set in its black surround.
@@ -38,11 +39,18 @@ function createScreen() {
     context.fill();
     context.save();
     context.clip();
-    context.font = 'bold 11px monospace';
+    // Mode 7's 40 columns × 25 rows, with its eight-colour text on black.
+    context.font = 'bold 18px monospace';
     context.textBaseline = 'top';
     for (const [i, [text, ink]] of lines.entries()) {
       context.fillStyle = ink;
-      context.fillText(text, 18, 12 + i * 12, width - 30);
+      if (i >= 25) break;
+      for (const [column, character] of text.slice(0, 40).split('').entries())
+        context.fillText(character, 8 + column * 15.6, 6 + i * 19.5, 15.6);
+    }
+    if (cursor && lines.length > 0 && lines.length < 25) {
+      context.fillStyle = '#f2f2ee';
+      context.fillRect(8, 6 + lines.length * 19.5 + 17, 14, 2.5);
     }
     // A faint reflection across the top left of the glass.
     const sheen = context.createLinearGradient(0, 0, width * 0.6, height * 0.6);
@@ -131,17 +139,19 @@ export function createCubMonitor(worldUnitsPerMetre: number) {
 
   // Brown bezel, a little proud of the case, round a black surround that
   // holds the tube. The tube sits high, leaving a deeper lower rail.
-  box(width, height, 0.03, BEZEL, 0, height / 2, front - 0.005);
   const screenY = height * 0.55;
-  box(
-    width * 0.88,
-    height * 0.8,
-    0.006,
-    '#0c0b0a',
-    0.004,
-    screenY,
-    front + 0.012,
-  );
+  // Four actual bezel rails leave an opening: no solid panel over the CRT.
+  box(0.028, height, 0.03, BEZEL, -0.162, height / 2, front - 0.005);
+  box(0.02, height, 0.03, BEZEL, 0.166, height / 2, front - 0.005);
+  box(0.304, 0.012, 0.03, BEZEL, 0.004, 0.294, front - 0.005);
+  box(0.304, 0.042, 0.03, BEZEL, 0.004, 0.021, front - 0.005);
+  const darkGlass = createPs1Material({ color: '#030605', roughness: 0.2 });
+  materials.push(darkGlass);
+  const tube = new Mesh(createCrtSurface(0.304, 0.246), darkGlass);
+  tube.position.set(0.004 * m, screenY * m, (front + 0.006) * m);
+  tube.geometry.scale(m, m, m);
+  tube.name = 'Inset curved CRT glass';
+  group.add(tube);
   const screen = createScreen();
   textures.push(screen.texture);
   const glass = createPs1Material(
@@ -158,26 +168,11 @@ export function createCubMonitor(worldUnitsPerMetre: number) {
   // A 4:3 picture within the 14-inch tube's bezel.
   const screenW = 0.276;
   const screenH = screenW * 0.75;
-  const face = new Mesh(new PlaneGeometry(screenW * m, screenH * m), glass);
-  const screenFaceZ = front + 0.012 + 0.006 / 2 + 0.001;
+  const face = new Mesh(createCrtSurface(screenW, screenH), glass);
+  face.geometry.scale(m, m, m);
+  const screenFaceZ = front + 0.0065;
   face.position.set(0.004 * m, screenY * m, screenFaceZ * m);
   group.add(face);
-  // The cursor after the last line of text.
-  const cursor = box(
-    0.009,
-    0.0035,
-    0.001,
-    '#f2f2ee',
-    0.004 - screenW / 2 + screenW * (18 / 320),
-    0,
-    screenFaceZ + 0.001 + 0.001 / 2,
-    true,
-  );
-  const placeCursor = (lineCount: number) => {
-    cursor.position.y =
-      (screenY + screenH / 2 - screenH * ((12 + lineCount * 12 + 9) / 240)) * m;
-  };
-
   // The badge on a black tab at the bottom left, and the bare red power
   // indicator at the bottom right, just under the tube.
   const badge = createLabelTexture('MICROVITEC', {
@@ -220,13 +215,10 @@ export function createCubMonitor(worldUnitsPerMetre: number) {
     power(on: boolean) {
       lampColour.set(on ? '#ff2a1e' : '#3a1512');
       face.visible = on;
-      if (!on) cursor.visible = false;
     },
     /** Redraw the text if it has changed, and blink the cursor about once a second. */
     update(seconds: number, lines: readonly ScreenLine[], showCursor = true) {
-      screen.draw(lines);
-      placeCursor(lines.length);
-      cursor.visible = showCursor && lines.length > 0 && seconds % 1.1 < 0.6;
+      screen.draw(lines, showCursor && seconds % 1.1 < 0.6);
     },
     dispose() {
       group.traverse((object) => {

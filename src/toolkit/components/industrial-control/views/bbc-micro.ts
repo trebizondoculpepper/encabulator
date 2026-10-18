@@ -3,16 +3,17 @@ import {
   BoxGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
+  Shape,
   Group,
   Mesh,
   PlaneGeometry,
-  Shape,
 } from 'three';
+import { combineUnletteredKeys } from './unlettered-keys';
 import type { BufferGeometry, Material, Texture } from 'three';
 import { createPs1Material } from '../../core/parts/ps1-material';
 import {
-  createCanvasTexture,
   createLabelTexture,
+  createCanvasTexture,
 } from '../../core/views/screens';
 
 /** Original Model B geometry, 410 × 345 × 75 mm; the front faces +Z. */
@@ -81,65 +82,18 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
   group.add(keyboard);
   box(0.386, 0.002, 0.19, '#191b18', 0, 0, 0, keyboard);
 
-  // All key legends share one atlas, while the caps remain actual geometry.
-  const atlas = createCanvasTexture(1024, 512);
-  textures.push(atlas.texture);
-  const legendMaterial = createPs1Material(
-    { map: atlas.texture, transparent: true, depthWrite: false },
-    true,
-  );
-  materials.push(legendMaterial);
-  let legendIndex = 0;
-  const capShape = new Shape();
-  capShape.moveTo(-0.5, -0.5);
-  capShape.lineTo(0.5, -0.5);
-  capShape.lineTo(0.5, 0.5);
-  capShape.lineTo(-0.5, 0.5);
-  capShape.closePath();
-  const capGeometry = new ExtrudeGeometry(capShape, {
-    depth: 0.24,
-    bevelEnabled: true,
-    bevelSize: 0.09,
-    bevelThickness: 0.07,
-    bevelSegments: 1,
-    steps: 1,
-  });
-  capGeometry.rotateX(-Math.PI / 2);
+  const caps: Mesh[] = [];
   const key = (
-    legend: string,
+    _legend: string,
     x: number,
     z: number,
     width = 0.019,
     color = '#292b27',
   ) => {
-    const cap = new Mesh(capGeometry, paint(color));
-    cap.scale.set(width / 1.18, 0.023, 0.017 / 1.18);
-    cap.position.set(x, 0.002, z);
+    const cap = new Mesh(new BoxGeometry(width, 0.008, 0.017), paint(color));
+    cap.position.set(x, 0.006, z);
     keyboard.add(cap);
-    const index = legendIndex++;
-    const col = index % 16,
-      row = Math.floor(index / 16);
-    atlas.context.fillStyle = '#eee7d6';
-    atlas.context.font = `bold ${legend.length > 3 ? 13 : 22}px monospace`;
-    atlas.context.textAlign = 'center';
-    atlas.context.textBaseline = 'middle';
-    const parts = legend.split(' ');
-    parts.forEach((part, line) =>
-      atlas.context.fillText(
-        part,
-        col * 64 + 32,
-        row * 64 + 32 + (line - (parts.length - 1) / 2) * 15,
-        58,
-      ),
-    );
-    const geometry = new PlaneGeometry(width * 0.8, 0.013);
-    const uv = geometry.getAttribute('uv');
-    for (let i = 0; i < uv.count; i++)
-      uv.setXY(i, (col + uv.getX(i)) / 16, 1 - (row + 1 - uv.getY(i)) / 8);
-    const label = new Mesh(geometry, legendMaterial);
-    label.rotation.x = -Math.PI / 2;
-    label.position.set(x, 0.0095, z);
-    keyboard.add(label);
+    caps.push(cap);
   };
   for (let i = 0; i < 10; i++)
     key(`f${i}`, -0.11 + i * 0.023, -0.07, 0.019, '#bf382c');
@@ -199,7 +153,6 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
   key('DELETE', 0.158, 0.03, 0.019);
   key('COPY', 0.181, 0.03, 0.019, '#5b523c');
   key('', -0.007, 0.065, 0.184);
-  atlas.texture.needsUpdate = true;
 
   const deckLabel = (
     text: string,
@@ -275,6 +228,7 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
     led.position.set(x, 0.003, 0.08);
     keyboard.add(led);
   }
+  combineUnletteredKeys(keyboard, caps);
   // Rear DIN sockets, RGB connector, moulding seam and rocker switch.
   for (const x of [-0.08, -0.025, 0.03]) {
     const socket = new Mesh(

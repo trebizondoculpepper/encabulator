@@ -1,3 +1,4 @@
+import { Vector3 } from 'three';
 import { beginPart } from '../../core/parts/parts';
 import { partAudio, recording, click } from '../../core/audio/part-audio';
 import { createMicroLabel } from '../../core/views/eighties-controls';
@@ -16,6 +17,27 @@ export function bbcWorkstation(kit: PanelKit) {
   const view = createBbcWorkstation(kit);
   const model = createBbcComputer();
   a.object.add(view.group);
+  let seat = (_pose: {
+    x: number;
+    z: number;
+    yaw: number;
+    pitch: number;
+    y: number;
+  }) => {};
+  a.uses.set(view.chair.group, () => {
+    const eye = view.chair.group.localToWorld(new Vector3(0, 1.18, 0));
+    const target = view.group.localToWorld(
+      view.cub.group.position.clone().add(new Vector3(0, 0.16, 0.17)),
+    );
+    const direction = target.sub(eye);
+    seat({
+      x: eye.x,
+      z: eye.z,
+      y: eye.y,
+      yaw: Math.atan2(direction.x, -direction.z),
+      pitch: Math.atan2(direction.y, Math.hypot(direction.x, direction.z)),
+    });
+  });
   a.uses.set(view.bbc.powerSwitch, model.power.flip);
   const label = createMicroLabel(kit, 'POWER  I / O', {
     height: 0.0025,
@@ -74,6 +96,9 @@ export function bbcWorkstation(kit: PanelKit) {
     ...part,
     model,
     view,
+    onSit(callback: typeof seat) {
+      seat = callback;
+    },
     setAudible(on: boolean) {
       audible = on;
       part.setAudible(on);

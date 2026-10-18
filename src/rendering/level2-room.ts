@@ -529,6 +529,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     },
     aimed: () => Boolean(usableAt(0, 0)),
   });
+  workstation.onSit(({ x, z, yaw, pitch, y }) =>
+    walk.place(x, z, yaw, pitch, y),
+  );
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect();
     if (!width || !height) return;

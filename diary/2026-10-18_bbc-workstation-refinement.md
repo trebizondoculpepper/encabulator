@@ -1,0 +1,9 @@
+# BBC workstation refinement
+
+Reduced the local VirtualBeeb comparison GLB from 53,685 to 13,303 triangles before further runtime keyboard replacement. Both BBC keyboards now use one unlettered mesh with black, red and brown caps. Static imported geometry is merged by material and costly transmission materials are replaced with opaque surfaces. The original source remains intact and the derivative retains the same development-only rights restriction.
+
+Rebuilt the Cub picture as a convex CRT surface inset behind its bezel, with matching curved black glass while off and live 40-column, 25-row Mode 7 text while booting. The baseline bezel now has an actual opening rather than overlapping solid panels. Added computer and monitor mains cords routed behind the desk into a four-way UK floor extension, monitor RGB cable to the BBC rear connector, and a shared supply cable into a grommet on the machine cabinet rear in Level0 and Level2. A separate flat ribbon runs from under the BBC to the automation cabinet rear, reserving the diagnostic connection; live machine diagnostic software remains the separate prompt.
+
+Using either workstation chair positions the player's eye at seated height looking at the monitor, through the existing universal use action and first-person placement API. Desk collision remains; chair collision is omitted so it does not eject the player from the seated position. Walking away uses the normal controls.
+
+Verification: keyboard, chair pose, cable presence, curved CRT geometry and existing boot/power tests; typecheck, lint, formatting, all 617 tests and production build passed. Browser inspection confirmed the live Mode 7 picture and unlettered keyboard in Dev19.
