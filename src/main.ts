@@ -53,7 +53,7 @@ const openRoom = async () => {
   else if (room === 'dev12')
     start = (await import('./rendering/tones-room')).startTonesRoom;
   else if (room === 'dev18')
-    start = (await import('./rendering/warehouse-room'))
+    start = (await import('./rendering/architectural-room'))
       .startArchitecturalGalleryRoom;
   else if (room === 'dev17')
     start = (await import('./rendering/warehouse-room')).startWarehouseRoom;

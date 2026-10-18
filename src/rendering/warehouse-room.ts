@@ -20,9 +20,6 @@ import { ps1Uniforms } from './ps1-material';
 import { createRenderer, useEnvironment } from './render-style';
 
 /** Dev17 previews the empty architectural shell for a future training scenario. */
-export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
-  return startWarehouseRoom(canvas, true);
-}
 export function startWarehouseRoom(canvas: HTMLCanvasElement, gallery = false) {
   const id = gallery ? 'dev18' : 'dev17';
   const m = METRE;

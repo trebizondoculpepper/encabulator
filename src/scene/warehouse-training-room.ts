@@ -1,5 +1,10 @@
 import { createKeepClearMarking } from './keep-clear-markings';
 import {
+  createFireKeepClear,
+  createHazardTape,
+  createWalkwayTape,
+} from './floor-safety-markings';
+import {
   BoxGeometry,
   Group,
   Mesh,
@@ -415,13 +420,38 @@ export function createWarehouseTrainingRoom(kit: PanelKit, gallery = false) {
   gateMark.rotation.z = Math.PI / 2;
   group.add(gateMark);
   fitted.add(gateMark);
-  for (const x of [-13.85, 13.85]) {
-    const mark = createKeepClearMarking(kit, 1.8, 1.8);
-    mark.position.set(x, 0.004, 13.9);
-    mark.rotation.z = x < 0 ? Math.PI / 2 : -Math.PI / 2;
+  // Floor safety markings, as a tidy UK workplace lays them: red and
+  // white hatching keeps both escape doors and the fire points clear,
+  // yellow tape marks the walkway joining the two doors along the side,
+  // and yellow and black tape the edge of the loading-gate apron.
+  const floorMark = (mark: Mesh, x: number, z: number, turn = 0) => {
+    mark.position.x = x;
+    mark.position.z = z;
+    mark.rotation.z = turn;
     group.add(mark);
     fitted.add(mark);
-  }
+  };
+  for (const x of [-13.85, 13.85])
+    floorMark(
+      createFireKeepClear(
+        kit,
+        2,
+        2,
+        x > 0 ? ['FIRE EXIT', 'KEEP CLEAR'] : ['KEEP CLEAR'],
+      ),
+      x,
+      13.85,
+      x < 0 ? Math.PI / 2 : -Math.PI / 2,
+    );
+  for (const x of [-14.45, 14.45])
+    floorMark(
+      createFireKeepClear(kit, 1, 0.8, []),
+      x,
+      12.1,
+      x < 0 ? Math.PI / 2 : -Math.PI / 2,
+    );
+  for (const z of [12.7, 14.3]) floorMark(createWalkwayTape(kit, 25.7), 0, z);
+  floorMark(createHazardTape(kit, 6.4), -12.8, 0, Math.PI / 2);
   // Batch only the shell; keep architectural components intact for future binding.
   for (const mesh of mergeStatic(group, 6, fitted)) {
     mesh.castShadow = !(mesh.material instanceof MeshBasicMaterial);
