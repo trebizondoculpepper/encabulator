@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BBC Micro · melody auditions</title>
+    <style>
+      body {
+        background: #17201d;
+        color: #edf1e8;
+        font:
+          17px/1.55 system-ui,
+          sans-serif;
+        max-width: 1050px;
+        margin: 48px auto;
+        padding: 0 24px;
+      }
+      h1 {
+        font-size: 30px;
+        font-weight: 600;
+      }
+      p {
+        max-width: 800px;
+        color: #c4d0c7;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 28px 0;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 18px 12px;
+        border-bottom: 1px solid #405047;
+      }
+      th {
+        color: #a4e3b6;
+        font-weight: 500;
+      }
+      audio {
+        width: 100%;
+        min-width: 220px;
+        height: 40px;
+      }
+      a {
+        color: #a4e3b6;
+      }
+      small {
+        color: #acb9b0;
+      }
+      .note {
+        padding: 12px 18px;
+        background: #26352b;
+        border-left: 3px solid #a4e3b6;
+      }
+      @media (max-width: 760px) {
+        table,
+        tbody,
+        tr,
+        th,
+        td {
+          display: block;
+        }
+        thead {
+          display: none;
+        }
+        td {
+          border: none;
+          padding: 7px 0;
+        }
+        tr {
+          margin-bottom: 28px;
+        }
+        audio {
+          min-width: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BBC Micro · melody auditions</h1>
+    <p>
+      Four sounds from
+      <a href="https://www.youtube.com/watch?v=KgPFSxlXM6o"
+        >Fizgog’s BBC Micro sound-chip recording</a
+      >. Compare a cleaned recording with a freshly synthesized approximation.
+      The original uploader identifies the effects as Pitfall sounds.
+    </p>
+    <p class="note">
+      The fanfare’s quiet opening is heavily obscured. Its reconstruction is
+      approximate. Cuts follow the gaps after each phrase, slightly later than
+      the rough timestamps. These are working candidates.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Cue</th>
+          <th>Cleaned recording</th>
+          <th>Chip-style reconstruction</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Fanfare</strong><br /><small>0.00–4.82 s</small></td>
+          <td>
+            <audio controls preload="none" src="fanfare-cleaned.mp3"></audio
+            ><br /><a href="fanfare-cleaned.wav">WAV</a>
+          </td>
+          <td>
+            <audio controls preload="none" src="fanfare-resynth.mp3"></audio
+            ><br /><a href="fanfare-resynth.wav">WAV</a>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Beware</strong><br /><small>4.82–7.65 s</small></td>
+          <td>
+            <audio controls preload="none" src="beware-cleaned.mp3"></audio
+            ><br /><a href="beware-cleaned.wav">WAV</a>
+          </td>
+          <td>
+            <audio controls preload="none" src="beware-resynth.mp3"></audio
+            ><br /><a href="beware-resynth.wav">WAV</a>
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Weird / discordant</strong><br /><small>7.65–9.85 s</small>
+          </td>
+          <td>
+            <audio controls preload="none" src="discordant-cleaned.mp3"></audio
+            ><br /><a href="discordant-cleaned.wav">WAV</a>
+          </td>
+          <td>
+            <audio controls preload="none" src="discordant-resynth.mp3"></audio
+            ><br /><a href="discordant-resynth.wav">WAV</a>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Down and up</strong><br /><small>9.85–11.03 s</small></td>
+          <td>
+            <audio controls preload="none" src="down-and-up-cleaned.mp3"></audio
+            ><br /><a href="down-and-up-cleaned.wav">WAV</a>
+          </td>
+          <td>
+            <audio controls preload="none" src="down-and-up-resynth.mp3"></audio
+            ><br /><a href="down-and-up-resynth.wav">WAV</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <a href="comparison-original-cleaned-resynth.wav">Full comparison WAV</a>:
+      original → cleaned → reconstructed, for each cue. Lossless downloads are
+      48 kHz / 16-bit mono.
+    </p>
+  </body>
+</html>

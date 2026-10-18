@@ -33,6 +33,7 @@ import {
   createCabinetBoard,
   createControlsBoard,
   createDisplaysBoard,
+  createStudioBoard,
 } from './test-boards';
 import type { TestFitting } from './test-boards';
 import {
@@ -153,6 +154,17 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     0,
     boardFootprint(2.4, 3.2),
   );
+  // The studio controls, a newer family than the industrial ones, on the
+  // north wall beyond the displays.
+  const studioX = 6.4;
+  place(
+    createStudioBoard(kit),
+    studioX,
+    1.55,
+    boardZ,
+    0,
+    boardFootprint(studioX, 2.1),
+  );
   // The cabinet fittings on the east wall, facing west: tried here first,
   // then fitted to the Retro Encabulator (dev6).
   const cabinetX = half.x - 0.25;
@@ -266,6 +278,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   > = {
     controls: { x: -3 * m, z: (boardZ + 2.2) * m, yaw: 0, pitch: -0.12 },
     displays: { x: 2.4 * m, z: (boardZ + 2.2) * m, yaw: 0, pitch: -0.12 },
+    studio: { x: studioX * m, z: (boardZ + 1.6) * m, yaw: 0, pitch: -0.1 },
     cabinet: {
       x: (cabinetX - 2.6) * m,
       z: cabinetZ * m,

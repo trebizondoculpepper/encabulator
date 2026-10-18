@@ -61,7 +61,13 @@ import {
   pushButton,
   pushbuttonStation,
   selector,
+  studioSwitch,
 } from '../../components/core/parts/parts';
+import { STUDIO_LED_COLOURS } from '../../components/industrial-control/views/studio-controls';
+import type {
+  StudioCapColour,
+  StudioLedColour,
+} from '../../components/industrial-control/views/studio-controls';
 import type { Part, PartSet } from '../../components/core/parts/parts';
 import { createPs1Material } from '../../components/core/parts/ps1-material';
 
@@ -255,6 +261,118 @@ export function createControlsBoard(kit: PanelKit): TestFitting {
     0.0045,
   );
   return fitting(board);
+}
+
+/**
+ * The STUDIO CONTROLS board: the short-travel studio switches of 2010s
+ * studio and broadcast gear (`createStudioSwitch`), a newer family than
+ * the heavy-duty industrial controls, three times life size: each LED
+ * colour, latching and momentary, one whose LED is driven separately, and
+ * the testing-scenario switches as the Hyperplasc Scenario Simulator
+ * wears them.
+ */
+export function createStudioBoard(kit: PanelKit): TestFitting {
+  const board = createBoard(kit, {
+    title: 'STUDIO CONTROLS',
+    width: 0.66,
+    height: 0.44,
+    scale: 3,
+  });
+  const what = (text: string, x: number, y: number) =>
+    board.caption(text, x, y - 0.03, 0.0042);
+  const pitch = 0.045;
+  const left = -0.27;
+  // Every LED colour, momentary: the LED shows the press.
+  (Object.keys(STUDIO_LED_COLOURS) as StudioLedColour[]).forEach((led, i) =>
+    board.place(
+      studioSwitch(kit, { legend: led.toUpperCase(), led }),
+      left + i * pitch,
+      0.1,
+    ),
+  );
+  what('MOMENTARY: THE LED SHOWS EACH PRESS', left + 2 * pitch, 0.1);
+  // The studio classics, latching: the LED lit while on.
+  const latching: [string, StudioLedColour][] = [
+    ['MUTE', 'red'],
+    ['SOLO', 'amber'],
+    ['REC', 'red'],
+    ['TALK', 'white'],
+  ];
+  latching.forEach(([legend, led], i) =>
+    board.place(
+      studioSwitch(kit, { legend, led, mode: 'latching' }),
+      0.04 + i * pitch,
+      0.1,
+    ),
+  );
+  what('LATCHING: LIT WHILE ON', 0.04 + 1.5 * pitch, 0.1);
+  // Momentary, its LED driven by something else: here, busy.
+  const busy = signal(false);
+  let clock = 0;
+  board.place(
+    studioSwitch(kit, { legend: 'SYNC', led: 'blue', lamp: busy }),
+    0.27,
+    0.1,
+  );
+  what('LED DRIVEN APART', 0.27, 0.1);
+  // The testing scenarios, as the simulator wears them.
+  const scenarios: [string, StudioLedColour][] = [
+    ['FULL OFF', 'red'],
+    ['FULL ON', 'green'],
+    ['SLOW START', 'green'],
+    ['RESET', 'blue'],
+    ['HICCUP', 'amber'],
+    ['GLITCH', 'amber'],
+    ['KAPUT', 'red'],
+  ];
+  scenarios.forEach(([legend, led], i) =>
+    board.place(
+      studioSwitch(kit, { legend, led }),
+      left + 0.04 + i * 0.07,
+      -0.04,
+    ),
+  );
+  what(
+    'TESTING SCENARIOS, AS ON THE HYPERPLASC SCENARIO SIMULATOR',
+    left + 0.04 + 3 * 0.07,
+    -0.04,
+  );
+  // Any cap with any LED: chosen independently.
+  const pairs: [StudioCapColour, StudioLedColour][] = [
+    ['graphite', 'green'],
+    ['black', 'blue'],
+    ['grey', 'amber'],
+    ['white', 'red'],
+    ['red', 'white'],
+    ['blue', 'amber'],
+    ['yellow', 'green'],
+  ];
+  pairs.forEach(([cap, led], i) =>
+    board.place(
+      studioSwitch(kit, {
+        legend: cap.toUpperCase(),
+        cap,
+        led,
+        mode: 'latching',
+        initial: true,
+      }),
+      left + 0.04 + i * 0.07,
+      -0.115,
+    ),
+  );
+  what('CAP AND LED COLOURS CHOSEN APART', left + 0.04 + 3 * 0.07, -0.115);
+  board.caption(
+    'Short-travel studio switches: a square cap with one corner chamfered, a square LED window, the legend on the cap.',
+    0,
+    -0.18,
+    0.0042,
+  );
+  return fitting(board, [
+    (delta) => {
+      clock += delta;
+      busy.value = Math.floor(clock * 2.5) % 3 !== 0;
+    },
+  ]);
 }
 
 /** The plant messages the message display steps through. */

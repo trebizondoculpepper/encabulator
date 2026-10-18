@@ -46,3 +46,7 @@ The revised normal-operation lesson replaces `cue_002` (normal baseline and thre
 ## BBC diagnostic read and Neumann Link
 
 No new binary audio assets. `industrial-control/parts/bbc-workstation.ts` synthesises a bounded 1.3-second seek sequence inside the 1.5-second diagnostic read, positioned at the floppy drive. Paired low-level noise/body impulses suggest a 5¼-inch stepper without a continuous harsh buzz. `industrial-control/parts/neumann-diagnostics.ts` synthesises one 880 Hz, 90 ms connection beep at the internal Link Controller LED. Reads and beeps have cancellation handles; power/link loss, room suspension and disposal stop them. Resuming does not replay old activity. Ordinary telemetry changes do not trigger a read or beep. Original project synthesis, credited in `CREDITS.md`.
+
+## BBC Micro melody audition library
+
+Four cleaned/reference-derived reconstruction pairs are prepared in `resources/sound/effects/bbc-micro-melodies/`, with lossless WAVs, MP3 previews, editable scores and a reproducible processing script. The fanfare’s opening is an uncertain approximation. All rendered WAVs were checked at 4× oversampling: no clipping, true peaks at or below −2 dBTP, 48 kHz / 16-bit mono. The comparison page is served locally at `/resources/sound/effects/bbc-micro-melodies/audition.html`. No production asset or gameplay trigger has been added; source attribution and unconfirmed reuse licence are recorded in CREDITS.md and the working-library README.

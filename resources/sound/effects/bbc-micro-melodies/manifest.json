@@ -1,0 +1,34 @@
+[
+  {
+    "id": "fanfare",
+    "sourceStart": 0.0,
+    "sourceEnd": 4.82,
+    "cleanedSeconds": 4.82,
+    "resynthSeconds": 4.87,
+    "transcription": "approximate; fanfare opening least certain"
+  },
+  {
+    "id": "beware",
+    "sourceStart": 4.82,
+    "sourceEnd": 7.65,
+    "cleanedSeconds": 2.83,
+    "resynthSeconds": 2.88,
+    "transcription": "approximate; fanfare opening least certain"
+  },
+  {
+    "id": "discordant",
+    "sourceStart": 7.65,
+    "sourceEnd": 9.85,
+    "cleanedSeconds": 2.2,
+    "resynthSeconds": 2.25,
+    "transcription": "approximate; fanfare opening least certain"
+  },
+  {
+    "id": "down-and-up",
+    "sourceStart": 9.85,
+    "sourceEnd": 11.03,
+    "cleanedSeconds": 1.18,
+    "resynthSeconds": 1.23,
+    "transcription": "approximate; fanfare opening least certain"
+  }
+]

@@ -23,7 +23,7 @@ Model each thing on a real catalogue part at true size (a Schneider datasheet, a
   - Positional part audio, recorded loops, impacts and door sounds, and the shared recordings.
   - Brands and their logos and badges (`logic/brands.ts` is the one definition every logo is drawn from), signage, and the shared drawing and sound tools for building fittings.
 - **`industrial-control/`**: what machines are controlled and watched with.
-  - Operator controls: push buttons, mushroom stops, selectors, potentiometers, the 22 mm XB4 series, pushbutton and control stations, 1980s toggles, rockers and keypads, flange, throw and rotary handles.
+  - Operator controls: push buttons, mushroom stops, selectors, potentiometers, the 22 mm XB4 series, pushbutton and control stations, 1980s toggles, rockers and keypads, flange, throw and rotary handles, and the 2010s short-travel studio switches.
   - Indicators and displays: pilot lamps, stack lights, LEDs, seven-segment and bar graphs, panel meters, round gauges, LCDs, VFDs, LED matrices, jewel lamps, hour meters, message displays, annunciators, power monitors, CRT monitors, chart recorders, operator terminals, drive keypads and boot screens.
   - Power and motor control: motor control units, contactors, overload relays, fuses, breakers, isolators, soft starters, capacitor boards, motors.
   - Electronics: PLC cards and their backplane and slots, PCB textures, capacitors, heatsinks, jacks.

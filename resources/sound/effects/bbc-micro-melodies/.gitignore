@@ -1,0 +1,4 @@
+# Original download and expiring signed playback URLs remain local working sources.
+source.*
+analysis-tracks.json
+__pycache__/

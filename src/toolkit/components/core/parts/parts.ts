@@ -69,6 +69,11 @@ import {
   createKeySwitch,
   createRocker,
 } from '../../industrial-control/views/panel-switchgear';
+import { createStudioSwitch } from '../../industrial-control/views/studio-controls';
+import type {
+  StudioCapColour,
+  StudioLedColour,
+} from '../../industrial-control/views/studio-controls';
 import { createRackUnit } from '../../industrial-control/views/rack-equipment';
 import type {
   RackUnitOptions,
@@ -428,6 +433,98 @@ export function ledPushbutton(
   });
   a.disposers.push(button.dispose);
   return { ...a.part(), state: button.state, lit: button.lit };
+}
+
+// ---- Studio switch ---------------------------------------------------------
+
+/** A studio switch's short travel: a soft, high, quick click. */
+const STUDIO_CLICK = click({
+  band: 3600,
+  q: 2.4,
+  decay: 0.01,
+  level: 0.14,
+  thump: [210, 0.015],
+});
+/** How long a momentary studio switch's LED shows a press, seconds. */
+const STUDIO_FLASH = 0.3;
+
+/**
+ * A short-travel studio switch (`createStudioSwitch`): its legend on its
+ * cap and a square LED window above it. Momentary, it does `action` on
+ * each press and its LED shows the press a moment, or shows `lamp` if
+ * given (something in progress, say); latching, each press turns it on or
+ * off, its LED lit while on, and it may be `bound` to the world.
+ */
+export function studioSwitch(
+  kit: PanelKit,
+  props: Common & {
+    /** Its LED's colour, and its cap's: chosen independently. */
+    led?: StudioLedColour;
+    cap?: StudioCapColour;
+    mode?: 'momentary' | 'latching';
+    action?: () => void;
+    lamp?: Readable<boolean>;
+    initial?: boolean;
+    bound?: Binding<boolean>;
+    power?: Readable<boolean>;
+    latch?: Readable<boolean>;
+  },
+): Part & { lit: ReadonlySignal<boolean> } {
+  const a = beginPart(
+    kit,
+    props.name ?? `${props.legend ?? ''} studio switch`.trim(),
+  );
+  const view = createStudioSwitch(kit, {
+    legend: props.legend,
+    led: props.led,
+    cap: props.cap,
+  });
+  a.object.add(view.group);
+  let lit: ReadonlySignal<boolean>;
+  let press: () => void;
+  if (props.mode === 'latching') {
+    const button = createLedPushbutton({
+      initial: props.initial,
+      bound: props.bound,
+      power: props.power,
+      latch: props.latch,
+    });
+    a.voice(button, { press: STUDIO_CLICK });
+    a.disposers.push(button.dispose);
+    lit = button.lit;
+    press = () => {
+      if (button.press()) props.action?.();
+    };
+  } else {
+    const flash = signal(0);
+    const button = createMomentary({
+      action: () => {
+        flash.value = STUDIO_FLASH;
+        props.action?.();
+      },
+      lamp: props.lamp,
+      power: props.power,
+      latch: props.latch,
+    });
+    a.voice(button, { press: STUDIO_CLICK });
+    a.disposers.push(button.dispose);
+    lit = props.lamp
+      ? button.lit
+      : computed(() => flash.value > 0 && (props.power?.value ?? true));
+    a.updates.push((delta) => {
+      if (flash.peek() > 0) flash.value = Math.max(0, flash.peek() - delta);
+    });
+    press = () => void button.press();
+  }
+  a.uses.set(view.cap, () => {
+    view.press();
+    press();
+  });
+  a.updates.push((delta) => {
+    view.setLit(lit.value);
+    view.update(delta);
+  });
+  return { ...a.part(), lit };
 }
 
 // ---- Pilot light -------------------------------------------------------------
