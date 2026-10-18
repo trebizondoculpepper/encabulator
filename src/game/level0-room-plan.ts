@@ -16,5 +16,6 @@ export const LEVEL0_CHAIRS = { ...LEVEL2_SKIP_SPOT };
 export const LEVEL0_SCENARIOS = {
   x: LEVEL0_MACHINE.x + 3.1,
   z: LEVEL0_MACHINE.z + 1.3,
-  yaw: -0.45,
+  // Turned about 46° clockwise (seen from above) from facing the room.
+  yaw: -0.45 - (20 * Math.PI) / 180,
 };

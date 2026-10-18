@@ -1,5 +1,5 @@
 import { Raycaster } from 'three';
-import type { Object3D } from 'three';
+import type { Color, Material, Mesh, Object3D } from 'three';
 import {
   afterEach,
   beforeEach,
@@ -66,6 +66,18 @@ function sandbox() {
   return { machine, cheats, panel, run, dispose };
 }
 
+/**
+ * A use on the door's pull, found as the room finds it: walking up from
+ * what was hit to the first thing with a use.
+ */
+function workDoor(panel: ReturnType<typeof createScenarioSimulator>) {
+  let o: Object3D = panel.group.getObjectByName(
+    'Scenario simulator door pull',
+  )!;
+  while (!panel.parts.uses.has(o)) o = o.parent!;
+  panel.parts.uses.get(o)!();
+}
+
 /** The use of whatever is inside the part named `name` on the simulator. */
 function useOf(
   panel: ReturnType<typeof createScenarioSimulator>,
@@ -87,10 +99,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
         new Raycaster(),
         [],
       ) !== false;
-    const handle = () =>
-      panel.parts.uses.get(
-        panel.group.getObjectByName('Cabinet door handle')!,
-      )!();
+    const handle = () => workDoor(panel);
     expect(panel.group.getObjectByName('Cabinet door lock')!.visible).toBe(
       false,
     );
@@ -107,14 +116,38 @@ describe('the Hyperplasc Scenario Simulator', () => {
     dispose();
   });
 
+  it("twinkles its units' status LEDs green and amber", () => {
+    const { panel, run, dispose } = sandbox();
+    const leds: Mesh[] = [];
+    panel.group.traverse((o) => {
+      if (o.name === 'Simulator status LED') leds.push(o as Mesh);
+    });
+    expect(leds.length).toBeGreaterThan(40);
+    const colours = new Set<string>();
+    let changes = 0;
+    let before = leds.map((led) => led.material);
+    for (let i = 0; i < 30; i++) {
+      run(0.1);
+      leds.forEach((led, k) => {
+        if (led.material !== before[k]) changes++;
+        const material = led.material as Material & { color?: Color };
+        if (material.color) colours.add(material.color.getHexString());
+      });
+      before = leds.map((led) => led.material);
+    }
+    expect(changes).toBeGreaterThan(100);
+    expect(colours).toContain('3dff6a');
+    expect(colours).toContain('ffb21e');
+    dispose();
+  });
+
   it('brings the machine fully on, and fully off again, with its buttons', () => {
     const { machine, panel, run, dispose } = sandbox();
-    panel.parts.uses.get(
-      panel.group.getObjectByName('Cabinet door handle')!,
-    )!();
+    workDoor(panel);
     run(0.5);
     useOf(panel, 'FULL ON push button')();
-    run(40);
+    // Everything boots and builds: six dimensions take about a minute.
+    run(60);
     const { plant } = machine;
     expect(machine.mcc.supply.value).toBe(true);
     expect(plant.plcStatus.value).toBe('run');

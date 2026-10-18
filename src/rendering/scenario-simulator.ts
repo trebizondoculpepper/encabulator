@@ -1,8 +1,9 @@
 import { signal } from '@preact/signals-core';
-import { Group } from 'three';
+import { BoxGeometry, CylinderGeometry, Group, Mesh } from 'three';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import {
   createMicroLabel,
+  kitGlow,
   kitPaint,
 } from '../toolkit/components/core/views/eighties-controls';
 import {
@@ -99,8 +100,50 @@ export function createScenarioSimulator(
       { u: 3, style: 'handles', colour: 'black', label: 'POWER DISTRIBUTION' },
     ],
   ];
-  for (const [at, options] of fill)
-    cabinet.mount(createRackUnit(kit, options), at);
+  const units = fill.flatMap(([at, options]) => {
+    const unit = createRackUnit(kit, options);
+    cabinet.mount(unit, at);
+    // A patch panel is passive: no status lights among its sockets.
+    return options.style === 'patch' ? [] : [unit];
+  });
+  // Rows of tiny status LEDs on every unit, twinkling green and amber at
+  // their own rates, as a busy rack of about 2015 does.
+  const ledOn = {
+    green: kitGlow(kit, '#3dff6a'),
+    amber: kitGlow(kit, '#ffb21e'),
+  };
+  const ledOff = kitPaint(kit, '#1b1d1e');
+  const ledShape = new BoxGeometry(0.0035, 0.0035, 0.0015);
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const leds = units.flatMap((unit) =>
+    Array.from({ length: 8 }, (_, i) => {
+      const led = new Mesh(ledShape, ledOff);
+      led.name = 'Simulator status LED';
+      led.position.set(
+        unit.faceWidth / 2 - 0.012 - (i % 4) * 0.008,
+        unit.u * 0.0222 - 0.012 - Math.floor(i / 4) * 0.008,
+        0.002,
+      );
+      unit.face.add(led);
+      // Some blink with every access, some only now and then.
+      return { led, next: 0, busy: 0.04 + random() * (i % 3 ? 0.25 : 1.5) };
+    }),
+  );
+  let clock = 0;
+  const twinkle = (delta: number) => {
+    clock += delta;
+    for (const light of leds) {
+      if (clock < light.next) continue;
+      const roll = random();
+      light.led.material =
+        roll < 0.55 ? ledOn.green : roll < 0.85 ? ledOn.amber : ledOff;
+      light.next = clock + light.busy * (0.5 + random());
+    }
+  };
 
   // The control panel, at eye level: TESTING SCENARIOS.
   const panel = createRackUnit(kit, {
@@ -181,8 +224,28 @@ export function createScenarioSimulator(
   latch.object.visible = false;
   latch.object.position.copy(door.handle.position);
   door.hinge.add(latch.object);
-  const work = [...latch.uses.values()][0];
-  parts.add({ ...latch, uses: new Map([[door.handle, work]]) });
+  // A chrome pull handle on two standoffs, on the door's free edge at
+  // about hand height, so the door plainly opens there.
+  const chrome = kitPaint(kit, '#d9dcde', 0.9);
+  const pull = new Group();
+  pull.name = 'Scenario simulator door pull';
+  pull.position.set(door.width - 0.045, 1.1, 0.012);
+  const bar = new Mesh(new CylinderGeometry(0.008, 0.008, 0.26, 16), chrome);
+  bar.position.z = 0.04;
+  pull.add(bar);
+  for (const y of [-0.11, 0.11]) {
+    const post = new Mesh(new CylinderGeometry(0.006, 0.006, 0.04, 12), chrome);
+    post.rotation.x = Math.PI / 2;
+    post.position.set(0, y, 0.02);
+    pull.add(post);
+  }
+  door.hinge.add(pull);
+  // A use anywhere on the door, its pull, handle, frame or glass, opens it
+  // or shuts it.
+  parts.add({
+    ...latch,
+    uses: new Map([[door.hinge, () => void latch.door.flip()]]),
+  });
 
   // Its controls take clicks only with the door open (or swinging).
   let angle = 0;
@@ -195,6 +258,7 @@ export function createScenarioSimulator(
       return open.value;
     },
     update(delta: number) {
+      twinkle(delta);
       parts.update(delta);
       scenarios.update(delta);
       const target = open.value ? -1.9 : 0;
