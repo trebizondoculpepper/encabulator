@@ -1694,12 +1694,25 @@ function dressDoor(
       // Each start ramps the feed motor up from rest, the yellow bar
       // filling before UP TO SPEED; in a fault it runs down to a stop and
       // FAULT flashes red (`soft-starter.ts`).
+      // Its emergency stop: struck, the motor stops and stays stopped until
+      // it is pulled out and HAND OFF AUTO is turned to OFF.
+      const stop = place(
+        mushroomStop(kit, { bound: circuit.emergency }),
+        cx - 0.03,
+        -0.18,
+        0.85,
+      );
+      caption('RESET: PULL OUT, TURN TO OFF', cx + 0.09, -0.18);
+      let stopped = false;
       const softStart = createSoftStarterLogic();
       updates.push((delta, clock) => {
         // It starts and stops on a cycle in AUTO; HAND runs it, OFF stops it.
         const t = clock % 40;
+        if (stop.pushed.value) stopped = true;
+        else if (hoa.position.value === 1) stopped = false;
         const demand =
-          hoa.position.value === 0 || (hoa.position.value === 2 && t < 30);
+          !stopped &&
+          (hoa.position.value === 0 || (hoa.position.value === 2 && t < 30));
         if (demand) circuit.start();
         else circuit.stop();
         const on = circuit.running.value && lit.value;
@@ -1709,21 +1722,29 @@ function dressDoor(
       lamp('green', cx + 0.0, -0.05, () => circuit.running.value);
       legend('RUN', cx + 0.0, -0.02, 0.04);
       handle('black', 0.8, undefined, -0.05);
-      louvres(0.24, 0.07, cx - 0.03, -height / 2 + 0.07);
+      louvres(0.24, 0.045, cx - 0.03, -height / 2 + 0.04);
       break;
     }
     case 'estop': {
+      // The same soft starter as the feed motor's, ramping it up each start.
+      const starter = createSoftStarter(kit);
+      put(starter.group, cx - 0.045, top - 0.06, 0.95);
+      const softStart = createSoftStarterLogic();
+      updates.push((delta) => {
+        const on = circuit.running.value && lit.value;
+        starter.set(softStart.step(delta, on, on && faults.active.value));
+      });
       const stop = place(
         mushroomStop(kit, { bound: circuit.emergency }),
         cx - 0.07,
-        top - 0.06,
+        0.03,
       );
       register('auxiliary.stop', {
         position: computed(() => (stop.pushed.value ? 1 : 0)),
       });
-      meter('A  AC', cx - 0.07, -0.06, 4, 50);
-      lamp('green', cx - 0.11, -0.2, running);
-      lamp('red', cx - 0.03, -0.2, (t) => !running(t));
+      meter('A  AC', cx - 0.07, -0.13, 4, 50);
+      lamp('green', cx - 0.11, -0.27, running);
+      lamp('red', cx - 0.03, -0.27, (t) => !running(t));
       handle('black', 0.85, undefined, 0.02);
       break;
     }

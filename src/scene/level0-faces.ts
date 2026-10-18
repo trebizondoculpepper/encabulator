@@ -382,23 +382,45 @@ export function createLevel0Dresser(
         );
         legend('HAND OFF AUTO', cx - 0.09, -0.02, 0.07);
         caption('AUTO: PLC CYCLE', cx - 0.09, -0.09);
+        // Its emergency stop: struck, the motor stops and stays stopped
+        // until it is pulled out and HAND OFF AUTO is turned to OFF.
+        const stop = place(
+          mushroomStop(kit, { bound: circuit.emergency }),
+          cx - 0.03,
+          -0.18,
+          0.85,
+        );
+        caption('RESET: PULL OUT, TURN TO OFF', cx + 0.09, -0.18);
+        let stopped = false;
         const softStart = createSoftStarterLogic();
         every((delta) => {
-          if (p.feedDemand.value) circuit.start();
+          if (stop.pushed.value) stopped = true;
+          else if (p.control.feedHoa.value === 1) stopped = false;
+          if (p.feedDemand.value && !stopped) circuit.start();
           else circuit.stop();
           const on = circuit.running.value && lit.value;
           starter.set(softStart.step(delta, on, false));
         });
         lamp('green', cx + 0.0, -0.05, circuit.running, 'RUN', 0.9, 0.04);
         handle('black', 0.8, undefined, -0.05);
-        door.louvres(0.24, 0.07, cx - 0.03, -height / 2 + 0.07);
+        door.louvres(0.24, 0.045, cx - 0.03, -height / 2 + 0.04);
         return true;
       }
       case 'estop': {
+        // Its soft starter's display, as on the feed motor: the bar fills
+        // as each start ramps the motor up.
+        const starter = createSoftStarter(kit);
+        put(starter.group, cx - 0.045, top - 0.06, 0.95);
+        caption('SOFT STARTER', cx - 0.045, top - 0.14);
+        const softStart = createSoftStarterLogic();
+        every((delta) => {
+          const on = circuit.running.value && lit.value;
+          starter.set(softStart.step(delta, on, false));
+        });
         const stop = place(
           mushroomStop(kit, { bound: circuit.emergency }),
           cx - 0.07,
-          top - 0.06,
+          0.03,
         );
         // Released, it does not restart the motor by itself: START does.
         let wasPushed = false;
@@ -406,24 +428,24 @@ export function createLevel0Dresser(
           if (stop.pushed.value && !wasPushed) circuit.stop();
           wasPushed = stop.pushed.value;
         });
-        button('green', 'START', cx + 0.05, top - 0.06, circuit.start);
+        button('green', 'START', cx + 0.05, 0.03, circuit.start);
         const meter = createPanelMeter(kit, 'A  AC', {
           width: 0.075,
           scaleMax: 50,
         });
-        put(meter.group, cx - 0.07, -0.06);
-        caption('MOTOR CURRENT', cx - 0.07, -0.115);
+        put(meter.group, cx - 0.07, -0.13);
+        caption('MOTOR CURRENT', cx - 0.07, -0.185);
         every((delta, clock) => {
           meter.set(
             circuit.running.value ? (12 + Math.sin(clock * 1.3) * 0.4) / 50 : 0,
           );
           meter.update(delta);
         });
-        lamp('green', cx - 0.11, -0.2, circuit.running, 'RUN');
+        lamp('green', cx - 0.11, -0.27, circuit.running, 'RUN');
         lamp(
           'red',
           cx - 0.03,
-          -0.2,
+          -0.27,
           computed(() => !circuit.running.value),
           'STOPPED',
         );
