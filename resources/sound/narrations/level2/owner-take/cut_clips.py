@@ -44,7 +44,7 @@ MAP = {
     "cue_008": [(241.00, 248.51, "exact")],
     "cue_009": [(252.5, 267.2)],
     "cue_010": [(272.8, 281.1)],
-    "cue_011": [(285.0, 297.0)],
+    "cue_011": [(288.80, 297.00, "exact")],
     "cue_012": [(301.2, 310.7)],
     "cue_013": [(315.7, 327.1)],
     "cue_014": [(332.4, 334.3)],
@@ -104,7 +104,7 @@ MAP = {
     "cue_068": [(790.6, 791.8)],
     "cue_069": [(795.1, 797.0)],
     "cue_070": [(801.8, 805.1)],
-    "cue_071": [(814.2, 817.7)],
+    "cue_071": [(814.15, 818.02, "exact")],
     "cue_072": [(823.1, 826.5)],
     "cue_073": [(828.8, 831.0)],
     "cue_074": [(833.7, 836.0)],
@@ -140,11 +140,11 @@ MAP = {
     "betaform_ack_3": [(1136.6, 1140.1)],
     "betaform_isolator_say": [(1146.4, 1149.8)],
     "betaform_isolator_remind": [(1166.40, 1175.79, "exact")],
-    "betaform_speed_say": [(1181.6, 1185.0)],
+    "betaform_speed_say": [(1181.95, 1184.70, "exact")],
     "betaform_speed_remind": [(1187.1, 1195.4)],
     "betaform_fan_say": [(1210.0, 1213.4)],
-    "betaform_fan_remind": [(1217.3, 1230.4)],
-    "betaform_key_say": [(1236.73, 1242.23, "exact")],
+    "betaform_fan_remind": [(1220.38, 1231.04, "exact")],
+    "betaform_key_say": [(1238.60, 1242.23, "exact")],
     "betaform_key_remind": [(1244.8, 1257.9)],
     "betaform_boost_say": [(1263.0, 1265.5)],
     "betaform_boost_remind": [(1269.6, 1278.2)],
@@ -247,8 +247,10 @@ def main() -> None:
                 # Pad into the pause, never past its middle.
                 before = [q for q in quiet if q[1] == s]
                 after = [q for q in quiet if q[0] == e]
-                s0 = max(s - PRE, (before[0][0] + s) / 2) if before else s - PRE
-                e0 = min(e + POST, (after[0][1] + e) / 2) if after else e + POST
+                # A pinned edge is exact: barely padded, so a clap beside it stays out.
+                pre, post = (0.05, 0.08) if exact else (PRE, POST)
+                s0 = max(s - pre, (before[0][0] + s) / 2) if before else s - pre
+                e0 = min(e + post, (after[0][1] + e) / 2) if after else e + post
                 spans.append((s0, e0, s, e))
             parts = []
             for i, (s0, e0, s, e) in enumerate(spans):
