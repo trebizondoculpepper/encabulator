@@ -7,6 +7,7 @@ import {
   dressSkip,
   lampLit,
 } from './skip-dressing';
+import { GRAFFITI } from './graffiti';
 
 /** A seeded random, so the tests see the same skips every time. */
 const seeded = (seed: number) => () => {
@@ -19,25 +20,31 @@ const many = (n = 2000) => {
 };
 
 describe('dressing a skip', () => {
-  it('gives graffiti to most skips, and lamps to some', () => {
+  it('chooses graffiti and lamps independently at the requested rates', () => {
+    expect(GRAFFITI_CHANCE).toBe(0.6);
+    expect(LAMP_CHANCE).toBe(0.5);
     const skips = many();
     const tagged = skips.filter((s) => s.tags.length).length / skips.length;
     const lit = skips.filter((s) => s.lamps.length).length / skips.length;
     expect(tagged).toBeCloseTo(GRAFFITI_CHANCE, 1);
     expect(lit).toBeCloseTo(LAMP_CHANCE, 1);
+    expect(
+      skips.filter((s) => s.tags.length && s.lamps.length).length /
+        skips.length,
+    ).toBeCloseTo(GRAFFITI_CHANCE * LAMP_CHANCE, 1);
     expect(skips.some((s) => !s.tags.length && !s.lamps.length)).toBe(true);
   });
 
-  it('keeps tags off the hire firm’s name and on the faces', () => {
-    for (const { tags } of many())
+  it('picks one of the gallery tags for one long side', () => {
+    for (const { tags } of many()) {
+      expect(tags.length).toBeLessThanOrEqual(1);
       for (const tag of tags) {
-        expect(tag.u).toBeGreaterThanOrEqual(-0.85);
-        expect(tag.u).toBeLessThanOrEqual(0.85);
-        expect(tag.v).toBeGreaterThanOrEqual(0);
-        expect(tag.v).toBeLessThanOrEqual(1);
-        if (tag.face === 'front' || tag.face === 'back')
-          expect(Math.abs(tag.u)).toBeGreaterThanOrEqual(0.5);
+        expect(['front', 'back']).toContain(tag.face);
+        expect(GRAFFITI).toContain(tag.art);
+        expect(tag.art.kind).toBe('tag');
+        expect([-1, 1]).toContain(tag.side);
       }
+    }
   });
 
   it('puts lamps on two corners of one side, or on all four', () => {

@@ -226,7 +226,7 @@ _If the player switched off the cabinet's isolator before reaching for a card, o
 
 **TRIGGER:** The first removed Pepperdyne board is dropped on the floor. Play once; from now on a dropped board plays the floor interruption below instead.
 
-**ACTION:** The player's eyes go down to the card on the floor for a moment (the game turns the view to it, holding the player for under two seconds). Unseen, behind them, a builder's mini skip appears at the far end of the room, about ten seconds' walk away: yellow, rusty, stencilled with the name of some made-up hire firm, and plainly never there before. It takes the first of three places at the far end where the player is neither standing nor looking.
+**ACTION:** The player's eyes go down to the card on the floor for a moment (the game turns the view to it, holding the player for under two seconds). Unseen, behind them, a builder's mini skip appears at the far end of the room, about ten seconds' walk away: yellow, rusty, stencilled with the name of some made-up hire firm, and plainly never there before. Independently, it has a 60% chance of a graffiti tag and a 50% chance of amber skip lamps. It takes the first of three places at the far end where the player is neither standing nor looking.
 
 **NARRATOR:** Were you born in a barn? Put it away in the proper receptacle. There's a skip over there.
 

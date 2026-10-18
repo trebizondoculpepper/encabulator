@@ -12,7 +12,8 @@ import {
 import type { Material, Object3D } from 'three';
 import type { BinShape } from '../game/bin-toss';
 import { lampLit } from '../game/skip-dressing';
-import type { SkipLamp } from '../game/skip-dressing';
+import type { GraffitiTag, SkipLamp } from '../game/skip-dressing';
+import { GRAFFITI_ASPECT, graffitiTexture } from './graffiti';
 import { anySkipHirer } from '../game/skip-hirers';
 import type { SkipHirer } from '../game/skip-hirers';
 import type { PanelKit } from './eighties-controls';
@@ -337,6 +338,59 @@ export function createSkip(kit: PanelKit, hirer = anySkipHirer()) {
     group.add(panel);
   }
   return { group, shape: SKIP_SHAPE, footprint: { x: LONG, z: WIDE } };
+}
+
+const graffitiMaterials = new WeakMap<
+  PanelKit,
+  Map<string, MeshStandardMaterial>
+>();
+
+/** Spray a selected gallery tag on a skip's side, clear of its hire lettering. */
+export function addSkipGraffiti(
+  kit: PanelKit,
+  skip: Object3D,
+  tags: readonly GraffitiTag[],
+) {
+  let materials = graffitiMaterials.get(kit);
+  if (!materials) graffitiMaterials.set(kit, (materials = new Map()));
+  const fitted = tags.map((tag) => {
+    let material = materials.get(tag.art.id);
+    if (!material) {
+      material = new MeshStandardMaterial({
+        map: graffitiTexture(tag.art),
+        transparent: true,
+        side: DoubleSide,
+        depthWrite: false,
+        roughness: 0.85,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+      });
+      materials.set(tag.art.id, material);
+      kit.materials.push(material);
+    }
+    const mesh = new Mesh(
+      new PlaneGeometry(tag.size * GRAFFITI_ASPECT, tag.size),
+      material,
+    );
+    mesh.name = `Skip graffiti ${tag.art.title}`;
+    mesh.position.set(
+      tag.side * 0.59,
+      0.47,
+      (tag.face === 'front' ? 1 : -1) * (WIDE / 2 + 0.007),
+    );
+    if (tag.face === 'back') mesh.rotation.y = Math.PI;
+    mesh.rotateZ(tag.angle);
+    skip.add(mesh);
+    return mesh;
+  });
+  return {
+    dispose() {
+      for (const mesh of fitted) {
+        mesh.removeFromParent();
+        mesh.geometry.dispose();
+      }
+    },
+  };
 }
 
 /**

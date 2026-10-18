@@ -39,7 +39,12 @@ import {
 } from '../scene/eighties-controls';
 import { createPortals } from '../scene/portals';
 import { turningKnob } from '../scene/rotary-knob';
-import { addSkipLamps, createSkip, letterSkip } from '../scene/skip';
+import {
+  addSkipGraffiti,
+  addSkipLamps,
+  createSkip,
+  letterSkip,
+} from '../scene/skip';
 import { createBinTossing } from './bin-tossing';
 import type { TossBin } from './bin-tossing';
 import { createFirstPerson } from './first-person';
@@ -221,6 +226,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     plan: Footprint;
     bin: TossBin;
     lamps: ReturnType<typeof addSkipLamps>;
+    graffiti: ReturnType<typeof addSkipGraffiti>;
   })[] = [];
   const plinthPlan = {
     minX: PLINTH.x - PLINTH.w / 2,
@@ -299,9 +305,19 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
           z,
         });
         contents.set(bin, []);
-        // Some have amber lamps clamped to their rails, flashing.
-        const lamps = addSkipLamps(kit, group, dressSkip().lamps);
-        skips.push({ id, born: born++, group, box, plan, bin, lamps });
+        const dressing = dressSkip();
+        const graffiti = addSkipGraffiti(kit, group, dressing.tags);
+        const lamps = addSkipLamps(kit, group, dressing.lamps);
+        skips.push({
+          id,
+          born: born++,
+          group,
+          box,
+          plan,
+          bin,
+          lamps,
+          graffiti,
+        });
         return true;
       }
     return false;
@@ -459,6 +475,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
       skips.splice(at, 1);
       tossing.remove(skip.bin);
       skip.lamps.dispose();
+      skip.graffiti.dispose();
       // What was thrown in it goes with it.
       for (const object of contents.get(skip.bin) ?? []) {
         object.removeFromParent();
@@ -482,6 +499,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
     spawnButton.remove();
     for (const skip of skips) {
       skip.lamps.dispose();
+      skip.graffiti.dispose();
       room.remove(skip.group);
     }
     room.add(model.group);

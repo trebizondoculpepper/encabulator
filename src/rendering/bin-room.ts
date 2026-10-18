@@ -30,7 +30,7 @@ import {
   disposeKit,
   kitPaint,
 } from '../scene/eighties-controls';
-import { addSkipLamps, createSkip } from '../scene/skip';
+import { addSkipGraffiti, addSkipLamps, createSkip } from '../scene/skip';
 import { createPortals } from '../scene/portals';
 import { knobDirection } from '../scene/rotary-knob';
 import { createBinTossing } from './bin-tossing';
@@ -147,8 +147,9 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   const tossing = createBinTossing({ camera, metre: m, random });
   const skip = tossing.add({ name: 'skip', ...createSkip(kit), x: 0, z: 0 });
   room.add(skip.group);
-  // Perhaps amber lamps clamped to its rails, flashing.
-  const lamps = addSkipLamps(kit, skip.group, dressSkip().lamps);
+  const dressing = dressSkip(random);
+  const graffiti = addSkipGraffiti(kit, skip.group, dressing.tags);
+  const lamps = addSkipLamps(kit, skip.group, dressing.lamps);
   const light = new SpotLight('#fff3e2', 16 * m * m, 0, 0.42, 0.6, 2);
   light.position.set(0, (CEILING - 0.1) * m, 0.8 * m);
   light.target.position.set(0, 0.4 * m, 0);
@@ -369,6 +370,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     portals.dispose();
     parts.dispose();
     lamps.dispose();
+    graffiti.dispose();
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
     renderer.dispose();

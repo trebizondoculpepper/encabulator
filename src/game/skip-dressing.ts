@@ -7,8 +7,11 @@
  * every skip has either: each is chosen at random. Pure logic.
  */
 
-/** A face of a skip: its two long sides, and its two sloping ends. */
-export type SkipFace = 'front' | 'back' | 'left' | 'right';
+import { GRAFFITI } from './graffiti';
+import type { GraffitiPiece } from './graffiti';
+
+/** The skip's two long sides, clear of the hire firm's name. */
+export type SkipFace = 'front' | 'back';
 /** A corner of its top rail, by its end (-1 left, 1 right) and side. */
 export interface SkipCorner {
   end: -1 | 1;
@@ -17,16 +20,12 @@ export interface SkipCorner {
 
 export interface GraffitiTag {
   face: SkipFace;
-  /** Across the face, -1 to 1, and up it, 0 (bottom) to 1 (top). */
-  u: number;
-  v: number;
-  text: string;
-  colour: string;
-  /** Letter height, metres, and slant, radians. */
+  /** Sign: left or right of the hire firm's middle panel. */
+  side: -1 | 1;
+  /** Height of the sprayed image, metres. */
   size: number;
   angle: number;
-  /** Whether it is outlined in a second colour. */
-  outline: string | null;
+  art: GraffitiPiece;
 }
 
 export interface SkipLamp extends SkipCorner {
@@ -40,66 +39,32 @@ export interface SkipDressing {
 }
 
 /** How often a skip has graffiti, and lamps. */
-export const GRAFFITI_CHANCE = 0.7;
-export const LAMP_CHANCE = 0.4;
+export const GRAFFITI_CHANCE = 0.6;
+export const LAMP_CHANCE = 0.5;
 /** A skip lamp flashes once a second, briefly. */
 export const FLASH_SECONDS = 1;
 export const FLASH_ON = 0.18;
 
-export const SPRAY_COLOURS = [
-  '#e8306b',
-  '#2fd0e0',
-  '#f5e23a',
-  '#7ee04a',
-  '#f5f5f5',
-  '#1a1a1a',
-  '#8b5cf6',
-  '#ff7a1a',
-];
-export const TAG_WORDS = [
-  'ZOK',
-  'KRAK',
-  'OI',
-  'NOPE',
-  'DAZ',
-  'BOSH',
-  'SKUD',
-  'WOT',
-  'KEV',
-  'GRIM',
-  'X',
-  '2 COOL',
-];
+const TAG_ART = GRAFFITI.filter((art) => art.kind === 'tag');
 
 const pick = <T>(list: readonly T[], random: () => number) =>
   list[Math.floor(random() * list.length)];
 
 /**
- * A skip's dressing at random: perhaps a few tags, sprayed on its long
- * sides either side of the hire firm's name and low on its ends below
- * the marker boards; perhaps lamps, on two or all four corners.
+ * A skip's dressing at random: one tag beside the hire firm's name on
+ * one long side, perhaps lamps on two or all four corners. The two
+ * probabilities are independent.
  */
 export function dressSkip(random: () => number = Math.random): SkipDressing {
   const tags: GraffitiTag[] = [];
   if (random() < GRAFFITI_CHANCE) {
-    const count = 1 + Math.floor(random() * 4);
-    for (let i = 0; i < count; i++) {
-      const face = pick(['front', 'back', 'left', 'right'] as const, random);
-      const end = face === 'left' || face === 'right';
-      tags.push({
-        face,
-        // On a side, clear of the firm's name in the middle panel.
-        u: end
-          ? (random() * 2 - 1) * 0.55
-          : (random() < 0.5 ? -1 : 1) * (0.5 + random() * 0.35),
-        v: end ? 0.12 + random() * 0.25 : 0.2 + random() * 0.6,
-        text: pick(TAG_WORDS, random),
-        colour: pick(SPRAY_COLOURS, random),
-        size: 0.09 + random() * 0.09,
-        angle: (random() - 0.6) * 0.5,
-        outline: random() < 0.5 ? pick(SPRAY_COLOURS, random) : null,
-      });
-    }
+    tags.push({
+      face: random() < 0.5 ? 'front' : 'back',
+      side: random() < 0.5 ? -1 : 1,
+      size: 0.22 + random() * 0.08,
+      angle: (random() - 0.5) * 0.25,
+      art: pick(TAG_ART, random),
+    });
   }
   const lamps: SkipLamp[] = [];
   if (random() < LAMP_CHANCE) {
