@@ -249,6 +249,21 @@ export function createLevel0Dresser(
           top - 0.36,
           1.2,
         );
+        // Its lamp: lit red while the interlock locks the disconnect open
+        // (the key out), fed from the incoming side so that it still shows
+        // with the disconnect open; push to test.
+        place(
+          pilotLight(kit, {
+            name: 'Kirk key locked lamp',
+            colour: 'red',
+            drive: computed(() => !p.control.kirk.value),
+            power: computed(() => machine.value?.supply.value ?? false),
+          }),
+          cx - 0.01,
+          top - 0.36,
+          0.8,
+        );
+        legend('ILLUMINATED IF LOCKED', cx - 0.01, top - 0.33, 0.085);
         caption(
           'KIRK KEY INTERLOCK\nIN = CLOSE PERMITTED',
           cx - 0.1,

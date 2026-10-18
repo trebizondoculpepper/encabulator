@@ -469,6 +469,8 @@ export function pilotLight(
   }
   a.updates.push((delta) => {
     lamp.step(delta);
+    // Whether it is lit, for a reader of the scene (a test, say).
+    a.object.userData.lit = lamp.lit.value;
     view.set(lamp.lit.value);
     view.update(delta);
     if (offView) {

@@ -223,11 +223,25 @@ describe('Level 0 machine wiring', () => {
     // Incoming only: MAIN INCOMING's meters and the station battery.
     expect(mcc.circuits.get(UNITS.incoming)!.powered.value).toBe(true);
     expect(plant.electrical.mains.value).toBe(false);
+    // Its lamp, fed from the incoming side, shows the interlock locked.
+    const locked = mcc.group.getObjectByName('Kirk key locked lamp')!;
+    const lamp = mcc.parts.uses.get(
+      [...mcc.parts.uses.keys()].find((o) => {
+        for (let x: Object3D | null = o; x; x = x.parent)
+          if (x === locked) return true;
+        return false;
+      })!,
+    );
+    expect(lamp).toBeDefined();
+    run(0.1);
+    expect(kirkLampLit(machine)).toBe(true);
     // The Kirk key out holds the main disconnect's handle open.
     const handle = mcc.circuits.get(UNITS.main)!.breaker!.handle!;
     expect(handle.operate()).toBe(false);
     expect(breaker(UNITS.main).position.value).toBe('off');
     plant.control.kirk.set(true);
+    run(0.1);
+    expect(kirkLampLit(machine)).toBe(false);
     expect(handle.operate()).toBe(true);
     run(1);
     expect(plant.electrical.mains.value).toBe(true);
@@ -538,4 +552,10 @@ function within(
       if (o.name === part) return true;
     return false;
   })!;
+}
+
+/** Whether the Kirk key's locked lamp is lit. */
+function kirkLampLit(machine: ReturnType<typeof createLevel0Machine>) {
+  return machine.mcc.group.getObjectByName('Kirk key locked lamp')!.userData
+    .lit as boolean;
 }
