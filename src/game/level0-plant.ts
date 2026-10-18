@@ -244,7 +244,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   // ---- Operator controls ---------------------------------------------------
   const control = {
     /** VFD-601 SPEED, detents 0 to 10. */
-    driveSpeed: g.input('drive.speed', 6, { where: 'VFD-601 SPEED knob' }),
+    driveSpeed: g.input('drive.speed', 0, { where: 'VFD-601 SPEED knob' }),
     /** The drive keypad's LOCAL (true) or REMOTE (PLC) control. */
     driveLocal: g.input('drive.local', true, {
       where: 'VFD-601 keypad ENTER',
@@ -260,12 +260,12 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     fanBoost: g.input('fan.boost', false, {
       where: 'PANENDERMIC FAN BOOST',
     }),
-    /** HYDRAULIC PUMP key: 0 LOCAL, 1 REMOTE. */
+    /** HYDRAULIC PUMP key: 0 LOCAL, 1 OFF, 2 REMOTE. */
     hydraulicKey: g.input('hydraulic.key', 1, {
-      where: 'HYDRAULIC PUMP LOCAL REMOTE key',
+      where: 'HYDRAULIC PUMP LOCAL OFF REMOTE key',
     }),
     /** FEED MOTOR: 0 HAND, 1 OFF, 2 AUTO. */
-    feedHoa: g.input('feed.hoa', 2, { where: 'FEED MOTOR HAND OFF AUTO' }),
+    feedHoa: g.input('feed.hoa', 1, { where: 'FEED MOTOR HAND OFF AUTO' }),
     /** PHASE TRIM, detents 0 to 12, 5° each about the middle. */
     phaseTrim: g.input<number>('phase.trim', PLANT.trimCentre, {
       where: 'PHASE REFERENCE PHASE TRIM knob',
@@ -275,19 +275,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       where: 'ENCABULATOR CONTROL DISPLAY selector',
     }),
     /** MODIAL INTERACTION chart drive: 0 STOP, 1 RUN. */
-    chartRun: g.input('chart.run', 1, { where: 'MODIAL CHART selector' }),
+    chartRun: g.input('chart.run', 0, { where: 'MODIAL CHART selector' }),
     /** RECIPROCATING DINGLE ARM: 0 OFF, 1 ON. */
     dingleEnable: g.input('dingle.enable', 0, {
       where: 'DINGLE ARM selector',
     }),
     /** AUXILIARY DRIVE SPEED, detents 0 to 10. */
-    auxSpeed: g.input('aux.speed', 5, { where: 'AUXILIARY DRIVE SPEED knob' }),
-    /** MAIN INCOMING AMMETER PHASE: 0 L1, 1 L2, 2 L3. */
-    ammeterPhase: g.input('incoming.ammeter', 1, {
+    auxSpeed: g.input('aux.speed', 0, { where: 'AUXILIARY DRIVE SPEED knob' }),
+    /** MAIN INCOMING AMMETER PHASE: 0 OFF (ammeter disconnected), 1 L1, 2 L2, 3 L3. */
+    ammeterPhase: g.input('incoming.ammeter', 0, {
       where: 'MAIN INCOMING AMMETER PHASE selector',
     }),
-    /** The main disconnect's Kirk key, in and turned (true). */
-    kirk: g.input('main.kirk', true, { where: 'MAIN DISCONNECT Kirk key' }),
+    /** The main disconnect's Kirk key, in and turned (true); it starts out. */
+    kirk: g.input('main.kirk', false, { where: 'MAIN DISCONNECT Kirk key' }),
     /** The PanelView's page, 1 to 8. */
     terminalPage: g.input('terminal.page', 1, {
       where: 'AUTOMATION CONTROL PanelView keys',
@@ -389,7 +389,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       control.dingleEnable,
     ],
     (key, out, inp, link, arm) =>
-      key === 0 || (out && inp && link && arm === 1),
+      key === 0 || (key === 2 && out && inp && link && arm === 1),
     { where: 'HYDRAULIC PUMP starter' },
   );
   const driveRemote = g.derive(
@@ -615,11 +615,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const eventLog = g.output('log.display', [s.events], (lines) => lines, {
     where: 'RECIPROCATING DINGLE ARM logger',
   });
-  /** The current in the phase MAIN INCOMING's AMMETER PHASE selects. */
+  /**
+   * The current in the phase MAIN INCOMING's AMMETER PHASE selects; none
+   * with it OFF, the ammeter disconnected.
+   */
   const phaseAmps = g.output(
     'supply.phaseAmps',
     [loadAmps, control.ammeterPhase],
-    (amps, phase) => amps * [1.02, 0.99, 1.03][phase],
+    (amps, phase) => amps * [0, 1.02, 0.99, 1.03][phase],
     { where: 'MAIN DISCONNECT power monitor' },
   );
   /** What each display has been set to show: nothing else depends on it. */

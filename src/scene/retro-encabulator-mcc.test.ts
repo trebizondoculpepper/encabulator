@@ -1036,7 +1036,7 @@ it('shows the Automation isolator green on, red off, and dark without upstream p
 
 it('lets Level 0 operate both pumps directly without lesson feed gates or forced faults', () => {
   const kit = createPanelKit();
-  const { mcc } = createLevel0Machine(kit);
+  const { mcc, plant } = createLevel0Machine(kit);
   const breaker = (id: string) =>
     mcc.components.find((device) => device.object.name === `${id}: breaker`)!
       .breaker!;
@@ -1045,6 +1045,8 @@ it('lets Level 0 operate both pumps directly without lesson feed gates or forced
   expect(breaker('section3.bucket1').closed.value).toBe(false);
   expect(breaker('section7.bucket2').closed.value).toBe(false);
   isolate(mcc);
+  // Level 0's Kirk key starts out; turn it in to close the main disconnect.
+  plant.control.kirk.set(true);
   breaker('section1.bucket2').operate();
   mcc.update(3);
   for (const id of ['section3.bucket1', 'section7.bucket2']) {

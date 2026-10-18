@@ -202,13 +202,15 @@ export function createLevel0Dresser(
         }
         caption('LINE VOLTS', cx - 0.07, -0.085);
         place(
-          selector(kit, { positions: 3, bound: p.control.ammeterPhase }),
+          // An ammeter selector switch's four positions: OFF disconnects
+          // the ammeter.
+          selector(kit, { positions: 4, bound: p.control.ammeterPhase }),
           cx + 0.13,
           -0.03,
           0.9,
         );
         legend('AMMETER PHASE', cx + 0.13, 0.005, 0.075);
-        caption('L1   L2   L3', cx + 0.13, -0.07);
+        caption('OFF  L1  L2  L3', cx + 0.13, -0.075);
         return true;
       }
       case 'main': {
@@ -488,7 +490,7 @@ export function createLevel0Dresser(
       case 'small-key': {
         place(
           selector(kit, {
-            positions: 2,
+            positions: 3,
             key: true,
             bound: p.control.hydraulicKey,
           }),
@@ -496,7 +498,7 @@ export function createLevel0Dresser(
           -0.04,
           0.8,
         );
-        legend('LOCAL REMOTE', cx - 0.11, -0.01, 0.06);
+        legend('LOCAL OFF REMOTE', cx - 0.11, -0.01, 0.07);
         caption('REMOTE: RUNS FOR ARM', cx - 0.11, -0.08);
         lamp('amber', cx - 0.02, -0.05, circuit.running, 'RUN');
         lamp('green', cx + 0.05, -0.05, p.hydraulicOk, 'PRESSURE');
@@ -1068,7 +1070,7 @@ export function terminalLines(
         `HYDRAULIC ${analog(p.state.hydraulic.value, 0)} PSI`,
         `HYDRO FLOW ${analog(p.state.flow.value * 100, 0)}%`,
         `FEED HOA ${['HAND', 'OFF', 'AUTO'][p.control.feedHoa.value]} ${p.feedDemand.value ? 'RUN' : 'STOP'}`,
-        `HYD KEY ${p.control.hydraulicKey.value ? 'REMOTE' : 'LOCAL'}`,
+        `HYD KEY ${['LOCAL', 'OFF', 'REMOTE'][p.control.hydraulicKey.value]}`,
       ];
     case 6:
       return [

@@ -41,6 +41,8 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
+// Whole machines run for minutes of simulated time.
+vi.setConfig({ testTimeout: 30_000 });
 
 function sandbox() {
   const kit = createPanelKit();
@@ -53,10 +55,31 @@ function sandbox() {
     for (let t = 0; t < seconds - 1e-9; t += dt) machine.update(dt);
   };
   /** The incoming isolator and the main disconnect on, and the lube pump. */
+  /**
+   * Start the machine by hand, as a player would: the isolator, the Kirk
+   * key, the main disconnect, every unit's breaker but the hydrocoptic
+   * pump's, START on each motor that has one, and its knobs and selectors
+   * set to run.
+   */
   const powerUp = () => {
     isolate(machine);
+    const { control } = machine.plant;
+    control.kirk.set(true);
     breaker(UNITS.main).operate();
-    breaker(UNITS.lube).operate();
+    for (const [id, unit] of machine.mcc.circuits)
+      if (
+        ![UNITS.incoming, UNITS.main, UNITS.hydro].includes(id as never) &&
+        unit.breaker?.breaker?.position.value === 'off'
+      )
+        unit.breaker.breaker.operate();
+    for (const id of [UNITS.mainMotor, UNITS.cooling, UNITS.auxMotor])
+      machine.mcc.circuits.get(id)!.start();
+    control.feedHoa.set(2);
+    control.hydraulicKey.set(2);
+    control.driveSpeed.set(6);
+    control.auxSpeed.set(5);
+    control.chartRun.set(1);
+    control.ammeterPhase.set(2);
     run(20);
   };
   const dispose = () => {
@@ -153,6 +176,90 @@ describe('Level 0 machine wiring', () => {
       expect(inputsOn(machine, unit).length, unit).toBeGreaterThan(0);
     // The spare space is a blank plate, and needs none.
     expect(inputsOn(machine, 'SPARE SPACE')).toHaveLength(0);
+    dispose();
+  });
+
+  it('starts a fresh room with every machine switch and selector off', () => {
+    const { machine, run, dispose } = sandbox();
+    const { plant, mcc } = machine;
+    expect(mcc.supply.value).toBe(false);
+    for (const [id, unit] of mcc.circuits) {
+      const position = unit.breaker?.breaker?.position.value;
+      // MAIN INCOMING's sealed breaker is protection, never operated.
+      if (position)
+        expect(position, id).toBe(id === UNITS.incoming ? 'on' : 'off');
+    }
+    const { control } = plant;
+    expect(control.kirk.value).toBe(false);
+    expect(control.feedHoa.value).toBe(1);
+    expect(control.hydraulicKey.value).toBe(1);
+    expect(control.ammeterPhase.value).toBe(0);
+    expect(control.fanMode.value).toBe(1);
+    expect(control.fanBoost.value).toBe(false);
+    expect(control.dingleEnable.value).toBe(0);
+    expect(control.chartRun.value).toBe(0);
+    expect(control.driveSpeed.value).toBe(0);
+    expect(control.auxSpeed.value).toBe(0);
+    // Released, healthy and silent.
+    expect(control.driveLocal.value).toBe(true);
+    for (const unit of mcc.circuits.values()) {
+      expect(unit.emergency.value).toBe(false);
+      expect(unit.running.value).toBe(false);
+    }
+    expect(
+      mcc.components.some((d) => d.faulted.value && d.kind !== 'rack-unit'),
+    ).toBe(false);
+    run(5);
+    expect(plant.plcStatus.value).toBe('off');
+    expect(plant.loadAmps.value).toBe(0);
+    dispose();
+  });
+
+  it('powers up only what each switch reaches, from the isolator to each module', () => {
+    const { machine, breaker, run, dispose } = sandbox();
+    const { plant, mcc } = machine;
+    isolate(machine);
+    run(1);
+    // Incoming only: MAIN INCOMING's meters and the station battery.
+    expect(mcc.circuits.get(UNITS.incoming)!.powered.value).toBe(true);
+    expect(plant.electrical.mains.value).toBe(false);
+    // The Kirk key out holds the main disconnect's handle open.
+    const handle = mcc.circuits.get(UNITS.main)!.breaker!.handle!;
+    expect(handle.operate()).toBe(false);
+    expect(breaker(UNITS.main).position.value).toBe('off');
+    plant.control.kirk.set(true);
+    expect(handle.operate()).toBe(true);
+    run(1);
+    expect(plant.electrical.mains.value).toBe(true);
+    // Each unit still waits for its own switch.
+    expect(plant.plcStatus.value).toBe('off');
+    expect(mcc.circuits.get(UNITS.lube)!.running.value).toBe(false);
+    breaker(UNITS.automation).operate();
+    run(0.2);
+    expect(plant.plcStatus.value).toBe('booting');
+    run(PLANT.plcBoot + 0.5);
+    expect(plant.plcStatus.value).toBe('run');
+    breaker(UNITS.lube).operate();
+    run(5);
+    expect(plant.oilOk.value).toBe(true);
+    // The main drive motor has power and oil, and waits for START.
+    breaker(UNITS.mainMotor).operate();
+    run(1);
+    expect(mcc.circuits.get(UNITS.mainMotor)!.running.value).toBe(false);
+    mcc.circuits.get(UNITS.mainMotor)!.start();
+    run(1);
+    expect(mcc.circuits.get(UNITS.mainMotor)!.running.value).toBe(true);
+    // The hydraulic pump's key: OFF holds it, LOCAL runs it.
+    breaker(UNITS.hydraulic).operate();
+    run(1);
+    expect(mcc.circuits.get(UNITS.hydraulic)!.running.value).toBe(false);
+    plant.control.hydraulicKey.set(0);
+    run(1);
+    expect(mcc.circuits.get(UNITS.hydraulic)!.running.value).toBe(true);
+    // The ammeter reads nothing until a phase is selected.
+    expect(plant.phaseAmps.value).toBe(0);
+    plant.control.ammeterPhase.set(1);
+    expect(plant.phaseAmps.value).toBeGreaterThan(0);
     dispose();
   });
 

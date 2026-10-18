@@ -20,6 +20,12 @@ import { createSmokeEmitter } from '../toolkit/components/core/views/smoke-emitt
 import type { MachineDevice } from '../toolkit/components/industrial-control/parts/machine-components';
 import type { PortableObject } from '../toolkit/controls/input/object-handling';
 
+/** Starters with their own START and STOP: stopped until START. */
+const STARTED_UNITS = [UNITS.mainMotor, UNITS.cooling, UNITS.auxMotor] as const;
+const STARTED: Record<string, true> = Object.fromEntries(
+  STARTED_UNITS.map((id) => [id, true]),
+);
+
 const portableOf = (device: MachineDevice) =>
   (device.object.userData.portable as PortableObject | undefined)?.component;
 
@@ -91,9 +97,16 @@ export function createLevel0Machine(
   ref.value = mcc;
   const circuit = (id: string) => mcc.circuits.get(id)!;
   const breaker = (id: string) => circuit(id).breaker!.breaker!;
-  // Level 2's initial switch positions: both pumps off.
-  breaker(UNITS.lube).position.set('off');
-  breaker(UNITS.hydro).position.set('off');
+  // A fresh machine starts with everything off, set once here so that a
+  // retained room keeps whatever the player has done since: every unit's
+  // breaker open, however it is worked, except MAIN INCOMING's, sealed
+  // behind its cover and never operated; and every starter with its own
+  // START button stopped, to wait for it. Emergency stops stay released,
+  // protective devices healthy.
+  for (const [id, unit] of mcc.circuits) {
+    if (id !== UNITS.incoming) unit.breaker?.breaker?.position.set('off');
+    if (STARTED[id as (typeof STARTED_UNITS)[number]]) unit.stop();
+  }
   const automation = breaker(UNITS.automation);
   const driveBreaker = breaker(UNITS.vfd);
   const assembly = circuit(UNITS.automation).devices.find(
