@@ -651,6 +651,8 @@ export interface CabinetOptions {
   feet?: 'plinth' | 'castors' | 'levellers';
   /** The door posed open. */
   doorOpen?: boolean;
+  /** A glass door's tint: blue-green, or dark smoked perspex. */
+  glass?: 'tinted' | 'smoke';
 }
 
 export interface CabinetView {
@@ -660,6 +662,18 @@ export interface CabinetView {
   depth: number;
   /** Fit a unit with its bottom at rack unit `at`, counting from 1 at the bottom. */
   mount(unit: RackUnitView, at: number): void;
+  /**
+   * Its door, for a part to work: the hinge to swing (open about -1.9),
+   * the swing handle and lock, the leaf's width and the height of its
+   * middle. Null without a door.
+   */
+  door: {
+    hinge: Group;
+    handle: Object3D;
+    lock: Object3D;
+    width: number;
+    middle: number;
+  } | null;
 }
 
 /**
@@ -697,6 +711,7 @@ export function createRackCabinet(
     header = true,
     feet = 'levellers',
     doorOpen = false,
+    glass: tint = 'tinted',
   } = options;
   const group = new Group();
   group.name = `${units}U ${brand} cabinet`;
@@ -902,6 +917,7 @@ export function createRackCabinet(
   } else box(group, width, HEADER, 0.02, paint, 0, top + HEADER / 2, 0);
   // The door.
   let doorLeaf: Object3D;
+  let doorParts: CabinetView['door'] = null;
   const hinge = new Group();
   hinge.position.set(-width / 2 + 0.01, 0, 0.022);
   group.add(hinge);
@@ -911,9 +927,9 @@ export function createRackCabinet(
     const y = bottom + bay / 2;
     if (door === 'glass') {
       const glass = createPs1Material({
-        color: '#4f6a72',
+        color: tint === 'smoke' ? '#1e2326' : '#4f6a72',
         transparent: true,
-        opacity: 0.35,
+        opacity: tint === 'smoke' ? 0.55 : 0.35,
         side: DoubleSide,
       });
       kit.materials.push(glass);
@@ -936,15 +952,19 @@ export function createRackCabinet(
     } else doorLeaf = box(hinge, w, h, 0.012, paint, w / 2, y, 0);
     doorLeaf.name = 'Cabinet door';
     // The swing handle and its lock.
-    box(hinge, 0.025, 0.14, 0.02, black, w - 0.04, y, 0.014);
-    add(
+    const handle = box(hinge, 0.025, 0.14, 0.02, black, w - 0.04, y, 0.014);
+    handle.name = 'Cabinet door handle';
+    const lock = add(
       hinge,
       new CylinderGeometry(0.007, 0.007, 0.006, 10),
       kitPaint(kit, '#c3c6c7', 0.7),
       w - 0.04,
       y + 0.09,
       0.014,
-    ).rotation.x = Math.PI / 2;
+    );
+    lock.rotation.x = Math.PI / 2;
+    lock.name = 'Cabinet door lock';
+    doorParts = { hinge, handle, lock, width: w, middle: y };
   }
   hinge.rotation.y = doorOpen ? -1.9 : 0;
   return {
@@ -956,6 +976,7 @@ export function createRackCabinet(
       unit.group.position.set(0, bottom + (at - 1) * U, railZ + 0.002);
       group.add(unit.group);
     },
+    door: doorParts,
   };
 }
 

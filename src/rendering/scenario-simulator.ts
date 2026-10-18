@@ -1,0 +1,230 @@
+import { computed, signal } from '@preact/signals-core';
+import { Group } from 'three';
+import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
+import {
+  createMicroLabel,
+  kitPaint,
+} from '../toolkit/components/core/views/eighties-controls';
+import {
+  createPartSet,
+  doorLatch,
+  keySwitch,
+  pushButton,
+} from '../toolkit/components/core/parts/parts';
+import type { OperatorColour } from '../toolkit/components/industrial-control/views/industrial-controls';
+import {
+  createRackCabinet,
+  createRackUnit,
+} from '../toolkit/components/industrial-control/views/rack-equipment';
+import type { Level0Scenarios } from './level0-scenarios';
+
+/** The cabinet, metres: a 42U rack, 600 mm wide and 800 mm deep. */
+const UNITS = 42;
+const WIDTH = 0.6;
+const DEPTH = 0.8;
+/** The control panel's bottom, in rack units: its 4U middle at about 1.52 m. */
+const PANEL_AT = 32;
+/** Half the cabinet's widest extent, for walking round it. */
+export const SIMULATOR_HALF = 0.5;
+
+const BUTTONS: readonly {
+  legend: string;
+  colour: OperatorColour;
+  act:
+    | 'fullOff'
+    | 'fullOn'
+    | 'slowStart'
+    | 'reset'
+    | 'hiccup'
+    | 'glitch'
+    | 'kaput';
+}[] = [
+  { legend: 'FULL OFF', colour: 'red', act: 'fullOff' },
+  { legend: 'FULL ON', colour: 'green', act: 'fullOn' },
+  { legend: 'SLOW START', colour: 'white', act: 'slowStart' },
+  { legend: 'RESET', colour: 'blue', act: 'reset' },
+  { legend: 'HICCUP', colour: 'amber', act: 'hiccup' },
+  { legend: 'GLITCH', colour: 'amber', act: 'glitch' },
+  { legend: 'KAPUT', colour: 'red', act: 'kaput' },
+];
+
+/**
+ * The Hyperplasc Scenario Simulator, by Neumann Dynamik: a modern 42U
+ * rack cabinet, built as the dev3 gallery's are, behind a smoked perspex
+ * door marked AUTHORISED PERSONNEL ONLY and locked with its key left in
+ * the lock. Inside, at eye level, a 4U panel of TESTING SCENARIOS push
+ * buttons sets the machine's state (`src/rendering/level0-scenarios.ts`);
+ * the rest of the rack is the simulator's own equipment. Its controls
+ * can be seen through the door but worked only with it open. Front faces
+ * +z; metres; its origin on the floor under the middle of its front.
+ */
+export function createScenarioSimulator(
+  kit: PanelKit,
+  scenarios: Level0Scenarios,
+) {
+  const group = new Group();
+  group.name = 'Hyperplasc Scenario Simulator';
+  const parts = createPartSet();
+  const cabinet = createRackCabinet(kit, {
+    units: UNITS,
+    width: WIDTH,
+    depth: DEPTH,
+    colour: 'black',
+    brand: 'neumann-dynamik',
+    door: 'glass',
+    glass: 'smoke',
+    feet: 'levellers',
+  });
+  group.add(cabinet.group);
+  // The simulator's own equipment, round its control panel.
+  const fill: [number, Parameters<typeof createRackUnit>[1]][] = [
+    [40, { u: 2, style: 'vented', colour: 'black' }],
+    [
+      37,
+      {
+        u: 3,
+        style: 'display',
+        colour: 'black',
+        label: 'HYPERPLASC SCENARIO SIMULATOR',
+      },
+    ],
+    [36, { u: 1, style: 'patch', colour: 'black' }],
+    [28, { u: 4, style: 'drives', colour: 'black', label: 'SCENARIO STORE' }],
+    [24, { u: 4, style: 'fans', colour: 'black' }],
+    [20, { u: 4, style: 'handles', colour: 'black', label: 'HYPERPLASC CORE' }],
+    [16, { u: 4, style: 'handles', colour: 'black', label: 'HYPERPLASC CORE' }],
+    [12, { u: 4, style: 'vented', colour: 'black' }],
+    [4, { u: 8, style: 'blank', colour: 'black' }],
+    [
+      1,
+      { u: 3, style: 'handles', colour: 'black', label: 'POWER DISTRIBUTION' },
+    ],
+  ];
+  for (const [at, options] of fill)
+    cabinet.mount(createRackUnit(kit, options), at);
+
+  // The control panel, at eye level: TESTING SCENARIOS.
+  const panel = createRackUnit(kit, {
+    u: 4,
+    style: 'blank',
+    colour: 'charcoal',
+    label: 'TESTING SCENARIOS',
+  });
+  cabinet.mount(panel, PANEL_AT);
+  const controls = new Group();
+  controls.name = 'Testing scenario controls';
+  panel.face.add(controls);
+  const title = createMicroLabel(kit, 'TESTING SCENARIOS', {
+    height: 0.009,
+    ink: '#e9edf0',
+  });
+  title.position.set(0, 0.075, 0.002);
+  panel.face.add(title);
+  const columns = 4;
+  BUTTONS.forEach((spec, i) => {
+    const button = parts.add(
+      pushButton(kit, {
+        colour: spec.colour,
+        legend: spec.legend,
+        action: () => scenarios[spec.act](),
+      }),
+    );
+    button.object.position.set(
+      -0.165 + (i % columns) * 0.11,
+      0.035 - Math.floor(i / columns) * 0.075,
+      0.002,
+    );
+    button.object.scale.setScalar(0.8);
+    controls.add(button.object);
+  });
+
+  // The door: smoked perspex, its swing handle, and its key in its lock.
+  const door = cabinet.door!;
+  const sign = (
+    text: string,
+    height: number,
+    ink: string,
+    plate: string,
+    y: number,
+  ) => {
+    const label = createMicroLabel(kit, text, { height, ink, plate });
+    label.position.set(door.width / 2, y, 0.012);
+    door.hinge.add(label);
+  };
+  sign(
+    'HYPERPLASC SCENARIO SIMULATOR',
+    0.02,
+    '#e9edf0',
+    '#1d1e20',
+    door.middle + 0.86,
+  );
+  sign(
+    'AUTHORISED PERSONNEL ONLY',
+    0.018,
+    '#151515',
+    '#f2c418',
+    door.middle - 0.2,
+  );
+  const unlocked = signal(false);
+  const key = parts.add(
+    keySwitch(kit, {
+      name: 'Scenario simulator lock',
+      bound: {
+        get value() {
+          return unlocked.value;
+        },
+        set: (value: boolean) => (unlocked.value = value),
+      },
+    }),
+  );
+  door.lock.visible = false;
+  key.object.position.copy(door.lock.position);
+  key.object.position.z = 0.012;
+  key.object.scale.setScalar(0.8);
+  door.hinge.add(key.object);
+  const open = signal(false);
+  // The door's latch works through its swing handle; locked, a shut door
+  // refuses it; an open one always shuts.
+  const latch = doorLatch(kit, {
+    name: 'Scenario simulator door',
+    material: kitPaint(kit, '#18191a'),
+    latch: computed(() => !unlocked.value && !open.value),
+    bound: {
+      get value() {
+        return open.value;
+      },
+      set: (value: boolean) => (open.value = value),
+    },
+  });
+  latch.object.visible = false;
+  latch.object.position.copy(door.handle.position);
+  door.hinge.add(latch.object);
+  const work = [...latch.uses.values()][0];
+  parts.add({ ...latch, uses: new Map([[door.handle, work]]) });
+
+  // Its controls take clicks only with the door open (or swinging).
+  let angle = 0;
+  controls.raycast = () => (open.value || angle < -0.001 ? undefined : false);
+  return {
+    group,
+    parts,
+    /** Whether its door is open. */
+    get open() {
+      return open.value;
+    },
+    unlock(on = true) {
+      unlocked.value = on;
+    },
+    update(delta: number) {
+      parts.update(delta);
+      scenarios.update(delta);
+      const target = open.value ? -1.9 : 0;
+      angle += (target - angle) * Math.min(1, delta * 6);
+      if (Math.abs(angle - target) < 0.001) angle = target;
+      door.hinge.rotation.y = angle;
+    },
+    dispose() {
+      parts.dispose();
+    },
+  };
+}

@@ -1343,11 +1343,11 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     'CARDINAL GRAMMETER CALIBRATE',
   );
   /**
-   * The cheat console's RESET: clear the faults no component holds itself,
+   * The scenario simulator's RESET: clear the faults no component holds itself,
    * the drive's latched fault, the PLC's halt and the grammeter's drift.
    */
   const clearFaults = g.action(
-    'cheat.clearFaults',
+    'scenario.clearFaults',
     [],
     [s.vfdFault, s.plcHalt, s.gramZero, s.gramSpan],
     () => {
@@ -1356,7 +1356,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.gramZero.set(0);
       s.gramSpan.set(0);
     },
-    'CHEATS RESET',
+    'SCENARIO SIMULATOR RESET',
   );
   const countReset = g.action(
     'semiboloid.reset',

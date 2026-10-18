@@ -11,7 +11,8 @@ const STARTED = [UNITS.mainMotor, UNITS.cooling, UNITS.auxMotor];
 export const SLOW_START_STEP_SECONDS = 2.5;
 
 /**
- * What the cheat console does to Level 0's machine. Each works the
+ * The testing scenarios the Hyperplasc Scenario Simulator sets Level 0's
+ * machine to. Each works the
  * machine's own switches, selectors and actions, as a player would, so
  * every boot, ramp, interlock and status light follows on as usual.
  *
@@ -21,7 +22,7 @@ export const SLOW_START_STEP_SECONDS = 2.5;
  * - SLOW START: FULL ON a step at a time, a unit every few seconds.
  * - HICCUP, GLITCH, KAPUT: failures (to be modelled in the plant next).
  */
-export function createLevel0Cheats(
+export function createLevel0Scenarios(
   machine: Level0Machine,
   random: () => number = Math.random,
 ) {
@@ -156,4 +157,4 @@ export function createLevel0Cheats(
   };
 }
 
-export type Level0Cheats = ReturnType<typeof createLevel0Cheats>;
+export type Level0Scenarios = ReturnType<typeof createLevel0Scenarios>;

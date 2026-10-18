@@ -1,3 +1,4 @@
+import { Raycaster } from 'three';
 import type { Object3D } from 'three';
 import {
   afterEach,
@@ -13,8 +14,11 @@ import {
   createPanelKit,
   disposeKit,
 } from '../toolkit/components/core/views/eighties-controls';
-import { createCheatConsole } from './cheat-console';
-import { SLOW_START_STEP_SECONDS, createLevel0Cheats } from './level0-cheats';
+import { createScenarioSimulator } from './scenario-simulator';
+import {
+  SLOW_START_STEP_SECONDS,
+  createLevel0Scenarios,
+} from './level0-scenarios';
 import { createLevel0Machine } from './level0-machine';
 
 beforeEach(() => {
@@ -45,8 +49,8 @@ vi.setConfig({ testTimeout: 30_000 });
 function sandbox() {
   const kit = createPanelKit();
   const machine = createLevel0Machine(kit, { random: () => 0.99 });
-  const cheats = createLevel0Cheats(machine, () => 0);
-  const panel = createCheatConsole(kit, cheats);
+  const cheats = createLevel0Scenarios(machine, () => 0);
+  const panel = createScenarioSimulator(kit, cheats);
   const run = (seconds: number, dt = 0.1) => {
     for (let t = 0; t < seconds - 1e-9; t += dt) {
       panel.update(dt);
@@ -63,42 +67,56 @@ function sandbox() {
 }
 
 /** The use of whatever is inside the part named `name` on the console. */
-function useOf(panel: ReturnType<typeof createCheatConsole>, name: string) {
+function useOf(
+  panel: ReturnType<typeof createScenarioSimulator>,
+  name: string,
+) {
   for (const [object, use] of panel.parts.uses)
     for (let o: Object3D | null = object; o; o = o.parent)
       if (o.name === name) return use;
   throw new Error(`No ${name}`);
 }
 
-describe('the cheat console', () => {
-  it('is locked with its key in it, and hides its buttons until opened', () => {
+describe('the Hyperplasc Scenario Simulator', () => {
+  it('is locked with its key in it, and its controls work only with the door open', () => {
     const { panel, run, dispose } = sandbox();
-    const inside = panel.group.getObjectByName('Cheat console buttons')!;
-    expect(inside.visible).toBe(false);
-    // Locked: the latch refuses.
-    useOf(panel, 'Cheat console door latch')();
+    const controls = panel.group.getObjectByName('Testing scenario controls')!;
+    // Returning false is how a hidden part stops the raycaster.
+    const takesClicks = () =>
+      (controls.raycast as (...args: unknown[]) => unknown)(
+        new Raycaster(),
+        [],
+      ) !== false;
+    expect(takesClicks()).toBe(false);
+    // Locked: the handle refuses.
+    panel.parts.uses.get(
+      panel.group.getObjectByName('Cabinet door handle')!,
+    )!();
     run(1);
     expect(panel.open).toBe(false);
-    expect(inside.visible).toBe(false);
-    // Turn the key, then the latch opens it.
-    useOf(panel, 'Cheat console lock')();
-    useOf(panel, 'Cheat console door latch')();
+    // Turn the key, then the handle opens it.
+    useOf(panel, 'Scenario simulator lock')();
+    panel.parts.uses.get(
+      panel.group.getObjectByName('Cabinet door handle')!,
+    )!();
     run(0.1);
     expect(panel.open).toBe(true);
-    expect(inside.visible).toBe(true);
-    // Shut again, its inside is hidden once the door has swung to.
-    useOf(panel, 'Cheat console door latch')();
-    run(0.05);
-    expect(inside.visible).toBe(true);
-    run(2);
-    expect(inside.visible).toBe(false);
+    expect(takesClicks()).toBe(true);
+    // Shut again, its controls take no clicks once it has swung to.
+    panel.parts.uses.get(
+      panel.group.getObjectByName('Cabinet door handle')!,
+    )!();
+    run(3);
+    expect(takesClicks()).toBe(false);
     dispose();
   });
 
   it('brings the machine fully on, and fully off again, with its buttons', () => {
     const { machine, panel, run, dispose } = sandbox();
     panel.unlock();
-    useOf(panel, 'Cheat console door latch')();
+    panel.parts.uses.get(
+      panel.group.getObjectByName('Cabinet door handle')!,
+    )!();
     run(0.5);
     useOf(panel, 'FULL ON push button')();
     run(40);
