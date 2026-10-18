@@ -12,9 +12,9 @@ const BOOT = recording(
 );
 
 /** Reusable workstation, including its own power control, boot and positional cue. */
-export function bbcWorkstation(kit: PanelKit) {
+export function bbcWorkstation(kit: PanelKit, importedConnectors = false) {
   const a = beginPart(kit, 'BBC Micro Model B');
-  const view = createBbcWorkstation(kit);
+  const view = createBbcWorkstation(kit, importedConnectors);
   const model = createBbcComputer();
   a.object.add(view.group);
   let seat = (_pose: {

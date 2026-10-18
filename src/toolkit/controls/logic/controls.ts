@@ -56,7 +56,7 @@ export const CONTROL_SCHEME: Record<
     gamepad: 'Triggers: zoom',
   },
   crouch: {
-    mouse: 'C or V: crouch, lower',
+    mouse: 'C / V: crouch / lower; again: stand',
     touch: 'Crouch button: crouch',
     gamepad: 'B: crouch',
   },

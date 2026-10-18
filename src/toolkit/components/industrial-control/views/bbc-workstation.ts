@@ -15,7 +15,10 @@ import { createCubMonitor } from './cub-monitor';
 import { createBbcDiskDrive } from './bbc-disk-drive';
 
 /** Original VX3 bench proportions and hardware placement, normalized to metres. */
-export function createBbcWorkstation(kit: PanelKit) {
+export function createBbcWorkstation(
+  kit: PanelKit,
+  importedConnectors = false,
+) {
   const group = new Group();
   group.name = 'BBC Micro workstation';
   const originalMetre = 4.35 / 0.4826;
@@ -112,32 +115,65 @@ export function createBbcWorkstation(kit: PanelKit) {
     group.add(wire);
   };
   const bx = bbc.group.position.x;
-  const rear = bbc.group.position.z - 0.174;
-  // Cords leave the rear connectors, clear the desk edge, then descend.
-  lead('BBC mains flex to floor power box', [
-    new Vector3(bx - 0.14, top + 0.035, rear),
-    new Vector3(bx - 0.14, top + 0.02, -0.28),
-    new Vector3(bx - 0.16, top - 0.04, -0.39),
-    new Vector3(bx - 0.17, 0.13, -0.4),
-    new Vector3(bx - 0.056, 0.071, -0.432),
-  ]);
-  lead('Cub monitor mains flex', [
-    new Vector3(bx + 0.11, top + 0.16, -0.4),
-    new Vector3(bx + 0.13, top + 0.04, -0.43),
-    new Vector3(bx + 0.12, 0.12, -0.45),
-    new Vector3(bx + 0.016, 0.071, -0.432),
-  ]);
+  const connector = (name: string, point: Vector3) => {
+    const at = point.clone().add(bbc.group.position);
+    const plug = new Mesh(
+      new BoxGeometry(0.016, 0.014, 0.024),
+      kitPaint(kit, '#242622'),
+    );
+    plug.name = name;
+    plug.position.copy(at).add(new Vector3(0, 0, -0.008));
+    group.add(plug);
+    return at.add(new Vector3(0, 0, -0.02));
+  };
+  const mainsBbc = connector(
+    'BBC rear mains connector',
+    importedConnectors
+      ? new Vector3(-0.184, 0.018, -0.174)
+      : new Vector3(-0.185, 0.045, -0.174),
+  );
+  const mainsCub = connector(
+    'Cub rear mains connector',
+    importedConnectors
+      ? new Vector3(0.11, 0.089, -0.381)
+      : new Vector3(0.11, 0.2, -0.411),
+  );
+  const rgbCub = connector(
+    'Cub rear RGB connector',
+    importedConnectors
+      ? new Vector3(0.118, 0.163, -0.398)
+      : new Vector3(-0.04, 0.23, -0.411),
+  );
+  const rgbBbc = connector(
+    'BBC rear RGB connector',
+    importedConnectors
+      ? new Vector3(0.148, 0.018, -0.184)
+      : new Vector3(0.03, 0.045, -0.174),
+  );
+  // Clear the actual rear edge before descending: curves must not disappear
+  // inside the desktop. Imported connectors have different measured positions.
+  for (const [name, start, x] of [
+    ['BBC mains flex to floor power box', mainsBbc, bx - 0.056],
+    ['Cub monitor mains flex', mainsCub, bx + 0.016],
+  ] as const) {
+    lead(name, [
+      start,
+      new Vector3(start.x, start.y, -0.44),
+      new Vector3(start.x, top - 0.06, -0.51),
+      new Vector3(x, 0.16, -0.52),
+      new Vector3(x, 0.071, -0.432),
+    ]);
+  }
   lead(
     'Cub RGB signal cable to BBC RGB socket',
     [
-      new Vector3(bx - 0.04, top + 0.18, -0.4),
-      new Vector3(bx - 0.12, top + 0.08, -0.43),
-      new Vector3(bx - 0.16, top + 0.025, -0.23),
-      new Vector3(bx + 0.03, top + 0.045, rear),
+      rgbCub,
+      new Vector3(rgbCub.x, rgbCub.y, -0.46),
+      new Vector3(rgbBbc.x + 0.04, rgbBbc.y, -0.46),
+      rgbBbc,
     ],
-    0.003,
+    0.0035,
   );
-  box(0.025, 0.018, 0.018, '#242622', bx + 0.03, top + 0.045, rear - 0.004);
   const powerBox = createWorkstationPowerBox(kit);
   powerBox.position.set(bx - 0.02, 0, -0.46);
   group.add(powerBox);

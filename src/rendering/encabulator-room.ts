@@ -43,7 +43,7 @@ import {
 /** Dev6 displays the credible electrical control system behind the fiction. */
 export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
-  const half = { x: 6, z: 5 };
+  const half = { x: 6, z: 6 };
   const bounds: Footprint = {
     minX: -half.x * m,
     maxX: half.x * m,
@@ -190,10 +190,17 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     lineup: { x: 0, z: 1.0 * m, yaw: 0, pitch: 0.05 },
     controls: { x: 0, z: -1.2 * m, yaw: 0, pitch: 0 },
     plc: { x: 0.7 * m, z: -1.9 * m, yaw: 0, pitch: 0 },
+    rearOverview: { x: 3 * m, z: -5.35 * m, yaw: -1.9, pitch: -0.1 },
+    rear: { x: 0, z: -5.35 * m, yaw: Math.PI, pitch: -0.18 },
+    service: { x: -0.05 * m, z: -5.3 * m, yaw: Math.PI, pitch: -0.18 },
     backs: { x: 3 * m, z: -1.2 * m, yaw: -0.857, pitch: -0.1 },
   };
   // Explicit development preview only; every ordinary start keeps doors closed.
   if (params.get('doors') === 'open') mcc.openAll(true);
+  if (import.meta.env.DEV && params.get('rear') === 'open')
+    for (const leaf of mcc.rear.doors) leaf.part.door.set(true);
+  if (import.meta.env.DEV && params.get('rear') === 'hidden')
+    mcc.rear.group.visible = false;
   const walk = createFirstPerson({
     canvas,
     camera,
@@ -252,8 +259,19 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     /** Click at (x, y) on the screen, -1 to 1 each way, as the player would. */
     click: (x: number, y: number) => use(x, y),
     doors: () => mcc.doorCount,
+    rearDoors: () =>
+      mcc.rear.doors.map((leaf) => ({
+        section: leaf.section,
+        open: leaf.part.door.state.value,
+      })),
+    rearDoor: (index: number) => mcc.rear.doors[index]?.part.door.flip(),
+    stats: () => ({
+      calls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+    }),
   };
   let last = 0;
+  let lastStats = 0;
   renderer.setAnimationLoop((time) => {
     if (canvas.parentElement?.hidden) {
       last = 0;
@@ -268,6 +286,11 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
     partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
     renderer.render(scene, camera);
+    if (import.meta.env.DEV && params.has('stats') && time - lastStats > 500) {
+      canvas.dataset.drawCalls = String(renderer.info.render.calls);
+      canvas.dataset.triangles = String(renderer.info.render.triangles);
+      lastStats = time;
+    }
   });
   const dispose = () => {
     renderer.setAnimationLoop(null);

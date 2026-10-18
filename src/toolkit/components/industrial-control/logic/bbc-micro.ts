@@ -32,7 +32,7 @@ export function createBbcComputer() {
     if (phase.value === 'loading')
       return [
         ...boot,
-        ['>*RUN DIAG', '#f2f2ee'],
+        ['>CHAIN "DIAG"', '#f2f2ee'],
         ['Loading diagnostics...', '#f2f2ee'],
       ];
     return [

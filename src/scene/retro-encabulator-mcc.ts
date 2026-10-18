@@ -1,3 +1,6 @@
+import { createCablePartition } from '../toolkit/components/industrial-control/views/cabinet-rear-fittings';
+import { createEncabulatorRear } from './encabulator-rear';
+import type { RearBucket } from './encabulator-rear';
 import { createScreenBoot } from '../toolkit/components/industrial-control/logic/screen-boot';
 import { drawBootScreen } from '../toolkit/components/industrial-control/views/boot-screen';
 import { machineTone } from '../toolkit/components/sound/audio/machine-tones';
@@ -385,6 +388,7 @@ export interface MccView {
   /** Sputter a stalled (or any running) machine back into life. */
   restart(): void;
   /** Each bucket's circuit, by bucket id (`section5.bucket1`). */
+  rear: ReturnType<typeof createEncabulatorRear>;
   circuits: ReadonlyMap<string, BucketCircuit>;
   /** Whether each opening unit's door is open, by bucket id. */
   doors: ReadonlyMap<string, Readable<boolean>>;
@@ -547,7 +551,10 @@ export function createRetroEncabulatorMcc(
     force(open: boolean): void;
     interior: Group;
     alwaysRender: boolean;
+    section: number;
+    centre: number;
   }[] = [];
+  const rearBuckets: RearBucket[] = [];
   const updates: ((delta: number, clock: number) => void)[] = [];
   const controls = new Map<string, { position: Readable<number> }>();
   const circuits = new Map<string, BucketCircuit>();
@@ -591,7 +598,7 @@ export function createRetroEncabulatorMcc(
   const wire = kitPaint(kit, '#32363a');
   const total = MCC_WIDTH;
   // Continuous structure and three-phase bus behind removable units.
-  box(lineup, liner, total, MCC_HEIGHT, 0.012, 0, MCC_HEIGHT / 2, -MCC_DEPTH);
+  // Individual rear panels replace the former continuous outer sheet.
   for (let phase = 0; phase < 3; phase++) {
     const y = MCC_HEIGHT - 0.24 - phase * 0.042;
     box(lineup, copper, total - 0.05, 0.018, 0.012, 0, y, -0.43);
@@ -656,16 +663,40 @@ export function createRetroEncabulatorMcc(
         MCC_HEIGHT / 2,
         -MCC_DEPTH / 2,
       );
-    box(
-      bay,
-      liner,
-      0.012,
-      MCC_HEIGHT - 2 * WIREWAY,
-      MCC_DEPTH - 0.03,
-      width / 2 - channel,
-      MCC_HEIGHT / 2,
-      -MCC_DEPTH / 2,
-    );
+    if (bayIndex === 3 || bayIndex === 4) {
+      let bucketTop = MCC_HEIGHT - WIREWAY;
+      const holes = BAYS[bayIndex].map((bucket) => {
+        const height = bucket.spaces * SPACE;
+        const y = bucketTop - height / 2 - 0.035 - MCC_HEIGHT / 2;
+        bucketTop -= height;
+        return { x: -0.432 + MCC_DEPTH / 2, y };
+      });
+      const partition = createCablePartition(
+        kit,
+        MCC_DEPTH - 0.03,
+        MCC_HEIGHT - 2 * WIREWAY,
+        holes,
+        liner,
+      );
+      partition.rotation.y = -Math.PI / 2;
+      partition.position.set(
+        width / 2 - channel,
+        MCC_HEIGHT / 2,
+        -MCC_DEPTH / 2,
+      );
+      bay.add(partition);
+    } else {
+      box(
+        bay,
+        liner,
+        0.012,
+        MCC_HEIGHT - 2 * WIREWAY,
+        MCC_DEPTH - 0.03,
+        width / 2 - channel,
+        MCC_HEIGHT / 2,
+        -MCC_DEPTH / 2,
+      );
+    }
     for (const y of [WIREWAY / 2, MCC_HEIGHT - WIREWAY / 2]) {
       box(
         bay,
@@ -761,6 +792,12 @@ export function createRetroEncabulatorMcc(
     for (const [bucketIndex, spec] of BAYS[bayIndex].entries()) {
       const h = spec.spaces * SPACE;
       const cy = top - h / 2;
+      rearBuckets.push({
+        id: `section${bayIndex + 1}.bucket${bucketIndex + 1}`,
+        section: bayIndex + 1,
+        centre: cy,
+        height: h,
+      });
       top -= h;
       // MAIN INCOMING is before the main disconnect: live from the isolator.
       const bucketId = `section${bayIndex + 1}.bucket${bucketIndex + 1}`;
@@ -974,6 +1011,8 @@ export function createRetroEncabulatorMcc(
           group: hinge,
           interior,
           alwaysRender,
+          section: bayIndex + 1,
+          centre: cy,
           open: () => door.state.value,
           force: (open) => door.set(open),
         });
@@ -1023,6 +1062,22 @@ export function createRetroEncabulatorMcc(
       hinge.add(tag);
     }
   });
+  const rear = createEncabulatorRear(kit, {
+    widths: BAY_WIDTHS,
+    height: MCC_HEIGHT,
+    depth: MCC_DEPTH,
+    parts,
+    paint: (width, height, seed) =>
+      createWornPaint(kit, {
+        colour: MCC_BLUE,
+        width,
+        height,
+        seed,
+        wear: 'light',
+      }),
+    buckets: rearBuckets,
+  });
+  lineup.add(rear.group);
   const drive = beginPart(kit, 'Encabulator drive train');
   drive.object.position.set(-0.0525, 0.7, -MCC_DEPTH / 2);
   drive.holdWhile(
@@ -1241,6 +1296,7 @@ export function createRetroEncabulatorMcc(
       stepSmoke(delta);
       for (const update of updates) update(delta, clock);
       parts.update(delta);
+      rear.update();
       for (const hinge of hinges) {
         const target = hinge.open() ? -1.75 : 0;
         hinge.group.rotation.y +=
@@ -1250,6 +1306,7 @@ export function createRetroEncabulatorMcc(
         hinge.interior.visible =
           hinge.alwaysRender ||
           hinge.open() ||
+          rear.access(hinge.section, hinge.centre) ||
           Math.abs(hinge.group.rotation.y) > 0.001;
       }
     },
@@ -1300,6 +1357,7 @@ export function createRetroEncabulatorMcc(
     get doorCount() {
       return hinges.length;
     },
+    rear,
     circuits,
     doors,
     mainBreaker,

@@ -19,7 +19,7 @@ export async function bbcImportedWorkstation(kit: PanelKit) {
     document.baseURI,
   );
   const gltf = await new GLTFLoader().loadAsync(url.href);
-  const part = bbcWorkstation(kit);
+  const part = bbcWorkstation(kit, true);
   const model = gltf.scene;
   model.name = 'Ant Mercer BBC Micro and Cub — VirtualBeeb comparison';
   model.position.copy(part.view.bbc.group.position);
@@ -56,11 +56,7 @@ export async function bbcImportedWorkstation(kit: PanelKit) {
       ? object.material[0]
       : object.material;
     originalMaterials.add(material);
-    if (
-      object.name.startsWith('JOINED_KEYBOARD') ||
-      material.name === 'SPACE_BAR'
-    )
-      keys.push(object);
+    if (object.name.startsWith('JOINED_KEYBOARD')) keys.push(object);
   });
   const keyboard = combineUnletteredKeys(model, keys);
   const replacements = new Map<

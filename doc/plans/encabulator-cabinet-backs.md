@@ -1,6 +1,6 @@
 # Plan: Encabulator cabinet backs
 
-Plan dated 18 October 2026 for [the prompt](../prompts/encabulator-cabinet-backs.md), supported by [construction research](../research/encabulator-cabinet-backs.md) and a [picture reference pack](../../resources/reference/encabulator-cabinet-backs/README.md). Status: researched and planned; rear geometry and interactions have not been implemented.
+Plan dated 18 October 2026 for [the prompt](../prompts/encabulator-cabinet-backs.md), supported by [construction research](../research/encabulator-cabinet-backs.md) and a [picture reference pack](../../resources/reference/encabulator-cabinet-backs/README.md). Status: implemented on 18 October 2026; see the [completion report](../reports/encabulator-cabinet-backs.md) for the final geometry, route schedule, validation and limits.
 
 ## Proposed appearance
 

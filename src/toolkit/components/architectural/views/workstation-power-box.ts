@@ -32,6 +32,7 @@ export function createWorkstationPowerBox(kit: PanelKit) {
       new BoxGeometry(0.038, 0.026, 0.043),
       kitPaint(kit, '#242622'),
     );
+    plug.name = x < 0 ? 'BBC floor power plug' : 'Cub floor power plug';
     plug.position.set(x, 0.071, 0.006);
     group.add(plug);
   }

@@ -73,6 +73,32 @@ export function pinchZoom(zoom: number, from: number, to: number) {
   return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, (zoom * to) / from));
 }
 
+/** Crouching from any non-standard height first restores normal standing. */
+export function changeStance(
+  state: {
+    eyeOffset: number;
+    crouched: boolean;
+    lowCrouched: boolean;
+    crouch: number;
+  },
+  low = false,
+) {
+  if (
+    Math.abs(state.eyeOffset) > 0.000001 ||
+    state.crouched ||
+    state.lowCrouched ||
+    state.crouch > 0.001
+  ) {
+    state.eyeOffset = 0;
+    state.crouched = false;
+    state.lowCrouched = false;
+    state.crouch = 0;
+  } else {
+    state.crouched = true;
+    state.lowCrouched = low;
+  }
+}
+
 const WALK_KEYS = new Set([
   'KeyW',
   'KeyA',
@@ -211,8 +237,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
   crouchButton.className = 'touch-crouch';
   crouchButton.textContent = 'CROUCH';
   crouchButton.addEventListener('click', () => {
-    walker.crouched = !walker.crouched;
-    walker.lowCrouched = false;
+    changeStance(walker);
   });
   container?.append(crouchButton);
   // The controls for the input in use, at the foot of the screen.
@@ -268,14 +293,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
       if (event.code.startsWith('Arrow')) event.preventDefault();
     }
     if (event.repeat) return;
-    if (event.code === 'KeyC') {
-      walker.crouched = walker.lowCrouched || !walker.crouched;
-      walker.lowCrouched = false;
-    }
-    if (event.code === 'KeyV') {
-      walker.crouched = true;
-      walker.lowCrouched = !walker.lowCrouched;
-    }
+    if (event.code === 'KeyC') changeStance(walker);
+    if (event.code === 'KeyV') changeStance(walker, true);
     if (event.code === 'KeyE') use(0, 0);
   };
   const keyup = (event: KeyboardEvent) => keys.delete(event.code);
@@ -452,8 +471,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (went(PAD.knobDown)) turningKnobs(-1, () => use(0, 0));
     if (went(PAD.knobUp)) turningKnobs(1, () => use(0, 0));
     if (went(PAD.crouch)) {
-      walker.crouched = !walker.crouched;
-      walker.lowCrouched = false;
+      changeStance(walker);
     }
     // A click of the walk stick runs until the stick comes back to centre.
     if (went(PAD.run)) padRun = true;
@@ -472,6 +490,9 @@ export function createFirstPerson(options: FirstPersonOptions) {
       walker.yaw = yaw;
       walker.pitch = clampPitch(pitch);
       walker.eyeOffset = y - eyeY;
+      walker.crouched = false;
+      walker.lowCrouched = false;
+      walker.crouch = 0;
       sticks?.reset();
       showHelp();
     },

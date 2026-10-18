@@ -14,6 +14,9 @@ describe('BBC Micro startup', () => {
     expect(computer.lines.value[0][0]).toBe('BBC Computer 32K');
     computer.step(1.5);
     expect(computer.phase.value).toBe('loading');
+    expect(
+      computer.lines.value.some(([line]) => line === '>CHAIN "DIAG"'),
+    ).toBe(true);
     computer.step(BBC_LOAD_SECONDS);
     expect(computer.phase.value).toBe('ready');
     expect(

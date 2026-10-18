@@ -241,6 +241,7 @@ export function startRetroComputingRoom(canvas: HTMLCanvasElement) {
     return null;
   };
   const views = {
+    cables: { x: 1.7 * m, z: -1.8 * m, yaw: 2.65, pitch: -0.5, y: 1.25 * m },
     power: { x: 1.84 * m, z: -0.1 * m, yaw: 0, pitch: -0.64, y: 1.2 * m },
     boot: { x: 1.85 * m, z: 0.45 * m, yaw: 0.48, pitch: -0.1, y: 1.18 * m },
     room: { x: 1.3 * m, z: 2.5 * m, yaw: 0, pitch: -0.18 },

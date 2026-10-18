@@ -1122,3 +1122,113 @@ it('stops the feed motor on its own emergency stop until HAND OFF AUTO goes thro
   expect(mcc.controls.get('auxiliary.stop')!.position.value).toBe(1);
   dispose();
 });
+
+describe('MCC rear service access', () => {
+  it('adds three closed leaves without changing the front door identities or machine state', () => {
+    const { mcc, dispose } = fixture();
+    expect(mcc.rear.doors.map((leaf) => leaf.section)).toEqual([4, 5, 5]);
+    expect(mcc.rear.doors.every((leaf) => !leaf.part.door.state.value)).toBe(
+      true,
+    );
+    const front = [...mcc.doors.values()].map((door) => door.value);
+    for (const leaf of mcc.rear.doors) {
+      const fasteners = [...leaf.part.uses.keys()].filter((o) =>
+        o.name.endsWith('fastener'),
+      );
+      expect(fasteners).toHaveLength(2);
+      leaf.part.uses.get(fasteners[0])!();
+      expect(leaf.part.door.state.value).toBe(true);
+      expect([...mcc.doors.values()].map((door) => door.value)).toEqual(front);
+      expect(mcc.mainBreaker.position.value).toBe('off');
+      leaf.part.uses.get(fasteners[1])!();
+      expect(leaf.part.door.state.value).toBe(false);
+    }
+    dispose();
+  });
+
+  it('renders a bucket through either access and keeps it visible while its rear leaf closes', () => {
+    const { mcc, interiors, dispose } = fixture();
+    const instruments = interiors.filter((o) =>
+      o.name.startsWith('Section 4 '),
+    );
+    expect(instruments).toHaveLength(4);
+    const rear = mcc.rear.doors[0];
+    expect(rear.interior.visible).toBe(false);
+    rear.part.door.set(true);
+    mcc.update(0.05);
+    expect(rear.interior.visible).toBe(true);
+    expect(instruments.every((o) => o.visible)).toBe(true);
+    expect(mcc.doors.get('section4.bucket1')!.value).toBe(false);
+    const back = [...rear.part.uses.keys()].find((o) =>
+      o.name.endsWith('inside cover'),
+    )!;
+    rear.part.uses.get(back)!();
+    mcc.update(0.01);
+    expect(rear.interior.visible).toBe(true);
+    for (let i = 0; i < 80; i++) mcc.update(0.05);
+    expect(rear.interior.visible).toBe(false);
+    expect(instruments.every((o) => !o.visible)).toBe(true);
+    // Front access continues independently when rear access is closed.
+    const frontLatch = [...mcc.parts.uses.keys()].find(
+      (o) =>
+        o.name.includes('Section 4 ENCABULATOR CONTROL') &&
+        o.name.endsWith(' latch'),
+    );
+    expect(frontLatch).toBeDefined();
+    work(mcc, frontLatch!);
+    mcc.update(0.05);
+    expect(instruments[0].visible).toBe(true);
+    dispose();
+  });
+
+  it('keeps opaque plates and guarded busways behind the new rear openings', () => {
+    const { mcc, dispose } = fixture();
+    const rear = mcc.rear.doors[0];
+    rear.part.door.set(true);
+    for (let i = 0; i < 80; i++) mcc.update(0.05);
+    mcc.group.updateMatrixWorld(true);
+    const ray = new Raycaster(
+      new Vector3(-0.127, 1.3, -1),
+      new Vector3(0, 0, 1),
+    );
+    const hit = ray.intersectObject(mcc.group, true)[0];
+    expect(hit).toBeDefined();
+    expect(hit.point.z).toBeLessThan(-0.37);
+    expect(hit.point.z).toBeGreaterThan(-0.52);
+    expect(mcc.rear.routes.every((route) => mcc.circuits.has(route.id))).toBe(
+      true,
+    );
+    expect(mcc.rear.routes).toHaveLength(6);
+    // Rear-only dressing is pruned from picking as well as rendering.
+    rear.part.door.set(false);
+    for (let i = 0; i < 80; i++) mcc.update(0.05);
+    expect(ray.intersectObject(rear.interior, true)).toHaveLength(0);
+    dispose();
+  });
+});
+
+it('provides a genuine grommeted opening through each rear service wireway partition', () => {
+  const { mcc, dispose } = fixture();
+  const partitions: Object3D[] = [];
+  mcc.group.traverse((o) => {
+    if (o.name === 'Grommeted wireway partition') partitions.push(o);
+  });
+  expect(partitions).toHaveLength(2);
+  mcc.group.updateMatrixWorld(true);
+  for (const partition of partitions) {
+    // A ray through a slot traverses sheet steel, rather than disappearing
+    // behind a decorative black rectangle over a solid partition.
+    const section = partitions.indexOf(partition) + 4;
+    for (const route of mcc.rear.routes.filter((r) => r.section === section)) {
+      const y = route.points[0][1] - partition.position.y;
+      const origin = partition.localToWorld(new Vector3(-0.178, y, -0.1));
+      const direction = new Vector3(0, 0, 1).transformDirection(
+        partition.matrixWorld,
+      );
+      expect(
+        new Raycaster(origin, direction).intersectObject(partition, true),
+      ).toHaveLength(0);
+    }
+  }
+  dispose();
+});

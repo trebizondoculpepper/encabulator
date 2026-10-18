@@ -6,7 +6,7 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { Box3, Mesh } from 'three';
+import { Box3, Mesh, TubeGeometry } from 'three';
 import { partAudio } from '../../core/audio/part-audio';
 import { createPanelKit, disposeKit } from '../../core/views/eighties-controls';
 import { bbcWorkstation } from './bbc-workstation';
@@ -74,6 +74,53 @@ describe('BBC workstation exhibit', () => {
     ).toBeDefined();
     exhibit.dispose();
     disposeKit(kit, exhibit.object);
+  });
+
+  it('joins both continuous mains cords to the actual rear connectors and distinct floor plugs for either model', () => {
+    for (const imported of [false, true]) {
+      const kit = createPanelKit();
+      const exhibit = bbcWorkstation(kit, imported);
+      exhibit.object.updateMatrixWorld(true);
+      for (const [wireName, connectorName, plugName] of [
+        [
+          'BBC mains flex to floor power box',
+          'BBC rear mains connector',
+          'BBC floor power plug',
+        ],
+        [
+          'Cub monitor mains flex',
+          'Cub rear mains connector',
+          'Cub floor power plug',
+        ],
+      ]) {
+        const wire = exhibit.object.getObjectByName(
+          wireName,
+        ) as Mesh<TubeGeometry>;
+        const curve = wire.geometry.parameters.path;
+        const start = wire.localToWorld(curve.getPoint(0));
+        const end = wire.localToWorld(curve.getPoint(1));
+        expect(
+          new Box3()
+            .setFromObject(exhibit.object.getObjectByName(connectorName)!)
+            .expandByScalar(0.002)
+            .containsPoint(start),
+        ).toBe(true);
+        expect(
+          new Box3()
+            .setFromObject(exhibit.object.getObjectByName(plugName)!)
+            .expandByScalar(0.002)
+            .containsPoint(end),
+        ).toBe(true);
+        // Between the equipment and the rear edge, the wire clears the top.
+        for (let i = 0; i <= 100; i++) {
+          const point = curve.getPoint(i / 100);
+          if (point.z > -exhibit.view.depth / 2)
+            expect(point.y).toBeGreaterThan(exhibit.view.top);
+        }
+      }
+      exhibit.dispose();
+      disposeKit(kit, exhibit.object);
+    }
   });
 
   it('boots from its real power rocker and cancels its positional recording when switched off or hidden', () => {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { MAX_ZOOM, MIN_ZOOM, pinchZoom, wheelZoom } from './first-person';
+import {
+  MAX_ZOOM,
+  MIN_ZOOM,
+  pinchZoom,
+  wheelZoom,
+  changeStance,
+} from './first-person';
 
 describe('wheel zoom', () => {
   it('zooms in when scrolling up and out when scrolling down', () => {
@@ -45,3 +51,28 @@ describe('pinch zoom', () => {
     expect(pinchZoom(1.5, 100, 0)).toBe(1.5);
   });
 });
+
+for (const low of [false, true]) {
+  it(`restores standing from a chair or raised eye before ${low ? 'V' : 'C'} crouching`, () => {
+    for (const eyeOffset of [-0.6234, 0.6]) {
+      const state = {
+        eyeOffset,
+        crouched: false,
+        lowCrouched: false,
+        crouch: 0,
+      };
+      changeStance(state, low);
+      expect(state).toEqual({
+        eyeOffset: 0,
+        crouched: false,
+        lowCrouched: false,
+        crouch: 0,
+      });
+      changeStance(state, low);
+      expect(state.lowCrouched).toBe(low);
+      expect(state.crouched).toBe(true);
+      changeStance(state, low);
+      expect(state.crouched).toBe(false);
+    }
+  });
+}

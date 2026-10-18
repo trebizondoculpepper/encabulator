@@ -1,3 +1,4 @@
+import { createRearFittingsBoard } from './rear-fittings-board';
 import {
   createRenderer,
   useEnvironment,
@@ -162,6 +163,12 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     minZ: (cabinetZ - 2.55) * m,
     maxZ: (cabinetZ + 2.55) * m,
   });
+  place(createRearFittingsBoard(kit), cabinetX, 1.55, 4.2, -Math.PI / 2, {
+    minX: (cabinetX - 0.5) * m,
+    maxX: half.x * m,
+    minZ: 2.75 * m,
+    maxZ: 5.65 * m,
+  });
   [...createMachineGallery(kit), ...createEmptyMachinePlinths(kit)].forEach(
     (plinth, i) => {
       const { x, z } = ALL_GALLERY_LAYOUT[i];
@@ -262,6 +269,12 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
     cabinet: {
       x: (cabinetX - 2.6) * m,
       z: cabinetZ * m,
+      yaw: Math.PI / 2,
+      pitch: -0.1,
+    },
+    rear: {
+      x: (cabinetX - 2.3) * m,
+      z: 4.2 * m,
       yaw: Math.PI / 2,
       pitch: -0.1,
     },

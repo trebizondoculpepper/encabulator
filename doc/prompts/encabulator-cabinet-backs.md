@@ -1,6 +1,6 @@
 # Model the Encabulator's cabinet backs
 
-Give the freestanding Encabulator a convincing rear elevation, visible when walking around it in the warehouse. Some cabinets should have solid backs; others should offer rear access to their internal equipment. This is a future implementation prompt; writing it does not execute the design.
+Give the freestanding Encabulator a convincing rear elevation, visible when walking around it in the warehouse. Some cabinets should have solid backs; others should offer rear access to their internal equipment. The initial implementation is complete; see [the completion report](../reports/encabulator-cabinet-backs.md) before follow-up work.
 
 Research and a proposed per-section implementation plan are now available in [the plan](../plans/encabulator-cabinet-backs.md), [research notes](../research/encabulator-cabinet-backs.md) and [reference pictures](../../resources/reference/encabulator-cabinet-backs/README.md). Read these before implementation. Coordinate a future diagnostic cable connection with [the BBC Micro terminal prompt](bbc-micro-diagnostic-terminal.md), without implementing that separate feature as part of this task.
 
