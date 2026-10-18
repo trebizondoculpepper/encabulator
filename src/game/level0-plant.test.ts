@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { BUILD_SECONDS } from './dimensionality';
+import { LEVEL0_MACHINE_HEADS } from './level0-room-plan';
 import { PLANT, WINDOWS, createLevel0Plant } from './level0-plant';
 import type { Electrical } from './level0-plant';
 
@@ -546,5 +547,45 @@ describe('Level 0 process model', () => {
       expect(p.strain.value).toBe(0);
       expect(p.brokenDown.value).toBe(false);
     });
+  });
+});
+
+describe('a sprinkler head failing over the machine', () => {
+  it('is over the machine: there are heads to fail', () => {
+    expect(LEVEL0_MACHINE_HEADS.length).toBeGreaterThan(0);
+  });
+
+  it('soaks a live machine and shorts its bus, sending the alarm to evacuation', () => {
+    const p = plant(RUNNING);
+    run(p, 10, 0.5);
+    p.sprinklerFailure();
+    run(p, 1, 0.5);
+    expect(p.fire.discharging.value).toBe(true);
+    expect(p.fire.stage.value).toBe('evacuate');
+    expect(p.fire.sounding.value).toBe(true);
+    run(p, 5, 0.5);
+    expect(p.wetness.value).toBeGreaterThan(PLANT.wetCabinets);
+    expect(p.drowned.value).toBe(true);
+    expect(p.faults.value.map((f) => f.code)).toContain('S03');
+  });
+
+  it('only wets a dead machine', () => {
+    const p = plant({ ...RUNNING, mains: false });
+    p.sprinklerFailure();
+    run(p, 30, 0.5);
+    expect(p.wetness.value).toBeGreaterThan(0.5);
+    expect(p.drowned.value).toBe(false);
+    expect(p.faults.value.map((f) => f.code)).toContain('A14');
+  });
+
+  it('is dried out and repaired by RESET, the main valve shut first', () => {
+    const p = plant(RUNNING);
+    p.sprinklerFailure();
+    run(p, 10, 0.5);
+    p.fire.restore();
+    p.clearFaults();
+    run(p, 1, 0.5);
+    expect(p.drowned.value).toBe(false);
+    expect(p.fire.discharging.value).toBe(false);
   });
 });

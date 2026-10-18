@@ -129,6 +129,7 @@ export function createLevel0Scenarios(
     }
     mcc.recover();
     plant.clearFaults();
+    plant.fire.restore();
     plant.plcReset();
     symptoms?.reset();
   };

@@ -11,6 +11,9 @@ import {
 } from './dimensionality';
 import type { DimensionConditions } from './dimensionality';
 import { worstSeverity } from './level0-status';
+import { LEVEL0_MACHINE_HEADS } from './level0-room-plan';
+import { createFireAlarmSystem } from '../toolkit/components/fire/logic/fire-alarm-system';
+import { WAREHOUSE_HEADS } from '../toolkit/components/architectural/logic/warehouse-services';
 import type { Severity } from './level0-status';
 
 /**
@@ -60,6 +63,12 @@ export const PLANT = {
    * and runs hot (red); at 1 it seizes.
    */
   oilAdequate: 38,
+  /** Seconds a sprinkler head's spray takes to soak the cabinets through. */
+  soakSeconds: 20,
+  /** Seconds soaked cabinets take to dry out, the spray stopped. */
+  drySeconds: 600,
+  /** Water in the cabinets at which it shows, and shorts a live bus. */
+  wetCabinets: 0.08,
   leakSeconds: 60,
   dryWearSeconds: 90,
   wearGrinding: 0.3,
@@ -423,6 +432,16 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     driveWear: g.state('drive.wear', 0),
     /** What has seized, if anything: the breakdown. */
     seized: g.state<'M-101' | 'VFD' | null>('machine.seized', null),
+    /**
+     * Water in the cabinets, 0 to 1: soaking in while a sprinkler head over
+     * the machine sprays, drying out slowly after.
+     */
+    water: g.state('machine.water', 0),
+    /**
+     * Water reached the live bus and shorted it: total shutdown, until the
+     * machine is dried out and repaired (the simulator's RESET).
+     */
+    drowned: g.state('machine.drowned', false),
     hydraulic: g.state('hydraulic.pressure', 0, { note: 'psi' }),
     flow: g.state('hydro.flow', 0, { note: 'share of rated flow' }),
     fan: g.state('fan.pressure', 0, { note: 'inWC' }),
@@ -949,6 +968,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.motorWear,
       s.driveWear,
       s.seized,
+      s.water,
+      s.drowned,
     ],
     (
       incoming,
@@ -984,6 +1005,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       motorWear,
       driveWear,
       seized,
+      water,
+      drowned,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -1062,6 +1085,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         else if (wear >= PLANT.wearGrinding)
           add({ code: warn, text: `${name} WORN`, window });
       }
+      if (drowned)
+        add({
+          code: 'S03',
+          text: 'WATER INGRESS - BUS SHORTED',
+          window: 'SAFETY',
+        });
+      else if (water > PLANT.wetCabinets)
+        add({ code: 'A14', text: 'WATER IN CABINETS', window: 'SAFETY' });
       if (vfdOn && hz > 1 && !cooling)
         add({ code: 'A02', text: 'DRIVE COOLING FAN OFF', window: 'COOLING' });
       if (controlOn && !vent && controlTemp > PLANT.controlHot)
@@ -1313,6 +1344,44 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   const spilled = g.output('lube.spilled', [s.oilLevel], (level) => 1 - level, {
     where: 'the oil spill on the floor',
   });
+  // ---- The building's fire alarm and sprinklers ---------------------------
+  // The warehouse's own system (BS 5839), set off by the machine's fire
+  // once it is modelled: for now no fire makes smoke or heat, but a head
+  // can still fail and spray (the simulator's SPRINKLER fault).
+  const fire = createFireAlarmSystem(g, {
+    heads: WAREHOUSE_HEADS.length,
+    mains: g.fixed('building.mains', true),
+    smokeTarget: g.fixed('machine.fireSmoke', 0),
+    alight: g.fixed('machine.fireAlight', false),
+    headTemperatures: g.fixed(
+      'sprinkler.heat',
+      WAREHOUSE_HEADS.map(() => 20),
+    ),
+  });
+  /** A sprinkler head over the machine is spraying on it. */
+  const raining = g.derive('machine.raining', [fire.heads], (heads) =>
+    LEVEL0_MACHINE_HEADS.some((i) => heads[i].spraying),
+  );
+  g.process('water ingress', [raining, e.mains], [s.water, s.drowned], (dt) => {
+    const wet = s.water.peek();
+    s.water.set(
+      raining.peek()
+        ? Math.min(1, wet + dt / PLANT.soakSeconds)
+        : Math.max(0, wet - dt / PLANT.drySeconds),
+    );
+    // Water on a live bus shorts it; a dead machine only gets wet.
+    if (e.mains.peek() && s.water.peek() > PLANT.wetCabinets)
+      s.drowned.set(true);
+  });
+  /** How wet the machine is, 0 to 1, for its puddle and its drips. */
+  const wetness = g.output('machine.wetness', [s.water], (w) => w, {
+    where: 'water on and round the machine',
+  });
+  /** The water shorted the bus: the machine is shut down. */
+  const drowned = g.output('machine.shorted', [s.drowned], (d) => d, {
+    where: 'the shutdown and its sparks',
+  });
+
   /**
    * How close the machine is to breaking down, 0 to 1: the worst of each
    * failure's own approach (for lube starvation, the worst bearing wear).
@@ -1442,8 +1511,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.motorWear,
       s.driveWear,
       s.seized,
+      s.water,
+      s.drowned,
     ],
     () => {
+      // Dried out and its shorted bus repaired.
+      s.water.set(0);
+      s.drowned.set(false);
       // Refilled, the switch freed, the worn bearings replaced.
       s.oilLevel.set(1);
       s.oilLeak.set(false);
@@ -1483,6 +1557,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     () => s.oilSwitchStuck.set(true),
     'SCENARIO SIMULATOR PRESSURE SWITCH',
   );
+  /**
+   * The simulator's SPRINKLER fault: a sprinkler head over the machine
+   * fails (struck, or its bulb cracked) and sprays. Its consequences
+   * follow: the flow switch sends the alarm to evacuation, the water soaks
+   * into the cabinets and, if the bus is live, shorts it.
+   */
+  const sprinklerFailure = () => fire.fail(LEVEL0_MACHINE_HEADS[0]);
   const countReset = g.action(
     'semiboloid.reset',
     [e.panMonitor],
@@ -1799,6 +1880,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     clearFaults,
     sealFailure,
     switchStuck,
+    fire,
+    wetness,
+    drowned,
+    sprinklerFailure,
     strain,
     brokenDown,
     spilled,

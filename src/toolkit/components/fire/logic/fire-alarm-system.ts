@@ -200,7 +200,18 @@ export function createFireAlarmSystem(
   };
   g.process(
     'fire alarm',
-    [riserValve, callPoint, smokeTarget, alight, headTemperatures],
+    [
+      riserValve,
+      callPoint,
+      smokeTarget,
+      alight,
+      headTemperatures,
+      willFindFire,
+      calledFalse,
+      allClearFor,
+      investigation,
+      stage,
+    ],
     [
       willFindFire,
       calledFalse,
@@ -334,6 +345,15 @@ export function createFireAlarmSystem(
   const resetSprinklers = g.action('sprinkler.reset', [], [bulbs], () =>
     bulbs.set(Array.from({ length: headCount }, () => false)),
   );
+  /**
+   * A head fails and sprays, whatever the heat: struck by something, or a
+   * cracked bulb. Its water sets the system off like any other.
+   */
+  const fail = g.action('sprinkler.fail', [], [bulbs], (i: number) => {
+    if (bulbs.peek()[i]) return false;
+    bulbs.set(bulbs.peek().map((b, j) => b || j === i));
+    return true;
+  });
   /** Put the whole system back as installed (development and scenarios). */
   const restore = g.action(
     'fire.restore',
@@ -385,6 +405,7 @@ export function createFireAlarmSystem(
     evacuate,
     reset,
     resetSprinklers,
+    fail,
     restore,
   };
 }
