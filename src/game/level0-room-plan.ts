@@ -15,7 +15,8 @@ export const LEVEL0_CHAIRS = { ...LEVEL2_SKIP_SPOT };
  * turned towards the middle.
  */
 export const LEVEL0_SCENARIOS = {
-  x: LEVEL0_MACHINE.x + 3.1,
+  // Far enough out to walk between it and the line-up's end (about 1 m).
+  x: LEVEL0_MACHINE.x + 3.4,
   z: LEVEL0_MACHINE.z + 1.3,
   // Turned about 46° clockwise (seen from above) from facing the room.
   yaw: -0.45 - (20 * Math.PI) / 180,

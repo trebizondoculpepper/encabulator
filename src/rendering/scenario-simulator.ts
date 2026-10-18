@@ -27,8 +27,28 @@ const WIDTH = 0.6;
 const DEPTH = 0.8;
 /** The control panel's bottom, in rack units: its 4U middle at about 1.52 m. */
 const PANEL_AT = 32;
-/** Half the cabinet's widest extent, for walking round it. */
-export const SIMULATOR_HALF = 0.5;
+/**
+ * The ground the cabinet stands on, for walking round it, metres: the box
+ * round its turned footprint (its front at its origin, its door and
+ * handle a little proud of it), standing at (x, z) turned by `yaw`.
+ */
+export function simulatorFootprint(x: number, z: number, yaw: number) {
+  const corners = [-1, 1].flatMap((side) =>
+    [0.07, -DEPTH - 0.02].map((depth) => {
+      const cx = side * (WIDTH / 2 + 0.02);
+      return {
+        x: x + cx * Math.cos(yaw) + depth * Math.sin(yaw),
+        z: z - cx * Math.sin(yaw) + depth * Math.cos(yaw),
+      };
+    }),
+  );
+  return {
+    minX: Math.min(...corners.map((c) => c.x)),
+    maxX: Math.max(...corners.map((c) => c.x)),
+    minZ: Math.min(...corners.map((c) => c.z)),
+    maxZ: Math.max(...corners.map((c) => c.z)),
+  };
+}
 
 type Act = Exclude<keyof Level0Scenarios, 'starting' | 'update'>;
 

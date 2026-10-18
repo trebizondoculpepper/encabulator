@@ -14,7 +14,15 @@ import {
   createPanelKit,
   disposeKit,
 } from '../toolkit/components/core/views/eighties-controls';
-import { createScenarioSimulator } from './scenario-simulator';
+import {
+  createScenarioSimulator,
+  simulatorFootprint,
+} from './scenario-simulator';
+import { LEVEL0_MACHINE, LEVEL0_SCENARIOS } from '../game/level0-room-plan';
+import { MCC_WIDTH } from '../scene/retro-encabulator-mcc';
+import { createWarehouseTrainingRoom } from '../scene/warehouse-training-room';
+import { createWarehouseFire } from '../toolkit/components/architectural/logic/warehouse-services';
+import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
 import {
   SLOW_START_STEP_SECONDS,
   createLevel0Scenarios,
@@ -323,5 +331,49 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(symptoms.soot).toBe(0);
     expect(symptoms.strain).toBe(0);
     dispose();
+  });
+
+  it('sets the whole building off from a call point by the fire exit', () => {
+    const { machine, run, dispose } = sandbox();
+    const kit = createPanelKit();
+    const fire = createWarehouseFire(machine.plant.fire);
+    const room = createWarehouseTrainingRoom(kit, false, { fire });
+    /** Work the first fitting of this kind, as a click on it would. */
+    const work = (title: string, n = 0) => {
+      const uses = [...room.parts.uses].filter(([o]) => {
+        for (let p: Object3D | null = o; p; p = p.parent)
+          if (p.name === title) return true;
+        return false;
+      });
+      uses[n][1]();
+    };
+    const heads = () =>
+      room.fittings.filter((o) => o.name.includes('sprinkler'));
+    expect(heads().length).toBeGreaterThan(0);
+    work(ARCHITECTURAL_FITTINGS.callpoint.title);
+    run(1, 0.5);
+    const f = machine.plant.fire;
+    expect(f.stage.value).toBe('evacuate');
+    expect(f.sounding.value).toBe(true);
+    expect(f.panelLamps.value.zone1).toBe(true);
+    // The panel, with its key, silences it; RESET waits for the call point.
+    f.panelKey.set(true);
+    f.silence();
+    expect(f.sounding.value).toBe(false);
+    expect(f.reset()).toBe(false);
+    room.parts.dispose();
+    disposeKit(kit, room.group);
+    dispose();
+  });
+
+  it('leaves room to walk between the simulator and the line-up', () => {
+    const rack = simulatorFootprint(
+      LEVEL0_SCENARIOS.x,
+      LEVEL0_SCENARIOS.z,
+      LEVEL0_SCENARIOS.yaw,
+    );
+    // The line-up's right-hand end, with the room's 0.1 m allowance.
+    const end = LEVEL0_MACHINE.x + MCC_WIDTH / 2 + 0.1;
+    expect(rack.minX - end).toBeGreaterThan(0.8);
   });
 });

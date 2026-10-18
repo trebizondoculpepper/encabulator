@@ -1,4 +1,6 @@
 import { signal } from '@preact/signals-core';
+import type { ReadonlySignal, Signal } from '@preact/signals-core';
+import type { FireAlarmSystem } from '../../fire/logic/fire-alarm-system';
 import { createBuildingServices } from './building-services';
 
 /** Physical pendant-head locations; room-wide service wiring is deliberately deferred. */
@@ -30,3 +32,50 @@ export function createArchitecturalServices() {
 export type ArchitecturalServices = ReturnType<
   typeof createArchitecturalServices
 >;
+
+/** What a building's fire fittings bind to: its fire alarm and sprinklers. */
+export type FireSource = Pick<
+  FireAlarmSystem,
+  | 'panelKey'
+  | 'riserValve'
+  | 'detector'
+  | 'sounding'
+  | 'panelLamps'
+  | 'heads'
+  | 'discharging'
+  | 'pressCallPoint'
+  | 'resetCallPoint'
+  | 'silence'
+  | 'evacuate'
+  | 'reset'
+  | 'resetSprinklers'
+>;
+
+/**
+ * A warehouse's fire fittings wired to one fire alarm system, so they
+ * work together as a real installation does: any call point sets the
+ * whole alarm off and latches on its own, every sounder and detector
+ * shows the one system, and each sprinkler head is its own head in it.
+ * `tone`, from a voice alarm, cues the sounders between its messages.
+ */
+export function createWarehouseFire(
+  system: FireSource,
+  tone?: ReadonlySignal<boolean>,
+) {
+  const callPoints: Signal<boolean>[] = [];
+  const latch = (i: number) => (callPoints[i] ??= signal<boolean>(false));
+  return {
+    system,
+    tone,
+    latch,
+    press(i: number) {
+      latch(i).value = true;
+      system.pressCallPoint();
+    },
+    reset(i: number) {
+      latch(i).value = false;
+      if (!callPoints.some((p) => p?.value)) system.resetCallPoint();
+    },
+  };
+}
+export type WarehouseFire = ReturnType<typeof createWarehouseFire>;

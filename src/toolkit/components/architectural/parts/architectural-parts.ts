@@ -5,7 +5,10 @@ import { click } from '../../core/audio/part-audio';
 import { WATER_SPRAY } from '../../core/audio/part-loops';
 import { architecturalComponent } from '../logic/architectural-fittings';
 import type { ArchitecturalKind } from '../logic/architectural-fittings';
-import type { ArchitecturalServices } from '../logic/warehouse-services';
+import type {
+  ArchitecturalServices,
+  WarehouseFire,
+} from '../logic/warehouse-services';
 import { createArchitecturalServices } from '../logic/warehouse-services';
 import { createSwitch } from '../../core/logic/world/components';
 import { createArchitecturalFixture } from '../views/architectural-fixtures';
@@ -37,10 +40,12 @@ export function architecturalPart(
     testers?: boolean;
     fallDistance?: number;
     length?: number;
+    /** The fire system to bind fire fittings to, if not their own. */
+    fire?: WarehouseFire;
   } = {},
 ) {
   const m = services.model,
-    f = m.fire;
+    f = options.fire?.system ?? m.fire;
   let part: Part;
   const i = options.index ?? 0;
   switch (kind) {
@@ -88,13 +93,16 @@ export function architecturalPart(
       break;
     case 'callpoint':
       part = callPoint(kit, {
-        latched: services.callPoints[i],
-        press: () => services.press(i),
-        reset: () => services.reset(i),
+        latched: options.fire?.latch(i) ?? services.callPoints[i],
+        press: () => (options.fire ?? services).press(i),
+        reset: () => (options.fire ?? services).reset(i),
       });
       break;
     case 'sounder':
-      part = sounderBeacon(kit, { sounding: f.sounding });
+      part = sounderBeacon(kit, {
+        sounding: f.sounding,
+        tone: options.fire?.tone,
+      });
       break;
     case 'detector':
       part = smokeDetector(kit, { alarm: f.detector });
@@ -110,7 +118,8 @@ export function architecturalPart(
       break;
     case 'sprinkler':
       part = sprinklerHead(kit, {
-        head: computed(() => f.heads.value[i]),
+        // Its own head in a shared system; its model's first, on its own.
+        head: computed(() => f.heads.value[options.fire ? i : 0]),
         voice: true,
         fallDistance: options.fallDistance,
       });

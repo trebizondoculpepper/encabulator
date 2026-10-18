@@ -1,6 +1,10 @@
 import { createMachineSideCulling } from '../scene/machine-side-culling';
 import { effect, signal } from '@preact/signals-core';
-import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
+import {
+  createArchitecturalServices,
+  createWarehouseFire,
+} from '../toolkit/components/architectural/logic/warehouse-services';
+import { voiceAlarm } from '../toolkit/components/fire/parts/fire-parts';
 import { addMachineWorkstation } from './machine-workstation';
 import {
   Group,
@@ -59,7 +63,10 @@ import { createLevel0Scenarios } from './level0-scenarios';
 import { createLevel0Failures } from './level0-failures';
 import { createLevel0Symptoms } from './level0-symptoms';
 import { createLevel0Strangeness } from './level0-strangeness';
-import { SIMULATOR_HALF, createScenarioSimulator } from './scenario-simulator';
+import {
+  createScenarioSimulator,
+  simulatorFootprint,
+} from './scenario-simulator';
 import { addWarehouseLighting } from './warehouse-lighting';
 
 /**
@@ -78,7 +85,24 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   const kit = createPanelKit();
   const building = createArchitecturalServices();
-  const room = createWarehouseTrainingRoom(kit, false, { lighting: building });
+  const diagnosticsAvailable = signal(false);
+  const machine = createLevel0Machine(kit, { diagnosticsAvailable });
+  // The building's fire alarm: the plant's fire system, heard from a
+  // ceiling speaker over the middle of the floor and the wall sounders,
+  // and every fire fitting in the warehouse working on it together.
+  const { fire } = machine.plant;
+  const voice = voiceAlarm(kit, {
+    voice: fire.voice,
+    announcement: fire.announcement,
+  });
+  voice.object.scale.setScalar(m);
+  voice.object.position.set(0, 6.4 * m, 0);
+  scene.add(voice.object);
+  const room = createWarehouseTrainingRoom(kit, false, {
+    lighting: building,
+    fire: createWarehouseFire(fire, voice.evacuationTone),
+  });
+  room.parts.add(voice);
   room.group.scale.setScalar(m);
   scene.add(room.group);
   const lighting = addWarehouseLighting(scene, room.lights, m, {
@@ -98,8 +122,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     minZ: solid.minZ * m,
     maxZ: solid.maxZ * m,
   }));
-  const diagnosticsAvailable = signal(false);
-  const machine = createLevel0Machine(kit, { diagnosticsAvailable });
   const { mcc } = machine;
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
@@ -260,12 +282,18 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     solids: () => [
       ...walls,
       ...workstation.solids(),
-      {
-        minX: (LEVEL0_SCENARIOS.x - SIMULATOR_HALF) * m,
-        maxX: (LEVEL0_SCENARIOS.x + SIMULATOR_HALF) * m,
-        minZ: (LEVEL0_SCENARIOS.z - SIMULATOR_HALF * 1.6) * m,
-        maxZ: (LEVEL0_SCENARIOS.z + 0.05) * m,
-      },
+      ((f) => ({
+        minX: f.minX * m,
+        maxX: f.maxX * m,
+        minZ: f.minZ * m,
+        maxZ: f.maxZ * m,
+      }))(
+        simulatorFootprint(
+          LEVEL0_SCENARIOS.x,
+          LEVEL0_SCENARIOS.z,
+          LEVEL0_SCENARIOS.yaw,
+        ),
+      ),
       ...roomSolids,
       ...footprints,
       skip

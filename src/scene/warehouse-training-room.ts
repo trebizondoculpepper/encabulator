@@ -29,7 +29,10 @@ import { createPartSet } from '../toolkit/components/core/parts/parts';
 import type { ArchitecturalKind } from '../toolkit/components/architectural/logic/architectural-fittings';
 import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
 import { WAREHOUSE_HEADS } from '../toolkit/components/architectural/logic/warehouse-services';
-import type { ArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
+import type {
+  ArchitecturalServices,
+  WarehouseFire,
+} from '../toolkit/components/architectural/logic/warehouse-services';
 import { mergeStatic } from '../toolkit/components/core/views/merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
 
@@ -37,7 +40,14 @@ import { warehouseSurfaces } from './warehouse-surfaces';
 export function createWarehouseTrainingRoom(
   kit: PanelKit,
   gallery = false,
-  options: { lighting?: ArchitecturalServices } = {},
+  options: {
+    lighting?: ArchitecturalServices;
+    /**
+     * The fire alarm system its fire fittings work together on; without
+     * one each is a specimen on its own.
+     */
+    fire?: WarehouseFire;
+  } = {},
 ) {
   const group = new Group();
   group.name = 'Guildford warehouse training room';
@@ -46,6 +56,7 @@ export function createWarehouseTrainingRoom(
   const fitted = new Set<Object3D>();
   const seen = new Set<ArchitecturalKind>();
   const lighting = options.lighting;
+  const fire = options.fire;
   const put = (
     kind: ArchitecturalKind,
     parent: Object3D,
@@ -63,7 +74,22 @@ export function createWarehouseTrainingRoom(
     ].includes(kind)
       ? lighting
       : undefined;
-    const part = parts.add(architecturalPart(kit, kind, services, options));
+    const fireKind = [
+      'callpoint',
+      'sounder',
+      'detector',
+      'firepanel',
+      'sprinkler',
+      'valves',
+      'bell',
+      'testvalve',
+    ].includes(kind);
+    const part = parts.add(
+      architecturalPart(kit, kind, services, {
+        ...options,
+        fire: fireKind ? fire : undefined,
+      }),
+    );
     part.object.position.set(x, y, z);
     parent.add(part.object);
     fitted.add(part.object);
@@ -343,7 +369,7 @@ export function createWarehouseTrainingRoom(
     station.position.set(side * 14.8, 0, 12.5);
     station.rotation.y = (-side * Math.PI) / 2;
     group.add(station);
-    put('callpoint', station, 0, 1.4, 0);
+    put('callpoint', station, 0, 1.4, 0, { index: side > 0 ? 1 : 0 });
     put('sounder', station, 0, 2.7, 0);
     put('exit', station, side * 1.4, 2.6, 0);
     put('emergency', station, 0, 3.2, 0.3);
@@ -378,8 +404,9 @@ export function createWarehouseTrainingRoom(
     }
     put('pipe', group, 14.2, 5.85, z).object.rotation.x = Math.PI / 2;
   }
-  for (const { x, z } of WAREHOUSE_HEADS)
-    put('sprinkler', group, x, 5.82, z, { fallDistance: 5.82 });
+  WAREHOUSE_HEADS.forEach(({ x, z }, index) =>
+    put('sprinkler', group, x, 5.82, z, { fallDistance: 5.82, index }),
+  );
   label(
     north,
     'NO SMOKING',
