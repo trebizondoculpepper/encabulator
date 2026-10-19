@@ -24,6 +24,7 @@ import {
   createRackCabinet,
   createRackUnit,
 } from '../toolkit/components/industrial-control/views/rack-equipment';
+import { createCharacterLcd } from '../toolkit/components/industrial-control/views/panel-instruments';
 import type { Level0Scenarios } from './level0-scenarios';
 
 /** The cabinet, metres: a 42U rack, 600 mm wide and 800 mm deep. */
@@ -260,6 +261,36 @@ export function createScenarioSimulator(
   // for each group, its name beside it, coloured caps that stand out
   // against the black rack, each LED showing its press; SLOW START's
   // stays lit while the start goes on.
+  const lcd = createCharacterLcd(kit, { columns: 20, rows: 2, cell: 0.0034 });
+  lcd.group.name = 'Scenario status LCD';
+  lcd.group.position.set(0.165, 0.04, 0.002);
+  // Keep the screen and its changing texture separate from static rack meshes.
+  lcd.group.userData.live = true;
+  panel.face.add(lcd.group);
+  const statusLabel = createMicroLabel(kit, 'SCENARIO STATUS', {
+    height: 0.004,
+    ink: '#c9ced3',
+  });
+  statusLabel.position.set(0.165, 0.064, 0.002);
+  panel.face.add(statusLabel);
+  let status: readonly string[] = ['standing by', ''];
+  let selected: Act | undefined;
+  let statusWait = 0;
+  const showStatus = (lines: readonly string[]) => {
+    status = lines;
+    lcd.show([...lines]);
+  };
+  showStatus(status);
+  const startScenario = (act: Act, name: string) => {
+    scenarios[act]();
+    selected = act;
+    statusWait = 1;
+    showStatus(
+      act === 'reset'
+        ? ['resetting', '']
+        : ['running scenario:', name.toLowerCase()],
+    );
+  };
   const starting = signal(false);
   const pitch = 0.052;
   const rowPitch = 0.046;
@@ -279,7 +310,7 @@ export function createScenarioSimulator(
           led: spec.led,
           cap: spec.cap,
           lamp: spec.act === 'slowStart' ? starting : undefined,
-          action: () => scenarios[spec.act](),
+          action: () => startScenario(spec.act, spec.legend.replace('\n', ' ')),
         }),
       );
       button.object.position.set(-0.09 + i * pitch, y, 0.002);
@@ -394,11 +425,26 @@ export function createScenarioSimulator(
     get open() {
       return open.value;
     },
+    /** The two lines currently visible on the console's LCD. */
+    get status() {
+      return status;
+    },
     update(delta: number) {
       starting.value = scenarios.starting;
       twinkle(delta);
       parts.update(delta);
       scenarios.update(delta);
+      statusWait = Math.max(0, statusWait - delta);
+      if (
+        (selected === 'slowStart' && !scenarios.starting) ||
+        (statusWait === 0 &&
+          (selected === 'reset' ||
+            selected === 'fullOn' ||
+            selected === 'fullOff'))
+      ) {
+        selected = undefined;
+        showStatus(['standing by', '']);
+      }
       const target = open.value ? -1.9 : 0;
       angle += (target - angle) * Math.min(1, delta * 6);
       if (Math.abs(angle - target) < 0.001) angle = target;

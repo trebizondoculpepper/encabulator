@@ -1,3 +1,4 @@
+import { plinthOccupied } from '../../controls/input/placement-target';
 import {
   AmbientLight,
   Box3,
@@ -191,6 +192,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     );
     deck.position.y = PLINTH.h - 0.015;
     deck.userData.boardSupport = true;
+    group.userData.placementSurface = deck;
     group.add(deck);
     const label = createMicroLabel(kit, title(kind), {
       height: 0.018,
@@ -283,6 +285,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   }
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
+    nearbyTargetFeedback: tossing.targetFeedback,
     canvas,
     camera,
     metre: m,
@@ -373,8 +376,10 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     lamps.update(time / 1000);
     // A plinth whose board has gone has a fresh one a little later.
     for (const p of plinths) {
-      const portable = p.board && portableOf(p.board);
-      if (!portable || portable.component.phase.value === 'installed') continue;
+      if (plinthOccupied(p.group)) {
+        p.taken = 0;
+        continue;
+      }
       p.taken += delta;
       if (p.taken > RESTOCK)
         appearing.add(

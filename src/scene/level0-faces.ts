@@ -321,6 +321,12 @@ export function createLevel0Dresser(
           const alive = powered.value && fate !== 'dead';
           const shown = scanner.step(delta, alive, targets);
           const linkShown = linkGlitches.step(delta, alive, shown, targets);
+          const diagnostics =
+            machine.value?.circuits.get('section1.bucket3')?.diagnostics;
+          if (alive && diagnostics && !diagnostics.diagnosticsOnline.value) {
+            panel.show(labels.map(() => (clock % 1 < 0.5 ? LAMP.amber : null)));
+            return;
+          }
           if (alive && fate === 'sputtering') {
             const surge = Math.random() < 0.35;
             panel.show(

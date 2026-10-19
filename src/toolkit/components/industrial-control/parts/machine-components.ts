@@ -1,7 +1,5 @@
-import {
-  MACHINE_DROP_PROFILES,
-  FUSE_CARTRIDGE_DROP,
-} from '../logic/machine-drop-profiles';
+import { replaceableFuse } from './replaceable-fuse';
+import { MACHINE_DROP_PROFILES } from '../logic/machine-drop-profiles';
 import type {
   Attachment,
   DropProfile,
@@ -41,7 +39,6 @@ import {
   capacitorBoard,
   electrolyticCapacitor,
   contactor,
-  fuse,
   motor,
   motorControlUnit,
   overloadRelay,
@@ -71,6 +68,8 @@ export interface MachineDevice extends Part {
    * A healthy spare card for one of its slots, wired to work in the slot
    * once seated there; the room places it and adds it to its parts.
    */
+  cartridges?: readonly MachineDevice[];
+  spareCartridge?(): MachineDevice;
   spare?(kind: (typeof EXPANSION_CARD_KINDS)[number]): MachineDevice;
   /**
    * Seat a card in an empty slot of its kind, whichever backplane made it
@@ -138,6 +137,8 @@ export function machineComponent(
     power.value ? (stress.value ? 12 : (props.current?.value ?? 1)) : 0,
   );
   let part: Part;
+  let fuseCartridges: readonly MachineDevice[] | undefined;
+  let spareCartridge: (() => MachineDevice) | undefined;
   let cards: MachineDevice[] | undefined;
   let service: ReturnType<typeof createServiceComponent> | undefined;
   let active: Readable<boolean> = running;
@@ -378,7 +379,7 @@ export function machineComponent(
         }),
         trip: click({ band: 1700, q: 2, decay: 0.1, level: 0.4 }),
       });
-      a.uses.set(view.service, handle.operate);
+      a.uses.set(view.group, handle.operate);
       a.updates.push(() =>
         view.set(
           handle!.on.value,
@@ -452,40 +453,18 @@ export function machineComponent(
       break;
     }
     case 'fuse': {
-      const device = fuse(kit, { name, current, rating: 2 });
-      if (attachment === 'detachable') {
-        const cartridge = beginPart(kit, `${name} cartridge`);
-        device.cartridge.parent!.add(cartridge.object);
-        cartridge.object.add(device.cartridge);
-        makeBoardPortable(
-          cartridge,
-          () => {
-            physicallyConnected.value = false;
-            device.detachCartridge();
-          },
-          'upright',
-          FUSE_CARTRIDGE_DROP,
-          () => {
-            physicallyConnected.value = true;
-            device.restoreCartridge();
-          },
-        );
-        const parts = createPartSet();
-        parts.add(device);
-        parts.add(cartridge.part());
-        part = { object: device.object, ...parts };
-      } else part = device;
-      active = computed(() => power.value && device.component.whole.value);
-      faulted = device.component.blown;
-      test = () => {
-        stress.value = true;
-        device.component.step(0.1);
-        stress.value = false;
-      };
-      repair = () => {
-        device.component.replace();
-      };
-      testLabel = 'OVERLOAD';
+      const device = replaceableFuse(kit, { name, power, current });
+      part = device;
+      active = device.active;
+      faulted = device.faulted;
+      value = device.value;
+      test = device.test;
+      repair = device.repair;
+      testLabel = device.testLabel;
+      slots = device.slots;
+      insert = device.insert;
+      fuseCartridges = device.cartridges;
+      spareCartridge = device.spareCartridge;
       break;
     }
     case 'capacitor': {
@@ -719,6 +698,8 @@ export function machineComponent(
     handle,
     breaker,
     cards,
+    cartridges: fuseCartridges,
+    spareCartridge,
     slots,
     spare,
     insert,

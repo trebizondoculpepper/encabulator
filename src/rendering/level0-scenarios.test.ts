@@ -1,4 +1,7 @@
-import { Raycaster } from 'three';
+import { createLevel0Spares } from './level0-spares';
+import { createSparesWorkbench } from '../toolkit/components/site-dressing/views/spares-workbench';
+import type { PortableObject } from '../toolkit/controls/input/object-handling';
+import { Raycaster, Vector3 } from 'three';
 import type { Color, Material, Mesh, Object3D } from 'three';
 import {
   afterEach,
@@ -103,6 +106,87 @@ function useOf(
 }
 
 describe('the Hyperplasc Scenario Simulator', () => {
+  it('stocks only the machine’s removable repair parts on the bench and replenishes taken items after 60s', () => {
+    const { machine, dispose } = sandbox();
+    const kit = createPanelKit();
+    const bench = createSparesWorkbench(kit);
+    const spares = createLevel0Spares(kit, bench, machine);
+    expect(spares.items.map((item) => item.kind).sort()).toEqual(
+      [
+        'capacitors',
+        'fuse',
+        'plc-power',
+        'plc-cpu',
+        'plc-input',
+        'plc-output',
+        'plc-analog',
+        'plc-comms',
+        'plc-cpu',
+      ].sort(),
+    );
+    const spareCpu = spares.items.find((item) => item.kind === 'plc-cpu')!;
+    expect(machine.boards()).toContain(spareCpu);
+    const original = spares.stock.places[0].item;
+    const portable = original.object.userData.portable as PortableObject;
+    portable.component.pickUp();
+    expect(portable.component.phase.value).toBe('held');
+    portable.detach();
+    original.object.removeFromParent();
+    spares.update(59.9);
+    expect(spares.stock.places[0].item).toBe(original);
+    spares.update(0.1);
+    expect(spares.stock.places[0].item).not.toBe(original);
+    expect(spares.stock.places[0].item.faulted.value).toBe(false);
+    spares.dispose();
+    disposeKit(kit, bench.group);
+    dispose();
+  });
+
+  it('takes presses across every button face after static merging', () => {
+    const { panel, dispose } = sandbox();
+    panel.group.updateMatrixWorld(true);
+    const controls = panel.group.getObjectByName('Testing scenario controls')!;
+    for (const button of controls.children) {
+      for (const [x, y] of [
+        [-0.006, -0.005],
+        [0.006, -0.005],
+        [-0.006, 0.006],
+        [-0.002, 0.0045],
+        [-0.012, 0],
+      ]) {
+        const target = button.localToWorld(new Vector3(x, y, 0));
+        const ray = new Raycaster(
+          target.clone().add(new Vector3(0, 0, 0.2)),
+          new Vector3(0, 0, -1),
+        );
+        const hit = ray.intersectObject(button, true)[0];
+        expect(hit, `${button.name} at ${x}, ${y}`).toBeDefined();
+        let object: Object3D | null = hit.object;
+        while (object && !panel.parts.uses.has(object)) object = object.parent;
+        expect(object, `${button.name} at ${x}, ${y}`).not.toBeNull();
+      }
+    }
+    dispose();
+  });
+
+  it('shows standby, reset and the running scenario on its two-line LCD', () => {
+    const { panel, run, dispose } = sandbox();
+    expect(panel.group.getObjectByName('Scenario status LCD')).toBeDefined();
+    expect(panel.status).toEqual(['standing by', '']);
+    useOf(panel, 'RESET states switch')();
+    expect(panel.status).toEqual(['resetting', '']);
+    run(1.2);
+    expect(panel.status).toEqual(['standing by', '']);
+    useOf(panel, 'SMOKING symptoms switch')();
+    expect(panel.status).toEqual(['running scenario:', 'smoking']);
+    useOf(panel, 'SLOW START states switch')();
+    run(1);
+    expect(panel.status).toEqual(['running scenario:', 'slow start']);
+    run(SLOW_START_STEP_SECONDS * 40);
+    expect(panel.status).toEqual(['standing by', '']);
+    dispose();
+  });
+
   it('opens by its handle, and its controls work only with the door open', () => {
     const { panel, run, dispose } = sandbox();
     const controls = panel.group.getObjectByName('Testing scenario controls')!;

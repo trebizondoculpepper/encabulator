@@ -12,6 +12,8 @@ import { assertDropProfile } from '../logic/drop-profile';
 import type { Object3D, PerspectiveCamera } from 'three';
 import type { createPortableBoard } from '../logic/portable-board';
 import { createBoardFall } from '../logic/portable-board';
+import { plinthOccupied } from './placement-target';
+import type { PlacementTarget } from './placement-target';
 
 export interface PortableObject {
   component: ReturnType<typeof createPortableBoard>;
@@ -65,6 +67,10 @@ export function createObjectHandling(
     portable: PortableObject,
     x: number,
     y: number,
+  ) => 'accept' | 'reject' | null,
+  nearbyTargetFeedback?: (
+    object: Object3D,
+    portable: PortableObject,
   ) => 'accept' | 'reject' | null,
 ) {
   const fixedSupports: SupportSurface[] = [];
@@ -133,7 +139,88 @@ export function createObjectHandling(
     ray.setFromCamera(point.set(x, y), camera);
     return ray
       .intersectObject(root, true)
-      .find((hit) => hit.object.visible && !hit.object.userData.noCollision);
+      .find((hit) => visible(hit.object) && !hit.object.userData.noCollision);
+  };
+  const visible = (object: Object3D) => {
+    for (let at: Object3D | null = object; at; at = at.parent)
+      if (!at.visible || at === held?.object) return false;
+    return true;
+  };
+  const surfaceTarget = (plinth: Object3D, deck: Object3D): PlacementTarget => {
+    const occupied = (object: Object3D) => {
+      if (plinthOccupied(plinth, object)) return true;
+      const top = new Box3().setFromObject(deck);
+      const candidates = new Set<Object3D>(records.keys());
+      return [...candidates].some((other) => {
+        if (other === object || !visible(other)) return false;
+        const portable = other.userData.portable as PortableObject | undefined;
+        if (!portable || portable.component.phase.value === 'held')
+          return false;
+        const bounds = new Box3().setFromObject(other);
+        return (
+          bounds.max.x > top.min.x &&
+          bounds.min.x < top.max.x &&
+          bounds.max.z > top.min.z &&
+          bounds.min.z < top.max.z &&
+          bounds.min.y >= top.max.y - 0.04 * metre &&
+          bounds.min.y < top.max.y + 0.15 * metre
+        );
+      });
+    };
+    return {
+      accepts: (object) => !occupied(object),
+      place(object, portable) {
+        const deckBounds = new Box3().setFromObject(deck);
+        const centre = deckBounds.getCenter(new Vector3());
+        // Preserve the carried orientation, and rest the actual model on top.
+        root.attach(object);
+        const bounds = new Box3().setFromObject(object);
+        const middle = bounds.getCenter(new Vector3());
+        const destination = object
+          .getWorldPosition(new Vector3())
+          .add(
+            new Vector3(
+              centre.x - middle.x,
+              deckBounds.max.y - bounds.min.y,
+              centre.z - middle.z,
+            ),
+          );
+        object.position.copy(root.worldToLocal(destination));
+        plinth.attach(object);
+        portable.component.drop();
+        portable.component.settle();
+        portable.component.motion(0, true);
+      },
+    };
+  };
+  /** Ignore the held model itself; a destination can be seen behind it. */
+  const placementAt = (x: number, y: number) => {
+    root.updateMatrixWorld(true);
+    camera.updateMatrixWorld(true);
+    ray.setFromCamera(point.set(x, y), camera);
+    const hit = ray
+      .intersectObject(root, true)
+      .find((hit) => visible(hit.object) && !hit.object.userData.noCollision);
+    if (!hit) return null;
+    for (let at: Object3D | null = hit.object; at; at = at.parent) {
+      const target = at.userData.placementTarget as PlacementTarget | undefined;
+      const deck = at.userData.placementSurface as Object3D | undefined;
+      if (target || deck) {
+        const destination = target ?? surfaceTarget(at, deck!);
+        const portable = records.get(held!.object)!.portable;
+        if (
+          hit.distance > (destination.reach ?? 3.2) * metre ||
+          destination.inRange?.(held!.object, portable) === false
+        )
+          return null;
+        return {
+          target: destination,
+          accepts: destination.accepts(held!.object, portable),
+          retainReset: Boolean(deck),
+        };
+      }
+    }
+    return null;
   };
   const release = (x: number, y: number) => {
     if (!held) return;
@@ -143,6 +230,14 @@ export function createObjectHandling(
     if (action === 'refuse') return;
     if (action) {
       records.delete(object);
+      held = null;
+      return;
+    }
+    const destination = placementAt(x, y);
+    if (destination) {
+      if (!destination.accepts) return;
+      destination.target.place(object, portable);
+      if (!destination.retainReset) records.delete(object);
       held = null;
       return;
     }
@@ -241,15 +336,18 @@ export function createObjectHandling(
   };
   return {
     holding: () => held !== null,
-    targetFeedback: (x: number, y: number) =>
-      held
-        ? (targetFeedback?.(
-            held.object,
-            records.get(held.object)!.portable,
-            x,
-            y,
-          ) ?? null)
-        : null,
+    targetFeedback(x: number, y: number) {
+      if (!held) return null;
+      const portable = records.get(held.object)!.portable;
+      const custom = targetFeedback?.(held.object, portable, x, y);
+      if (custom) return custom;
+      const destination = placementAt(x, y);
+      return destination
+        ? destination.accepts
+          ? 'accept'
+          : 'reject'
+        : (nearbyTargetFeedback?.(held.object, portable) ?? null);
+    },
     rotate(yaw: number, pitch: number) {
       if (!held) return;
       const previous = held.rotation.clone();
@@ -267,6 +365,10 @@ export function createObjectHandling(
     },
     use(x: number, y: number) {
       if (held) {
+        const hit = hitAt(x, y);
+        if (hit && hit.distance <= 3.2 * metre)
+          for (let at: Object3D | null = hit.object; at; at = at.parent)
+            if (at.userData.useWhileCarrying) return false;
         release(x, y);
         return true;
       }

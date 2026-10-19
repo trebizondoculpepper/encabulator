@@ -1,3 +1,5 @@
+import { liveContact } from '../toolkit/components/core/parts/live-contact';
+import { createDazzle } from '../toolkit/components/core/views/dazzle';
 import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { createMachineSideCulling } from '../scene/machine-side-culling';
 import { narrativeDiagnostics } from '../game/bbc-machine-diagnostics';
@@ -165,10 +167,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const oil = device('section3.bucket1');
   const drive = device('section6.bucket2');
   const hydro = device('section7.bucket2');
-  // The small breaker inside Automation Control, the cards' own cabinet:
-  // the cards come out only once it is off. The rest of the machine stays
-  // on, so the player is saving a machine that is still running.
-  const automation = device('section5.bucket1');
   oil.position.set('off');
   hydro.position.set('off');
 
@@ -258,8 +256,14 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     skipLamps = addSkipLamps(kit, skipModel.group, dressing.lamps);
     skip = tossing.add({ name: 'skip', ...skipModel, ...SKIP_SPOT });
   };
-  for (const card of cards)
-    (card.object.userData.portable as PortableObject).component.setLocked(true);
+  const contact = mcc.parts.add(liveContact(kit));
+  mcc.group.add(contact.object);
+  const dazzle = createDazzle(
+    canvas,
+    camera,
+    Math.random,
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
   const voice = createLevel2Voice();
   let started = false;
   let introTimer = 0;
@@ -474,24 +478,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     }
     return null;
   };
-  /**
-   * A card the player tried to pull while its cabinet is still live: the
-   * pickup refuses it (the card is locked) and the narrator objects.
-   */
-  const liveCardAt = (x: number, y: number) => {
-    if (phase < 10 || !automation.closed.value) return false;
-    raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObject(mcc.group, true)[0];
-    if (!hit || hit.distance > 3.2 * m) return false;
-    for (
-      let object: Object3D | null = hit.object;
-      object;
-      object = object.parent
-    )
-      if (cards.some((card) => card.object === object)) return true;
-    return false;
-  };
-  let warned = -Infinity;
   const footprints: Footprint[] = [
     {
       minX: (-MCC_WIDTH / 2 - 0.1) * m,
@@ -507,6 +493,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     },
   ];
   const walk = createFirstPerson({
+    nearbyTargetFeedback: tossing.targetFeedback,
     canvas,
     camera,
     metre: m,
@@ -545,15 +532,18 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
         back: LEVEL2_MACHINE.z - MCC_DEPTH - 0.05,
         front: LEVEL2_MACHINE.z + 0.08,
       }),
-    use: (x, y) => {
-      if (liveCardAt(x, y)) {
-        // Once, and again only if they keep trying.
-        if (clock - warned > 8) voice.interrupt(7);
-        warned = clock;
-        return;
-      }
-      usableAt(x, y)?.();
+    allowPickup: (object) => {
+      const card = cards.find((entry) => entry.object === object);
+      if (
+        card &&
+        (object.userData.portable as PortableObject).component.phase.value ===
+          'installed' &&
+        mcc.circuits.get('section5.bucket1')!.powered.value
+      )
+        contact.fire(object);
+      return true;
     },
+    use: (x, y) => usableAt(x, y)?.(),
     aimed: () => Boolean(usableAt(0, 0)),
   });
   workstation.onSit(({ x, z, yaw, pitch, y }) =>
@@ -588,6 +578,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     mcc.update(delta);
+    dazzle.update(delta);
     partAudio.listen(camera, m);
     phaseTime += delta;
     reminderPause.step(delta, voice.busy);
@@ -772,18 +763,6 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       voice.interrupt(5, 6);
     } else if (phase === 8 && smokeOn) advance(9);
     else if (phase === 9 && mcc.isDoorOpen(14)) advance(10, 8, 9);
-    if (phase >= 10)
-      // A card still in its slot comes out only with its cabinet's breaker
-      // off; one already out can always be picked up again.
-      for (const card of cards) {
-        const portable = (card.object.userData.portable as PortableObject)
-          .component;
-        // A card in the skip stays there.
-        if (!binned.has(cards.indexOf(card)))
-          portable.setLocked(
-            portable.phase.value === 'installed' && automation.closed.value,
-          );
-      }
     if (phase === 10) {
       for (const [index, card] of cards.entries()) {
         const state = (card.object.userData.portable as PortableObject)
@@ -872,6 +851,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     window.removeEventListener('keydown', startNarration, true);
     caption.remove();
     walk.dispose();
+    dazzle.dispose();
     voice.dispose();
     mcc.parts.dispose();
     room.parts.dispose();

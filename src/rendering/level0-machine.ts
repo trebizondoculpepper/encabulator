@@ -1,3 +1,5 @@
+import type { CabinetSocket } from './cabinet-placement';
+import { liveContact } from '../toolkit/components/core/parts/live-contact';
 import { level0Diagnostics } from '../game/bbc-machine-diagnostics';
 import type { UnitHealth } from '../toolkit/components/industrial-control/logic/bbc-micro';
 import { computed, effect, signal } from '@preact/signals-core';
@@ -139,7 +141,6 @@ export function createLevel0Machine(
   });
   ref.value = mcc;
   const circuit = (id: string) => mcc.circuits.get(id)!;
-  const breaker = (id: string) => circuit(id).breaker!.breaker!;
   // A fresh machine starts with everything off, set once here so that a
   // retained room keeps whatever the player has done since: every unit's
   // breaker open, however it is worked, except MAIN INCOMING's, sealed
@@ -150,8 +151,6 @@ export function createLevel0Machine(
     if (id !== UNITS.incoming) unit.breaker?.breaker?.position.set('off');
     if (STARTED[id as (typeof STARTED_UNITS)[number]]) unit.stop();
   }
-  const automation = breaker(UNITS.automation);
-  const driveBreaker = breaker(UNITS.vfd);
   const assembly = circuit(UNITS.automation).devices.find(
     (d) => d.kind === 'backplane',
   )!;
@@ -321,7 +320,7 @@ export function createLevel0Machine(
       ?.test();
   };
 
-  // ---- Boards: isolation, removal and reseating ----------------------------
+  // ---- Boards: live removal and reseating ----------------------------
   const seated = () =>
     assembly
       .slots!.map((slot) => slot.occupant.value)
@@ -329,23 +328,117 @@ export function createLevel0Machine(
   const capacitorsInPlace = () =>
     portableOf(capacitors)?.phase.value === 'installed' &&
     capacitors.object.parent === capacitorHome.parent;
+  const contact = mcc.parts.add(liveContact(kit));
+  mcc.group.add(contact.object);
+  const diagnosticBoards = circuit('section1.bucket3').diagnostics!;
+  const fuseHolders = [...mcc.circuits.values()].flatMap((unit) =>
+    unit.devices.filter((device) => device.kind === 'fuse').map((holder) => ({holder, unit})),
+  );
+  const live = (device: MachineDevice) => {
+    const fuse = fuseHolders.find(({holder}) => holder.slots?.[0].occupant.value === device);
+    if (fuse) return fuse.unit.breaker?.active.value ?? false;
+    return circuit(device === capacitors ? UNITS.vfd : diagnosticBoards.cards.includes(device) ? 'section1.bucket3' : UNITS.automation).powered.value;
+  };
+  const spareBoards: MachineDevice[] = [];
+  const boards = () => [...assembly.cards!, ...spareBoards, capacitors, ...diagnosticBoards.cards, ...fuseHolders.flatMap(({holder}) => holder.cartridges ?? [])];
+  const canReseat = (device: MachineDevice, targetSlot?: number) => {
+    if (!boards().includes(device)) return false;
+    if (device === capacitors)
+      return targetSlot === undefined && !capacitorsInPlace();
+    const index = targetSlot ?? CARD_KINDS.indexOf(device.kind as CardKind);
+    if (index < 0 || CARD_KINDS[index] !== device.kind) return false;
+    const occupant = assembly.slots![index].occupant.value;
+    return (
+      !occupant ||
+      portableOf(occupant)?.phase.value !== 'installed' ||
+      occupant.object.parent !== assembly.object
+    );
+  };
+  const reseat = (device: MachineDevice, targetSlot?: number) => {
+    if (!canReseat(device, targetSlot)) return false;
+    if (device === capacitors) {
+      capacitorHome.parent.add(device.object);
+      device.object.position.copy(capacitorHome.position);
+      device.object.quaternion.copy(capacitorHome.quaternion);
+      device.object.scale.setScalar(1);
+      portableOf(device)!.reset();
+      if (live(device)) contact.fire(device.object);
+      return true;
+    }
+    const slot = targetSlot ?? CARD_KINDS.indexOf(device.kind as CardKind);
+    const inserted = assembly.insert!(device, slot);
+    if (inserted && live(device)) contact.fire(device.object);
+    return inserted;
+  };
+  const repairSockets: CabinetSocket[] = [
+    ...assembly.cards!.map((card, index) => ({
+      home: assembly.object,
+      position: card.object.position.clone(),
+      width: card.kind === 'plc-cpu' ? 0.061 : 0.03,
+      height: 0.29,
+      accepts: (object: Object3D) => {
+        const device = boards().find((board) => board.object === object);
+        return Boolean(device && canReseat(device, index));
+      },
+      place: (object: Object3D) => {
+        const device = boards().find((board) => board.object === object);
+        return Boolean(device && reseat(device, index));
+      },
+    })),
+    {
+      home: capacitorHome.parent,
+      position: capacitorHome.position.clone(),
+      width: 0.25,
+      height: 0.22,
+      accepts: (object: Object3D) =>
+        object === capacitors.object && canReseat(capacitors),
+      place: (object: Object3D) =>
+        object === capacitors.object && reseat(capacitors),
+    },
+  ];
+  for (const socket of repairSockets) socket.position.z += 0.16;
+  for (const {holder, unit} of fuseHolders) {
+    repairSockets.push({
+      home: holder.object, position: holder.object.position.clone().set(0, 0, 0.04), width: 0.045, height: 0.065,
+      accepts: (object) => object.userData.repairKind === 'fuse' && !holder.slots![0].occupant.value,
+      place: (object) => {
+        const device = boards().find((board) => board.object === object);
+        if (!device || !holder.insert!(device, 0)) return false;
+        if (unit.breaker?.active.value) contact.fire(object);
+        return true;
+      },
+    });
+  }
+  diagnosticBoards.slots.forEach((slot, i) => repairSockets.push({
+    home: diagnosticBoards.object, position: diagnosticBoards.object.position.clone().set(slot.x, 0, 0.19), width: 0.05, height: 0.13,
+    accepts: (object) => {
+      const device = boards().find((board) => board.object === object);
+      return Boolean(device && diagnosticBoards.accepts(device, i));
+    },
+    place: (object) => {
+      const device = boards().find((board) => board.object === object);
+      if (!device || !diagnosticBoards.insert(device, i)) return false;
+      if (circuit('section1.bucket3').powered.value) contact.fire(object);
+      return true;
+    },
+  }));
+  const otherSeated = () => [
+    ...diagnosticBoards.slots.map((slot) => slot.occupant.value),
+    ...fuseHolders.map(({holder}) => holder.slots![0].occupant.value),
+  ].filter((device): device is MachineDevice => device !== null);
+
+
   const removedListeners = new Set<(board: MachineDevice) => void>();
-  let installed = new Set<MachineDevice>([...seated(), capacitors]);
+  let installed = new Set<MachineDevice>([...seated(), capacitors, ...otherSeated()]);
 
   let clock = 0;
   const update = (delta: number) => {
     clock += delta;
-    // Installed boards come out only with their own cabinet isolated; a
-    // loose one can always be picked up.
-    for (const card of seated())
-      portableOf(card)?.setLocked(automation.closed.value);
-    portableOf(capacitors)?.setLocked(
-      capacitorsInPlace() && driveBreaker.closed.value,
-    );
     plant.step(delta);
     mcc.update(delta);
     const now = new Set<MachineDevice>([
       ...seated(),
+      ...otherSeated(),
       ...(capacitorsInPlace() ? [capacitors] : []),
     ]);
     for (const board of installed)
@@ -410,8 +503,8 @@ export function createLevel0Machine(
       ),
     },
     plant,
-    automation,
-    driveBreaker,
+    automation: circuit(UNITS.automation).breaker!.breaker!,
+    driveBreaker: circuit(UNITS.vfd).breaker!.breaker!,
     assembly,
     capacitors,
     scheduler,
@@ -425,29 +518,37 @@ export function createLevel0Machine(
     spare(kind: CardKind) {
       const card = assembly.spare!(kind);
       watchHazard(card);
+      spareBoards.push(card);
       return card;
     },
+    spareFuse: () => fuseHolders[0].holder.spareCartridge!(),
+    spareDiagnostics: diagnosticBoards.spare,
+    /** All original and spare boards recognized by pickup and reseating. */
+    boards,
     /** Every card the rack knows, installed or not. */
     isCard: (object: Object3D) =>
       object.userData.machineComponentKind?.startsWith?.('plc-') === true,
+    /** Live handling is allowed; the connection supplies the consequences. */
+    allowPickup(object: Object3D) {
+      const device = boards().find((board) => board.object === object);
+      if (
+        device &&
+        (device === capacitors
+          ? capacitorsInPlace()
+          : [...seated(), ...otherSeated()].includes(device)) &&
+        portableOf(device)?.phase.value === 'installed' &&
+        live(device)
+      )
+        contact.fire(device.object);
+      return true;
+    },
     /**
      * Seat a card (or the capacitor board) back in the machine: only into
-     * an empty slot of its kind, and only with that cabinet isolated.
+     * an empty slot of its kind. Live contacts spark instead of refusing.
      */
-    reseat(device: MachineDevice) {
-      if (device === capacitors) {
-        if (driveBreaker.closed.value || capacitorsInPlace()) return false;
-        capacitorHome.parent.add(device.object);
-        device.object.position.copy(capacitorHome.position);
-        device.object.quaternion.copy(capacitorHome.quaternion);
-        device.object.scale.setScalar(1);
-        portableOf(device)!.reset();
-        return true;
-      }
-      if (automation.closed.value) return false;
-      const slot = CARD_KINDS.indexOf(device.kind as CardKind);
-      return slot >= 0 && assembly.insert!(device, slot);
-    },
+    canReseat,
+    reseat,
+    repairSockets,
     /** Whether a failed card is arcing now, and how much smoke it gives. */
     hazard: () => ({
       arcing: hazards.some(

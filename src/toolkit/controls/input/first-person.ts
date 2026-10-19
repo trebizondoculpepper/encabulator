@@ -9,6 +9,7 @@ import { PAD, controlsHelp, deadZone } from '../logic/controls';
 import type { InputMode } from '../logic/controls';
 import { turningKnobs } from './knob-turning';
 import { createTouchSticks } from './touch-sticks';
+import { bindViewWheel } from './view-wheel';
 
 /**
  * First-person walking, as in any PC shooter, with the same feel as the
@@ -142,6 +143,10 @@ export interface FirstPersonOptions {
     x: number,
     y: number,
   ) => 'accept' | 'reject' | null;
+  nearbyTargetFeedback?: (
+    object: Object3D,
+    portable: PortableObject,
+  ) => 'accept' | 'reject' | null;
   allowPickup?: (object: Object3D, portable: PortableObject) => boolean;
   /** Use whatever is at a normalised screen point (centre is 0, 0). */
   use: (x: number, y: number) => void;
@@ -192,6 +197,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
         options.heldAction,
         options.allowPickup,
         options.targetFeedback,
+        options.nearbyTargetFeedback,
       )
     : null;
   const use = (x: number, y: number) => {
@@ -399,7 +405,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     crosshair.hidden = !(
       locked() ||
       input === 'gamepad' ||
-      (input === 'mouse' && handling?.holding())
+      handling?.holding()
     );
     if (!locked()) {
       forget();
@@ -551,7 +557,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
-  canvas.addEventListener('wheel', wheel, { passive: false });
+  const unbindWheel = bindViewWheel(document, canvas, current, locked, wheel);
   container?.addEventListener('pointerdown', noticeInput, { capture: true });
   container?.addEventListener('gesturestart', stopGesture);
 
@@ -784,7 +790,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       crosshair.hidden = !(
         locked() ||
         input === 'gamepad' ||
-        (cursorAim && handling?.holding())
+        handling?.holding()
       );
       if (!crosshair.hidden) {
         const target = handling?.targetFeedback(
@@ -828,7 +834,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up);
       canvas.removeEventListener('pointercancel', up);
-      canvas.removeEventListener('wheel', wheel);
+      unbindWheel();
       container?.removeEventListener('pointerdown', noticeInput, {
         capture: true,
       });

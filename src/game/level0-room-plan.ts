@@ -22,6 +22,13 @@ export const LEVEL0_SCENARIOS = {
   yaw: -0.45 - (20 * Math.PI) / 180,
 };
 
+/** To the simulator's right; the bench's long edge runs north/south. */
+export const LEVEL0_SPARES = {
+  x: LEVEL0_SCENARIOS.x + 1,
+  z: LEVEL0_SCENARIOS.z + 3.1,
+  yaw: -Math.PI / 2,
+};
+
 /** The line-up's half-width, metres, and its depth behind its front. */
 const MACHINE_HALF = 2.03;
 const MACHINE_DEPTH = 0.51;

@@ -516,7 +516,7 @@ export function studioSwitch(
     });
     press = () => void button.press();
   }
-  a.uses.set(view.cap, () => {
+  a.uses.set(view.group, () => {
     view.press();
     press();
   });
@@ -988,6 +988,7 @@ export function doorLatch(
   door: ReturnType<typeof createSwitch>;
 } {
   const a = beginPart(kit, props.name ?? 'door latch');
+  a.object.userData.useWhileCarrying = true;
   a.object.add(createWingLatchView(props.material));
   const door =
     props.shared ??
@@ -1022,6 +1023,7 @@ export function doorBack(
   },
 ): Part {
   const a = beginPart(kit, props.name ?? 'door rear cover');
+  a.object.userData.useWhileCarrying = true;
   a.object.add(createDoorRearCover(kit, props.layout, props.material));
   // A click on it moves the door, not it (`mergeTree`).
   a.object.userData.still = true;

@@ -1,0 +1,5 @@
+# Cabinet insertion feedback
+
+Level0 previously attempted reseating only from its release-diversion callback, always using the centre of the camera view; it supplied no insertion feedback to the shared controller. Added socket aim targets for each automation card position and the original VFD capacitor-board mounting position. A shared cabinet placement adapter uses the actual cursor coordinates, ignores the held object, respects closed doors and hidden interiors, and supplies both feedback and the use action from the same compatibility/occupancy decision. Matching loose parts insert, while wrong parts or occupied slots show an X and remain held. Live insertion remains permitted and sparks.
+
+Recorded the owner's clarified feedback rule in AGENTS.md: green circle for a reachable compatible target, red X for a reachable target that rejects the part, ordinary crosshair beyond range. Updated generic placement and bins/skips accordingly; distant bins now leave the ordinary crosshair and a release remains an ordinary drop. Regression tests cover insertion, wrong parts, occupancy, occlusion, hidden contents and reach, alongside the bin and plinth tests.

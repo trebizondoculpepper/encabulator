@@ -358,6 +358,42 @@ describe('Level 0 machine wiring', () => {
     dispose();
   });
 
+  it('allows live capacitor-board and card handling, sparking only at live contacts', () => {
+    const { machine, room, powerUp, run, breaker, dispose } = sandbox();
+    powerUp();
+    const arc = machine.mcc.group.getObjectByName('Live connection discharge')!
+      .children[0];
+    const caps = machine.capacitors;
+    expect(
+      (caps.object.userData.portable as PortableObject).component.canPickUp
+        .value,
+    ).toBe(true);
+    expect(arc.visible).toBe(false);
+    expect(machine.allowPickup(caps.object)).toBe(true);
+    expect(arc.visible).toBe(true);
+    pull(caps, room);
+    run(3);
+    expect(machine.reseat(caps)).toBe(true);
+    expect(arc.visible).toBe(true);
+    expect(machine.reseat(caps)).toBe(false);
+    run(3);
+    breaker(UNITS.vfd).operate();
+    run(0.1);
+    machine.allowPickup(caps.object);
+    expect(arc.visible).toBe(false);
+    pull(caps, room);
+    expect(machine.reseat(caps)).toBe(true);
+    expect(arc.visible).toBe(false);
+    const card = machine.assembly.slots![1].occupant.value!;
+    machine.allowPickup(card.object);
+    expect(arc.visible).toBe(true);
+    pull(card, room);
+    run(3);
+    expect(machine.reseat(card)).toBe(true);
+    expect(arc.visible).toBe(true);
+    dispose();
+  });
+
   it('isolates and removes a failed card, which stays failed when put back', () => {
     const { machine, room, breaker, powerUp, run, dispose } = sandbox();
     powerUp();
@@ -373,11 +409,11 @@ describe('Level 0 machine wiring', () => {
     expect(machine.plant.healthy.value).toBe(false);
     expect(machine.hazard().arcing).toBe(true);
     expect(machine.hazard().smoke).toBeGreaterThan(0.3);
-    // Live, it will not come out.
+    // Live handling stays available; isolation only stops the existing fault arc.
     expect(
       (power.object.userData.portable as PortableObject).component.canPickUp
         .value,
-    ).toBe(false);
+    ).toBe(true);
     breaker(UNITS.automation).operate();
     run(0.2);
     // Isolated, it stops arcing at once; its smoke drifts away slowly.
@@ -389,12 +425,9 @@ describe('Level 0 machine wiring', () => {
     pull(power, room);
     run(0.2);
     expect(removed).toEqual([power]);
-    // A live cabinet refuses it.
-    breaker(UNITS.automation).operate();
-    expect(machine.reseat(power)).toBe(false);
+    // A live cabinet accepts it, without repairing the failed card.
     breaker(UNITS.automation).operate();
     expect(machine.reseat(power)).toBe(true);
-    breaker(UNITS.automation).operate();
     run(PLANT.plcBoot + 1);
     expect(machine.plant.plcStatus.value).toBe('halted');
     expect(machine.hazard().arcing).toBe(true);
@@ -421,8 +454,12 @@ describe('Level 0 machine wiring', () => {
     const fuse = machine.mcc.circuits
       .get(UNITS.lube)!
       .devices.find((d) => d.kind === 'fuse')!;
-    // Its own part replaces it, worked inside the open bucket.
-    [...fuse.uses.values()][0]();
+    // The blown cartridge comes out and a new one goes in its place.
+    const blown = fuse.cartridges![0].object.userData
+      .portable as PortableObject;
+    blown.component.pickUp();
+    blown.detach();
+    expect(fuse.insert!(fuse.spareCartridge!(), 0)).toBe(true);
     run(10);
     expect(machine.plant.oilOk.value).toBe(true);
     expect(machine.plant.faults.value.map((f) => f.code)).not.toContain(
@@ -979,5 +1016,107 @@ it('works the VFD speed ring and keypad edges through actual front hits', () => 
   click(key.localToWorld(new Vector3(0.0075, 0, 0)));
   expect(machine.plant.state.driveRun.value).toBe(true);
   failures.dispose();
+  dispose();
+});
+
+it('works the annunciator isolator through the open door, from its body as well as the lever', () => {
+  const { machine, powerUp, run, dispose } = sandbox();
+  powerUp();
+  const { mcc } = machine;
+  const unit = mcc.circuits.get('section1.bucket3')!;
+  mcc.openAll(true);
+  run(2);
+  mcc.group.updateMatrixWorld(true);
+  const target = unit.breaker!.object;
+  const centre = target.getWorldPosition(new Vector3());
+  // Upper body, away from the small operating lever at the bottom.
+  centre.y += 0.025;
+  centre.z += 0.095;
+  const ray = new Raycaster(
+    centre.clone().add(new Vector3(0, 0, 1)),
+    new Vector3(0, 0, -1),
+  );
+  ray.camera = new PerspectiveCamera();
+  const hit = ray.intersectObject(mcc.group, true).find((h) => {
+    for (let o: Object3D | null = h.object; o; o = o.parent)
+      if (!o.visible) return false;
+    return true;
+  });
+  let object: Object3D | null = hit?.object ?? null;
+  while (object && !mcc.parts.uses.has(object)) object = object.parent;
+  expect(object, `Hit ${hit?.object.name}`).not.toBeNull();
+  const work = mcc.parts.uses.get(object!)!;
+  expect(unit.powered.value).toBe(true);
+  work();
+  expect(unit.breaker!.breaker!.position.value).toBe('off');
+  expect(unit.powered.value).toBe(false);
+  expect(mcc.diagnosticEndpoint.value).toBe(false);
+  work();
+  expect(unit.powered.value).toBe(true);
+  expect(mcc.diagnosticEndpoint.value).toBe(true);
+  dispose();
+});
+
+
+it('replaces the automation control fuse physically, preserving a blown cartridge fault', () => {
+  const {machine, room, powerUp, run, dispose} = sandbox();
+  powerUp();
+  const unit = machine.mcc.circuits.get(UNITS.automation)!;
+  const holder = unit.devices.find((device) => device.kind === 'fuse')!;
+  const old = holder.slots![0].occupant.value!;
+  holder.test();
+  expect(old.faulted.value).toBe(true);
+  expect(unit.powered.value).toBe(false);
+  pull(old, room);
+  expect(holder.slots![0].occupant.value).toBeNull();
+  unit.reset();
+  expect(old.faulted.value).toBe(true);
+  const socket = machine.repairSockets.find((socket) => socket.home === holder.object)!;
+  expect(socket.accepts(old.object)).toBe(true);
+  expect(socket.place(old.object)).toBe(true);
+  expect(unit.powered.value).toBe(false);
+  pull(old, room);
+  const spare = machine.spareFuse();
+  room.add(spare.object);
+  expect(socket.place(spare.object)).toBe(true);
+  expect(unit.powered.value).toBe(true);
+  expect(socket.accepts(old.object)).toBe(false);
+  run(1);
+  spare.dispose();
+  dispose();
+});
+
+it('removes and replaces both Neumann cards, with an amber annunciator fault and offline BBC diagnostics', () => {
+  const {machine, room, powerUp, run, dispose} = sandbox();
+  powerUp();
+  const boards = machine.mcc.circuits.get('section1.bucket3')!.diagnostics!;
+  const diagnostics = boards.slots[1].occupant.value!;
+  const link = boards.slots[0].occupant.value!;
+  const slotModels: Object3D[] = [];
+  boards.object.traverse((object) => { if (object.userData.contactLength) slotModels.push(object); });
+  expect(slotModels).toHaveLength(4);
+  expect(slotModels.every((object) => object.userData.contactLength === 0.09)).toBe(true);
+  pull(diagnostics, room);
+  run(0.1);
+  expect(boards.diagnosticsOnline.value).toBe(false);
+  expect(machine.mcc.diagnosticEndpoint.value).toBe(false);
+  const colours = new Set<string | null>();
+  for (let n=0; n<12; n++) {
+    run(0.1);
+    machine.mcc.group.traverse((o) => { if(o.name.startsWith('Status ')) colours.add(o.userData.lit ?? null); });
+  }
+  // Every status window uses the same dedicated component-failure flash.
+  expect(colours).toContain(null);
+  const spare = machine.spareDiagnostics('neumann-diagnostics');
+  room.add(spare.object);
+  const socket = machine.repairSockets.find((socket) => socket.home === boards.object && socket.position.x === boards.slots[1].x)!;
+  expect(socket.accepts(link.object)).toBe(false);
+  expect(socket.accepts(spare.object)).toBe(true);
+  expect(socket.place(spare.object)).toBe(true);
+  expect(machine.mcc.diagnosticEndpoint.value).toBe(true);
+  pull(link, room);
+  expect(machine.mcc.diagnosticEndpoint.value).toBe(false);
+  expect(boards.diagnosticsOnline.value).toBe(true);
+  spare.dispose();
   dispose();
 });

@@ -1,3 +1,4 @@
+import { plinthOccupied } from '../../controls/input/placement-target';
 import {
   AmbientLight,
   Box3,
@@ -169,6 +170,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
   );
   deck.position.y = PLINTH.h - 0.015;
   deck.userData.boardSupport = true;
+  plinth.userData.placementSurface = deck;
   plinth.add(deck);
   const spot = new SpotLight('#fff3e2', 8 * m * m, 0, 0.3, 0.6, 2);
   spot.position.set(PLINTH.x * m, (CEILING - 0.1) * m, (PLINTH.z + 0.6) * m);
@@ -179,6 +181,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
   const boards = new Map<Object3D, MachineDevice>();
   /** Put the next board on the plinth, labelled on its front. */
   const stock = () => {
+    if (plinthOccupied(plinth)) return;
     const kind = KINDS[offered++ % KINDS.length];
     const device = parts.add(
       machineComponent(kit, kind, {
@@ -349,6 +352,7 @@ export function startAppearingSkipRoom(canvas: HTMLCanvasElement) {
   };
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
+    nearbyTargetFeedback: tossing.targetFeedback,
     canvas,
     camera,
     metre: m,

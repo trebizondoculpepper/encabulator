@@ -1,4 +1,4 @@
-import { computed, signal } from '@preact/signals-core';
+import { effect } from '@preact/signals-core';
 import {
   AmbientLight,
   Box3,
@@ -19,6 +19,7 @@ import {
 import type { Object3D } from 'three';
 import { click, partAudio } from '../../components/core/audio/part-audio';
 import { METRE } from '../../components/core/logic/units';
+import type { Readable } from '../../components/core/logic/world/components';
 import { createPartSet } from '../../components/core/parts/parts';
 import { ps1Uniforms } from '../../components/core/parts/ps1-material';
 import {
@@ -35,6 +36,7 @@ import { createShortSpark } from '../../components/core/views/button-effects';
 import { createDazzle } from '../../components/core/views/dazzle';
 import { createMaterialise } from '../../components/core/views/materialise';
 import { createSectionBoard } from '../../components/core/views/signage';
+import { createCircuitBreaker } from '../../components/industrial-control/logic/machine-components';
 import { machineComponent } from '../../components/industrial-control/parts/machine-components';
 import type { MachineDevice } from '../../components/industrial-control/parts/machine-components';
 import { createSkip } from '../../components/site-dressing/views/skip';
@@ -140,10 +142,10 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   const messages = [
     'LIVE · ISOLATE FIRST',
     'WRONG PART',
-    'WRONG BOARD',
     'SLOT OCCUPIED',
     'REMOVE A CARD',
     'PULLED LIVE',
+    'INSERTED LIVE',
     'INSERTING',
     'INSTALLED',
     'POWER OFF',
@@ -156,36 +158,58 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     display.left = 1.8;
     for (const [name, group] of display.names) group.visible = name === message;
   };
+  const stops: (() => void)[] = [];
+  /**
+   * An isolator for `station`: the small grey breaker with its throw
+   * handle fitted inside the Encabulator's cabinets (the `breaker` machine
+   * component). It will not move while a part is being slid into its board.
+   */
+  const isolator = (station: number, x: number, y: number, on: boolean) => {
+    const busy = {
+      get value() {
+        return pending.some((entry) => entry.station === station);
+      },
+    };
+    const breaker = createCircuitBreaker(undefined, `station${station}`);
+    if (!on) breaker.position.set('off');
+    const device = parts.add(
+      machineComponent(kit, 'breaker', {
+        name: `station ${station + 1} isolator`,
+        breaker,
+        latch: busy,
+      }),
+    );
+    device.object.position.set(x, y, -4.63);
+    room.add(device.object);
+    let first = true;
+    stops.push(
+      effect(() => {
+        const live = breaker.closed.value;
+        if (!first && !live) notice(station, 'POWER OFF');
+        first = false;
+      }),
+    );
+    return breaker.closed;
+  };
   const racks: {
     device: MachineDevice;
-    power: ReturnType<typeof signal<boolean>>;
+    power: Readable<boolean>;
     positions: Vector3[];
     orientations: Quaternion[];
     x: number;
   }[] = [];
   for (const [i, x] of [-1.35, 1.35].entries()) {
-    const power = signal(i === 1);
+    const power = isolator(i, x - 0.35, 1.43, i === 1);
     const device = parts.add(
       machineComponent(kit, 'backplane', {
         name: `REPAIR BOARD ${i + 1}`,
-        power: computed(() => power.value),
+        power,
       }),
     );
     device.object.position.set(x, 1.48, -4.68);
     room.add(device.object);
     label(`BOARD ${i + 1} · PLC BACKPLANE`, x, 2.12, -4.62, 1.5);
-    const switchMesh = new Mesh(
-      new BoxGeometry(0.11, 0.14, 0.05),
-      kitPaint(kit, '#252728'),
-    );
-    switchMesh.position.set(x - 0.35, 1.44, -4.6);
-    room.add(switchMesh);
-    controls.set(switchMesh, () => {
-      if (pending.some((entry) => entry.station === i)) return;
-      power.value = !power.value;
-      if (!power.value) notice(i, 'POWER OFF');
-    });
-    label('ISOLATOR', x - 0.35, 1.57, -4.58, 0.45);
+    label('ISOLATOR', x - 0.35, 1.6, -4.58, 0.45);
     const faultMesh = new Mesh(
       new BoxGeometry(0.12, 0.08, 0.04),
       kitPaint(kit, '#9a2722'),
@@ -201,7 +225,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       new BoxGeometry(0.06, 0.06, 0.025),
       new MeshBasicMaterial({ color: '#171a17' }),
     );
-    lamp.position.set(x - 0.35, 1.28, -4.56);
+    lamp.position.set(x - 0.35, 1.24, -4.56);
     room.add(lamp);
     statusLamps.push({ mesh: lamp, rack: i });
     const names = new Map<string, Object3D>();
@@ -250,7 +274,6 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   label('NEW REPLACEMENT PARTS', benchX, 1.13, benchZ + 0.57, 2.2);
   const stock: { card: MachineDevice; rack: number; x: number; z: number }[] =
     [];
-  const cardOwners = new Map<Object3D, number>();
   // Each place on the bench keeps its part: once the part is installed or
   // thrown in the skip, a new one boils in where it stood.
   const shelf: { item: Object3D; make: () => Object3D; due: number }[] = [];
@@ -263,7 +286,6 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         card.object.position.set(x, 0.94, z);
         room.add(card.object);
         stock.push({ card, rack: index, x, z });
-        cardOwners.set(card.object, index);
         return card.object;
       };
       shelf.push({ item: make(), make, due: 0 });
@@ -279,7 +301,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   // A second scale of repair: the existing 2 A cartridge and holder model.
   const fuse = createRepairFuse(kit, parts);
   const fuseX = -2.65;
-  const fusePower = signal(false);
+  const fusePower = isolator(2, fuseX - 0.27, 1.47, false);
   const fusePlate = new Mesh(
     new BoxGeometry(0.86, 0.6, 0.055),
     kitPaint(kit, '#9b9f9b'),
@@ -291,7 +313,6 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   const placeFuse = (object: Object3D) => {
     object.position.set(benchX + 0.85, 0.96, benchZ + 0.06);
     room.add(object);
-    cardOwners.set(object, 2);
     return object;
   };
   shelf.push({
@@ -301,18 +322,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   });
   label('2 A CONTROL FUSE', fuseX, 1.94, -4.62, 0.9);
   label('NEW 2 A FUSE', benchX + 0.85, 0.96, benchZ + 0.34, 0.8);
-  const fuseSwitch = new Mesh(
-    new BoxGeometry(0.11, 0.14, 0.05),
-    kitPaint(kit, '#252728'),
-  );
-  fuseSwitch.position.set(fuseX - 0.27, 1.48, -4.6);
-  room.add(fuseSwitch);
-  controls.set(fuseSwitch, () => {
-    if (pending.some((entry) => entry.station === 2)) return;
-    fusePower.value = !fusePower.value;
-    if (!fusePower.value) notice(2, 'POWER OFF');
-  });
-  label('ISOLATOR', fuseX - 0.27, 1.62, -4.58, 0.45);
+  label('ISOLATOR', fuseX - 0.27, 1.64, -4.58, 0.45);
   const fuseFault = new Mesh(
     new BoxGeometry(0.11, 0.08, 0.05),
     kitPaint(kit, '#9a2722'),
@@ -430,10 +440,6 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       new Vector3((benchX + 1.35) * m, 0.94 * m, (benchZ + 0.55) * m),
     ),
   ];
-  for (const [index, rack] of racks.entries())
-    for (const card of rack.device.cards!) cardOwners.set(card.object, index);
-  for (const cartridge of fuse.cartridges)
-    if (!cardOwners.has(cartridge.object)) cardOwners.set(cartridge.object, 2);
   const pending: {
     object: Object3D;
     portable: PortableObject;
@@ -443,6 +449,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     toQ: Quaternion;
     age: number;
     seat: () => boolean;
+    live: () => boolean;
     station: number;
   }[] = [];
   const refusal = (station: number, message: string, object: Object3D) => {
@@ -453,6 +460,12 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     );
     return 'refuse' as const;
   };
+  /** The card `object` is, from either board or the bench. */
+  const cardOf = (object: Object3D) =>
+    [
+      ...racks.flatMap((rack) => rack.device.cards!),
+      ...stock.map((entry) => entry.card),
+    ].find((card) => card.object === object);
   room.updateMatrixWorld(true);
   const sockets = [
     ...racks.flatMap((rack, board) =>
@@ -464,9 +477,8 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         live: () => rack.power.value,
         position,
         seat: (part: Object3D) => {
-          const card =
-            rack.device.cards!.find((c) => c.object === part) ??
-            stock.find((entry) => entry.card.object === part)?.card;
+          // Any card of the slot's kind: its own, the other board's or a spare.
+          const card = cardOf(part);
           return Boolean(card && rack.device.insert!(card, slot));
         },
         orientation: rack.orientations[slot],
@@ -520,12 +532,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     ];
   };
   const partKind = (object: Object3D) =>
-    fuse.has(object)
-      ? 'fuse'
-      : ([
-          ...racks.flatMap((rack) => rack.device.cards!),
-          ...stock.map((entry) => entry.card),
-        ].find((entry) => entry.object === object)?.kind ?? '');
+    fuse.has(object) ? 'fuse' : (cardOf(object)?.kind ?? '');
   const decisionFor = (socket: (typeof sockets)[number], object: Object3D) =>
     socketDecision({
       live: Boolean(socket.live()),
@@ -536,8 +543,6 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         ),
       partKind: partKind(object),
       socketKind: socket.kind,
-      partBoard: cardOwners.get(object) ?? -1,
-      socketBoard: socket.board,
     });
   const targetFeedback = (
     object: Object3D,
@@ -547,7 +552,8 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   ) => {
     const socket = aimedSocket(x, y);
     if (!socket) return null;
-    return decisionFor(socket, object) === 'insert'
+    const decision = decisionFor(socket, object);
+    return decision === 'insert' || decision === 'insert-live'
       ? ('accept' as const)
       : ('reject' as const);
   };
@@ -558,21 +564,13 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     y: number,
   ): boolean | 'refuse' => {
     const socket = aimedSocket(x, y);
-    if (!socket) {
-      if (tossing.divert(object, portable)) {
-        portable.component.drop();
-        return true;
-      }
-      return false;
-    }
+    if (!socket) return false;
     const decision = decisionFor(socket, object);
     const message = {
-      live: 'LIVE · ISOLATE FIRST',
       occupied: 'SLOT OCCUPIED',
       'wrong-part': 'WRONG PART',
-      'wrong-board': 'WRONG BOARD',
     } as const;
-    if (decision !== 'insert')
+    if (decision !== 'insert' && decision !== 'insert-live')
       return refusal(socket.board, message[decision], object);
     portable.component.setLocked(true);
     pending.push({
@@ -584,12 +582,13 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       toQ: socket.orientation.clone(),
       age: 0,
       seat: () => socket.seat(object),
+      live: () => Boolean(socket.live()),
       station: socket.board,
     });
     notice(socket.board, 'INSERTING');
     return true;
   };
-  // A part pulled out live comes out, but arcs as it breaks contact.
+  // Live insertion and extraction arc as the electrical contacts meet or part.
   const arc = createShortSpark(kit, 14);
   arc.group.scale.setScalar(3 * m);
   scene.add(arc.group);
@@ -598,12 +597,22 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   /** Seconds to each spark still to spit from the socket after a pop. */
   let afterSparks: number[] = [];
   const dazzle = createDazzle(canvas, camera);
+  const sparkAt = (object: Object3D, station: number, message: string) => {
+    object.getWorldPosition(arc.group.position);
+    arc.group.position.z += 0.03 * m;
+    arc.fire();
+    partAudio.play(crack, object);
+    dazzle.flash(object, { reduced: reducedMotion() });
+    // Then none to three more, spat from the socket as it settles.
+    afterSparks = [];
+    let at = 0;
+    for (let n = Math.floor(Math.random() * 4); n > 0; n--)
+      afterSparks.push((at += 0.12 + Math.random() * 0.45));
+    notice(station, message);
+  };
   const allowPickup = (object: Object3D) => {
     const liveRack = racks.findIndex(
-      (rack, index) =>
-        rack.power.value &&
-        cardOwners.get(object) === index &&
-        object.parent === rack.device.object,
+      (rack) => rack.power.value && object.parent === rack.device.object,
     );
     const station =
       liveRack >= 0
@@ -611,19 +620,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         : fusePower.value && fuse.occupant?.object === object
           ? 2
           : -1;
-    if (station >= 0) {
-      object.getWorldPosition(arc.group.position);
-      arc.group.position.z += 0.03 * m;
-      arc.fire();
-      partAudio.play(crack, object);
-      dazzle.flash(object, { reduced: reducedMotion() });
-      // Then none to three more, spat from the socket as it settles.
-      afterSparks = [];
-      let at = 0;
-      for (let n = Math.floor(Math.random() * 4); n > 0; n--)
-        afterSparks.push((at += 0.12 + Math.random() * 0.45));
-      notice(station, 'PULLED LIVE');
-    }
+    if (station >= 0) sparkAt(object, station, 'PULLED LIVE');
     return true;
   };
   const views = {
@@ -635,6 +632,8 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   };
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
+    nearbyTargetFeedback: tossing.targetFeedback,
+    divert: tossing.divert,
     canvas,
     camera,
     metre: m,
@@ -742,7 +741,9 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       insertion.portable.component.setLocked(false);
       if (seated) {
         used(insertion.object);
-        notice(insertion.station, 'INSTALLED');
+        if (insertion.live())
+          sparkAt(insertion.object, insertion.station, 'INSERTED LIVE');
+        else notice(insertion.station, 'INSTALLED');
         partAudio.play(
           click({ band: 1250, q: 2.5, decay: 0.07, level: 0.14 }),
           insertion.object,
@@ -796,6 +797,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   });
   const dispose = () => {
     renderer.setAnimationLoop(null);
+    for (const stop of stops) stop();
     observer.disconnect();
     walk.dispose();
     portals.dispose();

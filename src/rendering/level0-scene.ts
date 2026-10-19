@@ -1,3 +1,6 @@
+import { createLevel0Spares } from './level0-spares';
+import { createSparesWorkbench } from '../toolkit/components/site-dressing/views/spares-workbench';
+import { LEVEL0_SPARES } from '../game/level0-room-plan';
 import { Scene, Vector3 } from 'three';
 import type { Mesh } from 'three';
 import { computed, effect, signal } from '@preact/signals-core';
@@ -187,12 +190,19 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
   );
   simulator.group.rotation.y = LEVEL0_SCENARIOS.yaw;
   scene.add(simulator.group);
+  const sparesBench = createSparesWorkbench(kit);
+  sparesBench.group.scale.setScalar(m);
+  sparesBench.group.position.set(LEVEL0_SPARES.x * m, 0, LEVEL0_SPARES.z * m);
+  sparesBench.group.rotation.y = LEVEL0_SPARES.yaw;
+  scene.add(sparesBench.group);
+  const spares = createLevel0Spares(kit, sparesBench, machine);
   // What is merged may be hidden when too small to see (`createDetailCuller`).
   const detail = [
     ...mcc.batches,
     ...room.batches,
     ...workstation.batches,
     ...simulator.batches,
+    ...spares.batches,
   ];
   // The presence detectors over the lighting zones, where they hang, so
   // each can be told whether it sees the player.
@@ -246,6 +256,8 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
     failures,
     scenarios,
     simulator,
+    sparesBench,
+    spares,
     detail,
   };
 }

@@ -2494,7 +2494,9 @@ function populateInterior(
     start: () => request.set(true),
     stop: () => request.set(false),
     reset: () => {
-      for (const device of own) device.repair();
+      for (const device of own)
+        if (device.kind !== 'fuse' && device.kind !== 'capacitors')
+          device.repair();
       emergency.set(false);
     },
   };

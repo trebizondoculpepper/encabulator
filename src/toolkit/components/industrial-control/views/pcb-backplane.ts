@@ -112,7 +112,11 @@ export function createPcbBackplane(
 }
 
 /** Fixed female edge connector. The two rails leave a real, dark open card slot. */
-export function createCardEdgeSlot(kit: PanelKit, index: number) {
+export function createCardEdgeSlot(
+  kit: PanelKit,
+  index: number,
+  contactLength = 0.196,
+) {
   const group = new Group();
   group.name = `Fixed black card slot ${index + 1}`;
   group.userData.attachment = 'fixed';
@@ -134,18 +138,19 @@ export function createCardEdgeSlot(kit: PanelKit, index: number) {
     group.add(mesh);
     return mesh;
   };
-  piece(0.011, 0.204, 0.003, 0, 0, 0.0015);
-  piece(0.003, 0.195, 0.0005, 0, 0, 0.0033, inside);
+  piece(0.011, contactLength + 0.008, 0.003, 0, 0, 0.0015);
+  piece(0.003, contactLength - 0.001, 0.0005, 0, 0, 0.0033, inside);
   for (const side of [-1, 1]) {
-    piece(0.0035, 0.196, 0.017, side * 0.00325, 0, 0.0115);
-    piece(0.011, 0.004, 0.02, 0, side * 0.1, 0.01);
-    for (let pin = 0; pin < 32; pin++)
+    piece(0.0035, contactLength, 0.017, side * 0.00325, 0, 0.0115);
+    piece(0.011, 0.004, 0.02, 0, side * (contactLength / 2 + 0.002), 0.01);
+    const pins = Math.min(32, Math.floor(contactLength / 0.00508));
+    for (let pin = 0; pin < pins; pin++)
       piece(
         0.00035,
         0.0022,
         0.008,
         side * 0.00125,
-        (pin - 15.5) * 0.00508,
+        (pin - (pins - 1) / 2) * 0.00508,
         0.0075,
         gold,
       );
@@ -155,7 +160,7 @@ export function createCardEdgeSlot(kit: PanelKit, index: number) {
     maxWidth: 0.025,
     ink: '#e4ead6',
   });
-  legend.position.set(0, -0.116, 0.0002);
+  legend.position.set(0, -contactLength / 2 - 0.018, 0.0002);
   group.add(legend);
   return group;
 }

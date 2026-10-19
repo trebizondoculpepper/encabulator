@@ -1,3 +1,5 @@
+import { createCabinetPlacement } from './cabinet-placement';
+import { createDazzle } from '../toolkit/components/core/views/dazzle';
 import { Group, Mesh, PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { Object3D } from 'three';
 import {
@@ -5,6 +7,7 @@ import {
   LEVEL0_SCENARIOS,
   LEVEL0_MACHINE,
   LEVEL0_START,
+  LEVEL0_SPARES,
 } from '../game/level0-room-plan';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
 import { domeSky, pickWeather, skyLook } from '../game/level0-sky';
@@ -75,6 +78,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     failures,
     scenarios,
     simulator,
+    sparesBench,
+    spares,
     detail,
   } = createLevel0Scene(kit, m);
   const renderer = createRenderer(canvas);
@@ -84,6 +89,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // Merged detail too small to see from where the player stands is not drawn.
   const culler = createDetailCuller(camera);
   cullLevel0Detail(culler, detail);
+  spares.onBatches((meshes) => cullLevel0Detail(culler, meshes));
   const bounds: Footprint = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -98,6 +104,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     maxZ: solid.maxZ * m,
   }));
   const { mcc } = machine;
+  const dazzle = createDazzle(
+    canvas,
+    camera,
+    Math.random,
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
   if (
     import.meta.env.DEV &&
     new URLSearchParams(location.search).get('view') === 'annunciator-open'
@@ -149,31 +161,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     }
     return null;
   };
-  /** What, in the machine, the player is looking at within reach. */
-  const aimedInto = (home: Object3D) => {
-    raycaster.setFromCamera(pointer.set(0, 0), camera);
-    const hit = raycaster.intersectObject(mcc.group, true)[0];
-    if (!hit || hit.distance > 3.2 * m) return false;
-    for (let o: Object3D | null = hit.object; o; o = o.parent)
-      if (o === home) return true;
-    return false;
-  };
-  /**
-   * Let go of a board while looking into its own place in the machine and
-   * it is seated there, if that cabinet is isolated and the place is empty;
-   * otherwise it drops, or goes in the skip, as anything does.
-   */
-  const reseat = (object: Object3D) => {
-    const device = [...machine.assembly.cards!, machine.capacitors].find(
-      (board) => board.object === object,
-    );
-    if (!device) return false;
-    const home =
-      device === machine.capacitors
-        ? machine.capacitorParent
-        : machine.assembly.object;
-    return aimedInto(home) && machine.reseat(device);
-  };
+  const cabinetPlacement = createCabinetPlacement(
+    mcc.group,
+    camera,
+    machine.repairSockets,
+    m,
+  );
   const footprints: Footprint[] = [
     {
       minX: (LEVEL0_MACHINE.x - MCC_WIDTH / 2 - 0.1) * m,
@@ -189,29 +182,40 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     },
   ];
   const walk = createFirstPerson({
+    nearbyTargetFeedback: tossing.targetFeedback,
+    allowPickup: machine.allowPickup,
+    targetFeedback: cabinetPlacement.targetFeedback,
+    heldAction: cabinetPlacement.heldAction,
     canvas,
     camera,
     metre: m,
     floorY: 0,
     objects: scene,
     start:
-      new URLSearchParams(location.search).get('view') === 'data-cable'
+      new URLSearchParams(location.search).get('view') === 'spares'
         ? {
-            x: (LEVEL0_MACHINE.x - 4.6) * m,
-            z: (LEVEL0_MACHINE.z - 2.4) * m,
-            yaw: 2.45,
-            pitch: -0.58,
+            x: (LEVEL0_SPARES.x - 2.2) * m,
+            z: LEVEL0_SPARES.z * m,
+            yaw: Math.PI / 2,
+            pitch: -0.37,
           }
-        : new URLSearchParams(location.search)
-              .get('view')
-              ?.startsWith('annunciator')
+        : new URLSearchParams(location.search).get('view') === 'data-cable'
           ? {
-              x: (LEVEL0_MACHINE.x - 1.79) * m,
-              z: (LEVEL0_MACHINE.z + 0.8) * m,
-              yaw: 0,
-              pitch: -0.78,
+              x: (LEVEL0_MACHINE.x - 4.6) * m,
+              z: (LEVEL0_MACHINE.z - 2.4) * m,
+              yaw: 2.45,
+              pitch: -0.58,
             }
-          : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
+          : new URLSearchParams(location.search)
+                .get('view')
+                ?.startsWith('annunciator')
+            ? {
+                x: (LEVEL0_MACHINE.x - 1.79) * m,
+                z: (LEVEL0_MACHINE.z + 0.8) * m,
+                yaw: 0,
+                pitch: -0.78,
+              }
+            : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
     solids: () => [
       ...walls,
       ...workstation.solids(),
@@ -227,6 +231,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
           LEVEL0_SCENARIOS.yaw,
         ),
       ),
+      {
+        minX: (LEVEL0_SPARES.x - 0.4) * m,
+        maxX: (LEVEL0_SPARES.x + 0.5) * m,
+        minZ: (LEVEL0_SPARES.z - 1.8) * m,
+        maxZ: (LEVEL0_SPARES.z + 1.8) * m,
+      },
       ...roomSolids,
       ...footprints,
       skip
@@ -243,8 +253,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
             maxZ: (LEVEL0_CHAIRS.z + CHAIR_STACK_HALF) * m,
           },
     ],
-    divert: (object, portable) =>
-      reseat(object) || tossing.divert(object, portable),
+    divert: tossing.divert,
     redirectDrop: (placement) =>
       ejectCabinetDrop(placement, {
         minX: LEVEL0_MACHINE.x - MCC_WIDTH / 2 - 0.05,
@@ -342,7 +351,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     room.parts.update(delta);
     lighting.update();
     workstation.parts.update(delta);
+    spares.update(delta);
     simulator.update(delta);
+    dazzle.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);
     machine.update(delta);
@@ -363,6 +374,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     renderer.setAnimationLoop(null);
     observer.disconnect();
     walk.dispose();
+    cabinetPlacement.dispose();
     machine.dispose();
     failures.dispose();
     symptoms.dispose();
@@ -372,6 +384,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     stopDiagnosticLink();
     workstation.dispose();
     simulator.dispose();
+    spares.dispose();
+    dazzle.dispose();
     skipLamps?.dispose();
     skipGraffiti?.dispose();
     scene.remove(skipModel.group, chairs);
@@ -437,6 +451,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     /** The scenario simulator's actions (development only). */
     scenarios,
     simulator,
+    sparesBench,
     /** The sky: set a starting condition (overcast, sunny or night). */
     sky(next: Weather) {
       weather = next;

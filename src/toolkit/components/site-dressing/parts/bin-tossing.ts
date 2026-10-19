@@ -10,6 +10,7 @@ import {
 } from '../logic/bin-toss';
 import type { BinShape, Point3 } from '../logic/bin-toss';
 import type { PortableObject } from '../../../controls/input/object-handling';
+import type { PlacementTarget } from '../../../controls/input/placement-target';
 
 /** A bin things can be thrown into: its model, its inside and where it is. */
 export interface TossBin {
@@ -125,18 +126,58 @@ export function createBinTossing({
       bin,
     });
   };
+  const available = (bin: TossBin) => {
+    if (!bin.group.parent) return false;
+    for (let at: Object3D | null = bin.group; at; at = at.parent)
+      if (!at.visible) return false;
+    return true;
+  };
+  const distance = (object: Object3D, bin: TossBin) => {
+    const centre = new Box3()
+      .setFromObject(object)
+      .getCenter(new Vector3())
+      .divideScalar(m);
+    return distanceToBin(centre, bin, bin.footprint, bin.group.rotation.y);
+  };
+  /** Shared by the cue, the aimed placement and the magnetic release. */
+  const accepts = (object: Object3D, bin: TossBin) =>
+    available(bin) && distance(object, bin) <= BIN_MAGNET_REACH;
+  const nearest = (object: Object3D) => {
+    camera.getWorldPosition(eye).divideScalar(m);
+    return bins
+      .filter((bin) => accepts(object, bin))
+      .sort(
+        (a, b) =>
+          distance(object, a) - distance(object, b) ||
+          Math.hypot(a.x - eye.x, a.z - eye.z) -
+            Math.hypot(b.x - eye.x, b.z - eye.z),
+      )[0];
+  };
   return {
     bins: bins as readonly (TossBin & { filled: number })[],
     /** Add a bin to throw things into; it must already be in the scene. */
     add(bin: TossBin) {
       const entry = Object.assign(bin, { filled: 0 });
       bins.push(entry);
+      const target: PlacementTarget = {
+        reach: Infinity,
+        inRange: (object) => accepts(object, entry),
+        accepts: (object) => accepts(object, entry),
+        place: (object, portable) => {
+          portable.component.drop();
+          toss(object, portable, entry);
+        },
+      };
+      entry.group.userData.placementTarget = target;
       return entry;
     },
     /** Take a bin away; anything on its way into it lands nowhere. */
     remove(bin: TossBin) {
       const at = bins.findIndex((b) => b === bin);
-      if (at >= 0) bins.splice(at, 1);
+      if (at >= 0) {
+        bins.splice(at, 1);
+        delete bin.group.userData.placementTarget;
+      }
       for (let i = tosses.length - 1; i >= 0; i--)
         if (tosses[i].bin === bin) tosses.splice(i, 1);
     },
@@ -144,34 +185,14 @@ export function createBinTossing({
     incoming: (bin: TossBin) => tosses.some((t) => t.bin === bin),
     /** For `createFirstPerson`: take a released object into a bin, or not. */
     divert(object: Object3D, portable: PortableObject) {
-      camera.getWorldPosition(eye).divideScalar(m);
-      // Bin openings attract a carried object within two metres of their
-      // nearest edge, whichever way the player happens to face.
-      const held = new Box3()
-        .setFromObject(object)
-        .getCenter(new Vector3())
-        .divideScalar(m);
-      const bin = bins
-        .map((b) => ({
-          bin: b,
-          distance: distanceToBin(
-            { x: held.x, z: held.z },
-            { x: b.x, z: b.z },
-            b.footprint,
-            b.group.rotation.y,
-          ),
-        }))
-        .filter(({ distance }) => distance <= BIN_MAGNET_REACH)
-        .sort(
-          (a, b) =>
-            a.distance - b.distance ||
-            Math.hypot(a.bin.x - eye.x, a.bin.z - eye.z) -
-              Math.hypot(b.bin.x - eye.x, b.bin.z - eye.z),
-        )[0]?.bin;
+      const bin = nearest(object);
       if (!bin) return false;
       toss(object, portable, bin);
       return true;
     },
+    /** Green whenever the ordinary magnetic release would take this object. */
+    targetFeedback: (object: Object3D) =>
+      nearest(object) ? ('accept' as const) : null,
     /** Throw `object` straight into the named bin (for development). */
     toss(object: Object3D, portable: PortableObject, name: string) {
       const bin = bins.find((b) => b.name === name) ?? bins[0];

@@ -6,14 +6,17 @@ const ready = {
   occupied: false,
   partKind: 'plc-power',
   socketKind: 'plc-power',
-  partBoard: 1,
-  socketBoard: 1,
 };
 
-it('seats only a matching spare at an isolated empty socket', () => {
+it('seats a part of its kind at an empty socket, from any board, live or not', () => {
   expect(socketDecision(ready)).toBe('insert');
-  expect(socketDecision({ ...ready, live: true })).toBe('live');
+  expect(socketDecision({ ...ready, live: true })).toBe('insert-live');
   expect(socketDecision({ ...ready, occupied: true })).toBe('occupied');
   expect(socketDecision({ ...ready, partKind: 'plc-cpu' })).toBe('wrong-part');
-  expect(socketDecision({ ...ready, partBoard: 2 })).toBe('wrong-board');
+});
+
+it('still rejects occupied or incompatible sockets while powered', () => {
+  const live = { ...ready, live: true };
+  expect(socketDecision({ ...live, occupied: true })).toBe('occupied');
+  expect(socketDecision({ ...live, partKind: 'plc-cpu' })).toBe('wrong-part');
 });

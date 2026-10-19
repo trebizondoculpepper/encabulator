@@ -45,6 +45,7 @@ export function createMachineGallery(kit: PanelKit): TestFitting[] {
     const deck = new Mesh(new BoxGeometry(0.94, 0.03, 0.94), top);
     deck.position.y = 0.965;
     deck.userData.boardSupport = true;
+    group.userData.placementSurface = deck;
     group.add(deck);
     const panel = new Group();
     panel.name = 'Pedestal test controls';
@@ -237,6 +238,7 @@ export function createEmptyMachinePlinths(kit: PanelKit): TestFitting[] {
     const deck = new Mesh(new BoxGeometry(0.94, 0.03, 0.94), top);
     deck.position.y = 0.965;
     deck.userData.boardSupport = true;
+    group.userData.placementSurface = deck;
     group.add(column, deck);
     const sign = new Group();
     sign.name = 'Folded exhibit out of service card';
