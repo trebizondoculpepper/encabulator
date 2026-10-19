@@ -260,15 +260,15 @@ export interface PlantFault {
 /**
  * How bad a fault is, from its code: a halted PLC, an earth fault, a
  * tripped drive and failed DC bus parts are critical; lost lube, lost I/O,
- * protective devices operated, an emergency stop pushed and wiring faults
- * are failures; the rest
+ * protective devices operated and wiring faults are failures; the rest,
+ * an emergency stop among them,
  * (hot, unlocked, drifting, a door open) are warnings.
  */
 export function severityOf(code: string): Severity {
   if (/^(E01|E10|E11|E20|F04|F07|S0\d)$|-(C1|A1)$/.test(code))
     return 'critical';
   if (
-    /^(E02|E3\d|E4\d|E5\d|E6\d|A01|A11|A13)$|-(Q|F1|F2|KM|K\d|X\d|RU\d|ES)$/.test(
+    /^(E02|E3\d|E4\d|E5\d|E6\d|A01|A11|A13)$|-(Q|F1|F2|KM|K\d|X\d|RU\d)$/.test(
       code,
     )
   )
@@ -447,6 +447,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     }),
     /** FEED MOTOR: 0 HAND, 1 OFF, 2 AUTO. */
     feedHoa: g.input('feed.hoa', 1, { where: 'FEED MOTOR HAND OFF AUTO' }),
+    /**
+     * FEED MOTOR held stopped by its emergency stop: set when it is struck,
+     * kept after it is pulled out, cleared only by HAND OFF AUTO at OFF.
+     */
+    feedHeld: g.input('feed.held', false, {
+      where: 'FEED MOTOR emergency stop latch',
+    }),
     /** PHASE TRIM, detents 0 to 12, 5° each about the middle. */
     phaseTrim: g.input<number>('phase.trim', PLANT.trimCentre, {
       where: 'PHASE REFERENCE PHASE TRIM knob',
@@ -637,8 +644,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   );
   const feedDemand = g.output(
     'feed.demand',
-    [control.feedHoa, feedAuto],
-    (hoa, auto) => hoa === 0 || (hoa === 2 && auto),
+    [control.feedHoa, feedAuto, control.feedHeld],
+    (hoa, auto, held) => !held && (hoa === 0 || (hoa === 2 && auto)),
     { where: 'FEED MOTOR starter' },
   );
   const hydraulicPermit = g.output(
@@ -1464,6 +1471,10 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         window,
         on: on[window],
         starting: starting[window] ?? false,
+        // Held stopped by its emergency stop (`-ES`): amber, not red.
+        emergency: list.some(
+          (f) => f.window === window && f.code.endsWith('-ES'),
+        ),
         worst: worstSeverity(
           list
             .filter((f) => f.window === window)
@@ -1474,14 +1485,20 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     {
       where: 'DISTRIBUTION status annunciator',
       equals: ((
-        a: { on: boolean; starting: boolean; worst: unknown }[],
+        a: {
+          on: boolean;
+          starting: boolean;
+          worst: unknown;
+          emergency: boolean;
+        }[],
         b: typeof a,
       ) =>
         a.every(
           (w, i) =>
             w.on === b[i].on &&
             w.starting === b[i].starting &&
-            w.worst === b[i].worst,
+            w.worst === b[i].worst &&
+            w.emergency === b[i].emergency,
         )) as never,
     },
   );

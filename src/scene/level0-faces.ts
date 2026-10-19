@@ -310,6 +310,7 @@ export function createLevel0Dresser(
               starting: state.starting,
               worst: state.worst,
               acknowledged: acknowledged.has(state.window),
+              emergency: state.emergency,
             });
           });
           // Drowned, DISTRIBUTION holds out a while, then fails: the panel
@@ -457,24 +458,22 @@ export function createLevel0Dresser(
         legend('HAND OFF AUTO', cx - 0.09, -0.02, 0.07);
         caption('AUTO: PLC CYCLE', cx - 0.09, -0.09);
         // Its emergency stop: struck, the motor stops and stays stopped
-        // until it is pulled out and HAND OFF AUTO is turned to OFF.
-        const stop = place(
+        // until it is pulled out and HAND OFF AUTO is turned to OFF (the
+        // model's `feedHeld`, which its demand already allows for).
+        place(
           mushroomStop(kit, { bound: circuit.emergency }),
           cx - 0.03,
           -0.18,
           0.85,
         );
         caption('RESET: PULL OUT, TURN TO OFF', cx + 0.09, -0.18);
-        let stopped = false;
         const softStart = createSoftStarterLogic({
           fullLoad: PLANT.motorAmps,
           startAmps: PLANT.softStartAmps,
           rampAmps: PLANT.softRampAmps,
         });
         every((delta) => {
-          if (stop.pushed.value) stopped = true;
-          else if (p.control.feedHoa.value === 1) stopped = false;
-          if (p.feedDemand.value && !stopped) circuit.start();
+          if (p.feedDemand.value) circuit.start();
           else circuit.stop();
           const on = circuit.running.value && lit.value;
           starter.set(softStart.step(delta, on, false));

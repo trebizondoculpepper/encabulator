@@ -31,7 +31,7 @@ import { FAILURES } from '../game/machine-failure';
 import { CARD_KINDS } from '../game/level0-plant';
 import { createLevel0Machine } from './level0-machine';
 import { MODULE_OF, UNIT_ROLES } from './level0-wiring';
-import { SCAN_SECONDS_PER_WINDOW } from '../game/level0-status';
+import { SCAN_SECONDS_PER_WINDOW, statusLight } from '../game/level0-status';
 import { WINDOWS } from '../game/level0-plant';
 
 beforeEach(() => {
@@ -847,7 +847,7 @@ it.each([
   ['FEED MOTOR', UNITS.feed, 'M-102'],
   ['AUXILIARY MOTOR', UNITS.auxMotor, 'M-103'],
 ] as const)(
-  "reports the %s's emergency stop as a failure, and warns BEWARE",
+  "shows the %s's emergency stop amber, a warning, not a failure",
   (label, unit, window) => {
     const { machine, run, dispose } = sandbox();
     const bbc = createBbcComputer(machine.diagnostics);
@@ -856,9 +856,16 @@ it.each([
       run(seconds);
       bbc.step(seconds);
     };
+    /** What the window shows, scanned or not. */
+    const light = () => {
+      const state = machine.plant.windowStates.value.find(
+        (w) => w.window === window,
+      )!;
+      return statusLight({ powered: true, acknowledged: false, ...state });
+    };
     createLevel0Scenarios(machine).fullOn();
     both(100);
-    expect(machine.diagnostics.units!.value[window]).toBe('green');
+    expect(light()).toBe('green');
     const stop = within(machine, label, 'EMERGENCY STOP');
     machine.mcc.parts.uses.get(stop)!();
     both(2);
@@ -866,18 +873,50 @@ it.each([
     expect(machine.plant.faults.value.map((f) => f.text)).toContain(
       `${label} EMERGENCY STOP`,
     );
-    expect(machine.diagnostics.units!.value[window]).toBe('failed');
-    expect(bbc.beware.value).toBe(1);
-    // Pulled out, the fault clears.
-    machine.mcc.parts.uses.get(stop)!();
-    both(2);
-    expect(machine.plant.faults.value.map((f) => f.text)).not.toContain(
-      `${label} EMERGENCY STOP`,
-    );
+    expect(light()).toBe('amber');
+    // A warning: the BBC's BEWARE is for failures.
+    expect(machine.diagnostics.units!.value[window]).toBe('other');
+    expect(bbc.beware.value).toBe(0);
     bbc.dispose();
     dispose();
   },
 );
+
+it('holds the feed motor stopped, amber, until its stop is reset through OFF', () => {
+  const { machine, run, dispose } = sandbox();
+  const feed = machine.mcc.circuits.get(UNITS.feed)!;
+  const light = () => {
+    const state = machine.plant.windowStates.value.find(
+      (w) => w.window === 'M-102',
+    )!;
+    return statusLight({ powered: true, acknowledged: false, ...state });
+  };
+  createLevel0Scenarios(machine).fullOn();
+  run(100);
+  // In AUTO, the PLC runs it: on, green, whether or not it is turning.
+  expect(machine.plant.control.feedHoa.value).toBe(2);
+  expect(light()).toBe('green');
+  const stop = within(machine, 'FEED MOTOR', 'EMERGENCY STOP');
+  machine.mcc.parts.uses.get(stop)!();
+  run(2);
+  expect(light()).toBe('amber');
+  // Pulled out, it is still held: stopped, and amber, never green.
+  machine.mcc.parts.uses.get(stop)!();
+  for (let i = 0; i < 30; i++) {
+    run(1);
+    expect(feed.running.value).toBe(false);
+    expect(light()).toBe('amber');
+  }
+  // Through OFF, it is released, and back in AUTO the PLC runs it again.
+  machine.plant.control.feedHoa.set(1);
+  run(1);
+  expect(machine.plant.control.feedHeld.value).toBe(false);
+  expect(light()).not.toBe('amber');
+  machine.plant.control.feedHoa.set(2);
+  run(20);
+  expect(light()).toBe('green');
+  dispose();
+});
 
 it('lets a front click reach every VFD keypad key and its speed knob', () => {
   const { machine, dispose } = sandbox();

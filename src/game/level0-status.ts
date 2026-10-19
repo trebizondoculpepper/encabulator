@@ -7,7 +7,8 @@
  *   (pressure building, a controller booting) and as the annunciator
  *   powers up;
  * - green: on and OK;
- * - amber: sub-optimal, a warning;
+ * - amber: sub-optimal, a warning, or the module held stopped by its
+ *   emergency stop;
  * - red: a failure, or the module off;
  * - red flashing: a critical failure, until it is acknowledged.
  */
@@ -48,6 +49,8 @@ export interface WindowState {
   worst: Severity | null;
   /** Its critical failure has been acknowledged (ACK). */
   acknowledged: boolean;
+  /** It is held stopped by its emergency stop, until that is reset. */
+  emergency?: boolean;
 }
 
 export function statusLight(window: WindowState): StatusLight {
@@ -58,6 +61,8 @@ export function statusLight(window: WindowState): StatusLight {
     case 'failure':
       return 'red';
   }
+  // Stopped on purpose, by its emergency stop: a warning, not a failure.
+  if (window.emergency) return 'amber';
   if (!window.on) return 'red';
   switch (window.worst) {
     case 'warning':

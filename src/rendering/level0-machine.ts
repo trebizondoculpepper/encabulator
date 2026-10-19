@@ -169,6 +169,15 @@ export function createLevel0Machine(
   const outputRelay = wires.relay(UNITS.field, 2);
   const inputRelay = wires.relay(UNITS.field, 3);
 
+  // The feed motor's emergency stop latch, kept in the model (`feedHeld`):
+  // struck, it holds the motor stopped; pulled out, it holds on until
+  // HAND OFF AUTO is turned to OFF.
+  const feedLatch = effect(() => {
+    if (circuit(UNITS.feed).emergency.value) plant.control.feedHeld.set(true);
+    else if (plant.control.feedHoa.value === 1)
+      plant.control.feedHeld.set(false);
+  });
+
   // ---- Electrical components into the model --------------------------------
   const unbridge = effect(() => {
     plant.sense({
@@ -229,7 +238,12 @@ export function createLevel0Machine(
             (d.kind === 'terminal' && d.service!.failed.value),
         ),
     });
-    plant.report(componentReports(mcc));
+    plant.report(
+      componentReports(
+        mcc,
+        (id) => id === UNITS.feed && plant.control.feedHeld.value,
+      ),
+    );
     plant.senseControlAmps(controlAmps(mcc, mains.value));
     assembly.slots!.forEach((slot, i) => {
       const card = slot.occupant.value;
@@ -447,6 +461,7 @@ export function createLevel0Machine(
     capacitorParent: capacitorHome.parent,
     dispose() {
       unbridge();
+      feedLatch();
       for (const hazard of hazards) hazard.smoke.dispose();
     },
   };

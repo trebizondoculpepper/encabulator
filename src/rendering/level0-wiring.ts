@@ -196,7 +196,11 @@ export function createUnitWiring(machine: ReadonlySignal<MccView | null>) {
  * breaker can supply the diagnostics: each with its unit's code (U and
  * its section and bucket) and the device's tag.
  */
-export function componentReports(machine: MccView): PlantFault[] {
+export function componentReports(
+  machine: MccView,
+  /** Units still held stopped by an emergency stop pulled back out. */
+  held: (id: string) => boolean = () => false,
+): PlantFault[] {
   const list: PlantFault[] = [];
   for (const [id, circuit] of machine.circuits) {
     const [, section, bucket] = /section(\d)\.bucket(\d)/.exec(id) ?? [];
@@ -209,8 +213,8 @@ export function componentReports(machine: MccView): PlantFault[] {
     const breaker = circuit.breaker;
     if (breaker?.faulted.value) report('Q', 'BREAKER TRIPPED');
     if (!breaker?.active.value) continue;
-    // A motor stopped on its emergency stop, until it is pulled out.
-    if (circuit.emergency.value) report('ES', 'EMERGENCY STOP');
+    // A motor stopped on its emergency stop, until it is reset.
+    if (circuit.emergency.value || held(id)) report('ES', 'EMERGENCY STOP');
     let relays = 0;
     let chassis = 0;
     let terminals = 0;
