@@ -22,6 +22,7 @@ import {
 import type { MachineComponentKind } from '../../components/industrial-control/logic/machine-components';
 import { dressSkip } from '../../components/site-dressing/logic/skip-dressing';
 import { METRE } from '../../components/core/logic/units';
+import { createMaterialise } from '../../components/core/views/materialise';
 import type { Footprint } from '../../controls/logic/walk-collision';
 import { createSectionBoard } from '../../components/core/views/signage';
 import {
@@ -55,7 +56,9 @@ const CEILING = 3.2;
 const RING = 3;
 const PLINTH = { w: 0.5, h: 0.95, d: 0.5 };
 /** Seconds after its board is taken before a plinth has a fresh one. */
-const RESTOCK = 3;
+const RESTOCK = 10;
+/** Seconds a fresh board takes to boil in from nothing. */
+const MATERIALISE = 2;
 /** The boards on the plinths: the Pepperdyne cards and their neighbours. */
 const KINDS: readonly MachineComponentKind[] = [
   ...EXPANSION_CARD_KINDS,
@@ -229,8 +232,14 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     p.group.add(device.object);
     p.board = device;
     p.taken = 0;
+    return device;
   };
   for (const p of plinths) stock(p);
+  // A restocked board does not just appear: it boils in from nothing.
+  const reducedMotion = () =>
+    globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ??
+    false;
+  const appearing = new Set<ReturnType<typeof createMaterialise>>();
   const portableOf = (device: MachineDevice) =>
     device.object.userData.portable as PortableObject | undefined;
 
@@ -323,6 +332,10 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
     },
     /** How many things have gone in each bin. */
     fill: () => skip.filled,
+    /** Restock now, without the wait, every plinth whose board has gone. */
+    hurry() {
+      for (const p of plinths) p.taken = RESTOCK;
+    },
     /** Throw plinth boards straight into the skip, `n` of them. */
     throw(n = 1) {
       const first = skip.filled;
@@ -363,8 +376,16 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
       const portable = p.board && portableOf(p.board);
       if (!portable || portable.component.phase.value === 'installed') continue;
       p.taken += delta;
-      if (p.taken > RESTOCK) stock(p);
+      if (p.taken > RESTOCK)
+        appearing.add(
+          createMaterialise(stock(p).object, {
+            seconds: MATERIALISE,
+            reduced: reducedMotion(),
+          }),
+        );
     }
+    for (const effect of appearing)
+      if (!effect.update(delta)) appearing.delete(effect);
     parts.update(delta);
     portals.update(delta, walk.walker.x, walk.walker.z);
     partAudio.listen(camera, m);
@@ -372,6 +393,7 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   });
   const dispose = () => {
     renderer.setAnimationLoop(null);
+    for (const effect of appearing) effect.finish();
     observer.disconnect();
     walk.dispose();
     portals.dispose();
