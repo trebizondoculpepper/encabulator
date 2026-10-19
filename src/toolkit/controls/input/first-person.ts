@@ -1,4 +1,4 @@
-import type { Object3D, PerspectiveCamera } from 'three';
+import type { Box3, Object3D, PerspectiveCamera } from 'three';
 import { createObjectHandling } from './object-handling';
 import type { DropPlacement } from './object-handling';
 import type { PortableObject, SupportSurface } from './object-handling';
@@ -129,6 +129,20 @@ export interface FirstPersonOptions {
   /** Take a released object instead of dropping it (`createObjectHandling`). */
   divert?: (object: Object3D, portable: PortableObject) => boolean;
   redirectDrop?: (placement: DropPlacement) => DropPlacement;
+  carrySolids?: () => readonly Box3[];
+  heldAction?: (
+    object: Object3D,
+    portable: PortableObject,
+    x: number,
+    y: number,
+  ) => boolean | 'refuse';
+  targetFeedback?: (
+    object: Object3D,
+    portable: PortableObject,
+    x: number,
+    y: number,
+  ) => 'accept' | 'reject' | null;
+  allowPickup?: (object: Object3D, portable: PortableObject) => boolean;
   /** Use whatever is at a normalised screen point (centre is 0, 0). */
   use: (x: number, y: number) => void;
   /** Whether something usable is under the crosshair. */
@@ -149,6 +163,10 @@ export function createFirstPerson(options: FirstPersonOptions) {
         options.supports,
         options.divert,
         options.redirectDrop,
+        options.carrySolids,
+        options.heldAction,
+        options.allowPickup,
+        options.targetFeedback,
       )
     : null;
   const use = (x: number, y: number) => {
@@ -243,6 +261,20 @@ export function createFirstPerson(options: FirstPersonOptions) {
     changeStance(walker);
   });
   container?.append(crouchButton);
+  const inspectButton = document.createElement('button');
+  inspectButton.type = 'button';
+  inspectButton.className = 'touch-crouch';
+  inspectButton.textContent = 'INSPECT';
+  inspectButton.style.left = '80px';
+  let touchInspect = false;
+  inspectButton.addEventListener('pointerdown', (event) => {
+    event.stopPropagation();
+    touchInspect = true;
+  });
+  const stopInspect = () => (touchInspect = false);
+  inspectButton.addEventListener('pointerup', stopInspect);
+  inspectButton.addEventListener('pointercancel', stopInspect);
+  container?.append(inspectButton);
   // The controls for the input in use, at the foot of the screen.
   const help = document.createElement('div');
   help.className = 'controls-help';
@@ -265,7 +297,11 @@ export function createFirstPerson(options: FirstPersonOptions) {
     movement.style.display = mode === 'mouse' ? 'flex' : 'none';
     help.textContent = controlsHelp(mode);
     showHelp();
-    crosshair.hidden = !(locked() || mode === 'gamepad');
+    crosshair.hidden = !(
+      locked() ||
+      mode === 'gamepad' ||
+      (mode === 'mouse' && handling?.holding())
+    );
     if (mode !== 'touch') sticks?.reset();
   };
   setInput(
@@ -289,7 +325,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (canvas.parentElement?.hidden) return;
     if (typing(event)) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (WALK_KEYS.has(event.code)) {
+    if (WALK_KEYS.has(event.code) || event.code === 'KeyX') {
       setInput('mouse');
       keys.add(event.code);
       tapped.add(event.code);
@@ -304,6 +340,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
   const forget = () => {
     keys.clear();
     tapped.clear();
+    touchInspect = false;
   };
   const look = (event: MouseEvent) => {
     if (!locked()) return;
@@ -311,11 +348,19 @@ export function createFirstPerson(options: FirstPersonOptions) {
     if (holding) return;
     // Looking slows as the view zooms in, so small controls stay easy to aim at.
     const rate = LOOK_RADIANS_PER_PIXEL / walker.zoom;
+    if (handling?.holding() && keys.has('KeyX')) {
+      handling.rotate(event.movementX * rate, event.movementY * rate);
+      return;
+    }
     walker.yaw += event.movementX * rate;
     walker.pitch = clampPitch(walker.pitch - event.movementY * rate);
   };
   const lockChange = () => {
-    crosshair.hidden = !(locked() || input === 'gamepad');
+    crosshair.hidden = !(
+      locked() ||
+      input === 'gamepad' ||
+      (input === 'mouse' && handling?.holding())
+    );
     if (!locked()) {
       forget();
       releasedAt = performance.now();
@@ -334,6 +379,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
     yaw: number;
     pitch: number;
     moved: boolean;
+    previousX: number;
+    previousY: number;
   } | null = null;
   const screenPoint = (x: number, y: number): [number, number] => {
     const rect = canvas.getBoundingClientRect();
@@ -342,6 +389,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
       -((y - rect.top) / rect.height) * 2 + 1,
     ];
   };
+  let hoverPoint: [number, number] = [0, 0];
+  let hoverPosition: [number, number] = [0, 0];
   // Fingers on the canvas, for the pinch.
   const fingers = new Map<number, { x: number; y: number }>();
   let pinch: { distance: number; zoom: number } | null = null;
@@ -374,9 +423,16 @@ export function createFirstPerson(options: FirstPersonOptions) {
       yaw: walker.yaw,
       pitch: walker.pitch,
       moved: false,
+      previousX: event.clientX,
+      previousY: event.clientY,
     };
   };
   const move = (event: PointerEvent) => {
+    if (event.pointerType === 'mouse' && !locked()) {
+      hoverPoint = screenPoint(event.clientX, event.clientY);
+      const rect = canvas.getBoundingClientRect();
+      hoverPosition = [event.clientX - rect.left, event.clientY - rect.top];
+    }
     const finger = fingers.get(event.pointerId);
     if (finger) {
       finger.x = event.clientX;
@@ -394,6 +450,15 @@ export function createFirstPerson(options: FirstPersonOptions) {
     const slop = event.pointerType === 'mouse' ? 5 : 12;
     if (Math.hypot(dx, dy) > slop) drag.moved = true;
     if (!drag.moved || holding) return;
+    if (touchInspect && handling?.holding()) {
+      handling.rotate(
+        (event.clientX - drag.previousX) * 0.004,
+        (event.clientY - drag.previousY) * 0.003,
+      );
+      drag.previousX = event.clientX;
+      drag.previousY = event.clientY;
+      return;
+    }
     walker.yaw = drag.yaw - (dx * 0.004) / walker.zoom;
     walker.pitch = clampPitch(drag.pitch + (dy * 0.003) / walker.zoom);
   };
@@ -449,6 +514,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     look: { x: 0, y: 0 },
     zoom: 0,
     run: false,
+    inspect: false,
   };
   const readGamepad = () => {
     if (canvas.parentElement?.hidden) return idle;
@@ -484,7 +550,13 @@ export function createFirstPerson(options: FirstPersonOptions) {
     // A click of the walk stick runs until the stick comes back to centre.
     if (went(PAD.run)) padRun = true;
     if (!Math.hypot(move.x, move.y)) padRun = false;
-    return { move, look, zoom, run: padRun };
+    return {
+      move,
+      look,
+      zoom,
+      run: padRun,
+      inspect: pad.buttons[3]?.pressed ?? false,
+    };
   };
 
   const eyeY = floorY + EYE_HEIGHT_METRES * metre;
@@ -538,13 +610,21 @@ export function createFirstPerson(options: FirstPersonOptions) {
       if (sticks && !holding) {
         // The look stick turns the head, slower as the view zooms in.
         const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
-        walker.yaw += sticks.look.x * turn;
-        walker.pitch = clampPitch(walker.pitch - sticks.look.y * turn * 0.75);
+        if (touchInspect && handling?.holding())
+          handling.rotate(sticks.look.x * turn, sticks.look.y * turn * 0.75);
+        else {
+          walker.yaw += sticks.look.x * turn;
+          walker.pitch = clampPitch(walker.pitch - sticks.look.y * turn * 0.75);
+        }
       }
       if (!holding) {
         const turn = (TOUCH_LOOK_RADIANS_PER_SECOND * delta) / walker.zoom;
-        walker.yaw += pad.look.x * turn;
-        walker.pitch = clampPitch(walker.pitch - pad.look.y * turn * 0.75);
+        if (pad.inspect && handling?.holding())
+          handling.rotate(pad.look.x * turn, pad.look.y * turn * 0.75);
+        else {
+          walker.yaw += pad.look.x * turn;
+          walker.pitch = clampPitch(walker.pitch - pad.look.y * turn * 0.75);
+        }
         if (pad.zoom)
           walker.zoom = Math.max(
             MIN_ZOOM,
@@ -597,11 +677,40 @@ export function createFirstPerson(options: FirstPersonOptions) {
         camera.updateProjectionMatrix();
       }
       handling?.update(delta);
-      if (locked() && (options.aimed || handling))
-        crosshair.style.borderColor =
-          handling?.aimed() || options.aimed?.()
-            ? '#ffb43a'
-            : 'rgba(233, 225, 200, 0.85)';
+      const cursorAim = input === 'mouse' && !locked();
+      crosshair.hidden = !(
+        locked() ||
+        input === 'gamepad' ||
+        (cursorAim && handling?.holding())
+      );
+      if (!crosshair.hidden) {
+        const target = handling?.targetFeedback(
+          cursorAim ? hoverPoint[0] : 0,
+          cursorAim ? hoverPoint[1] : 0,
+        );
+        crosshair.textContent = target === 'reject' ? '×' : '';
+        Object.assign(crosshair.style, {
+          left: cursorAim ? `${hoverPosition[0]}px` : '50%',
+          top: cursorAim ? `${hoverPosition[1]}px` : '50%',
+          width: target ? '18px' : '8px',
+          height: target ? '18px' : '8px',
+          margin: target ? '-9px 0 0 -9px' : '-4px 0 0 -4px',
+          borderRadius: target === 'reject' ? '0' : '50%',
+          borderColor:
+            target === 'accept'
+              ? '#44df70'
+              : target === 'reject'
+                ? 'transparent'
+                : handling?.aimed() || options.aimed?.()
+                  ? '#ffb43a'
+                  : 'rgba(233, 225, 200, 0.85)',
+          color: '#f04b43',
+          fontSize: '26px',
+          fontWeight: 'bold',
+          lineHeight: '14px',
+          textAlign: 'center',
+        });
+      }
     },
     dispose() {
       handling?.dispose();
@@ -625,6 +734,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       crosshair.remove();
       movement.remove();
       crouchButton.remove();
+      inspectButton.remove();
       clearTimeout(fading);
       help.remove();
     },

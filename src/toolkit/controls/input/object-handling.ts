@@ -1,5 +1,6 @@
 import {
   Box3,
+  Euler,
   Matrix4,
   Mesh,
   Quaternion,
@@ -48,6 +49,23 @@ export function createObjectHandling(
   divert?: (object: Object3D, portable: PortableObject) => boolean,
   /** Room geometry may move a release clear of an inaccessible enclosure. */
   redirectDrop?: (placement: DropPlacement) => DropPlacement,
+  /** A held part cannot pass through these coarse world-space solid volumes. */
+  carrySolids: () => readonly Box3[] = () => [],
+  /** Give a room first chance to seat or magnetically bin a held part. */
+  heldAction?: (
+    object: Object3D,
+    portable: PortableObject,
+    x: number,
+    y: number,
+  ) => boolean | 'refuse',
+  /** A room may interlock pickup of installed parts. */
+  allowPickup?: (object: Object3D, portable: PortableObject) => boolean,
+  targetFeedback?: (
+    object: Object3D,
+    portable: PortableObject,
+    x: number,
+    y: number,
+  ) => 'accept' | 'reject' | null,
 ) {
   const fixedSupports: SupportSurface[] = [];
   root.updateMatrixWorld(true);
@@ -117,10 +135,17 @@ export function createObjectHandling(
       .intersectObject(root, true)
       .find((hit) => hit.object.visible && !hit.object.userData.noCollision);
   };
-  const release = () => {
+  const release = (x: number, y: number) => {
     if (!held) return;
     const { object } = held;
     const portable = records.get(object)!.portable;
+    const action = heldAction?.(object, portable, x, y);
+    if (action === 'refuse') return;
+    if (action) {
+      records.delete(object);
+      held = null;
+      return;
+    }
     portable.component.drop();
     if (divert?.(object, portable)) {
       // The room's to move from now on: it is not put back where it was
@@ -215,9 +240,34 @@ export function createObjectHandling(
     held = null;
   };
   return {
+    holding: () => held !== null,
+    targetFeedback: (x: number, y: number) =>
+      held
+        ? (targetFeedback?.(
+            held.object,
+            records.get(held.object)!.portable,
+            x,
+            y,
+          ) ?? null)
+        : null,
+    rotate(yaw: number, pitch: number) {
+      if (!held) return;
+      const previous = held.rotation.clone();
+      held.rotation.premultiply(
+        new Quaternion().setFromEuler(new Euler(-pitch, yaw, 0, 'YXZ')),
+      );
+      camera.getWorldQuaternion(cameraRotation);
+      held.object.quaternion.copy(cameraRotation).multiply(held.rotation);
+      held.object.updateMatrixWorld(true);
+      const rotated = new Box3().setFromObject(held.object);
+      if (carrySolids().some((solid) => rotated.intersectsBox(solid))) {
+        held.rotation.copy(previous);
+        held.object.quaternion.copy(cameraRotation).multiply(previous);
+      }
+    },
     use(x: number, y: number) {
       if (held) {
-        release();
+        release(x, y);
         return true;
       }
       const hit = hitAt(x, y);
@@ -225,6 +275,7 @@ export function createObjectHandling(
       const found = portableAt(hit.object);
       if (!found || !found.portable.component.canPickUp.value) return false;
       const { object, portable } = found;
+      if (allowPickup && !allowPickup(object, portable)) return false;
       if (!records.has(object))
         records.set(object, {
           parent: object.parent!,
@@ -276,13 +327,45 @@ export function createObjectHandling(
         camera.getWorldQuaternion(cameraRotation);
         worldRotation.copy(cameraRotation).multiply(held.rotation);
         held.object.quaternion.copy(worldRotation);
+        held.grab.lerp(
+          new Vector3(0.18 * metre, -0.18 * metre, -0.65 * metre),
+          Math.min(1, dt * 12),
+        );
         worldPosition
           .copy(held.offset)
           .multiply(held.object.scale)
           .applyQuaternion(worldRotation);
-        held.object.position
-          .copy(camera.localToWorld(held.grab.clone()))
+        const start = held.object.position.clone();
+        const target = camera
+          .localToWorld(held.grab.clone())
           .sub(worldPosition);
+        const travel = target.clone().sub(start);
+        const solids = carrySolids();
+        if (solids.length) {
+          held.object.updateMatrixWorld(true);
+          const startBox = new Box3().setFromObject(held.object);
+          const candidate = new Box3();
+          const steps = Math.min(
+            48,
+            Math.max(1, Math.ceil(travel.length() / (0.04 * metre))),
+          );
+          let safe = 0;
+          for (let i = 1; i <= steps; i++) {
+            candidate
+              .copy(startBox)
+              .translate(travel.clone().multiplyScalar(i / steps));
+            if (
+              solids.some(
+                (solid) =>
+                  candidate.intersectsBox(solid) &&
+                  !startBox.intersectsBox(solid),
+              )
+            )
+              break;
+            safe = i / steps;
+          }
+          held.object.position.copy(start).addScaledVector(travel, safe);
+        } else held.object.position.copy(target);
       }
       for (const [object, fall] of falling) {
         const portable = records.get(object)!.portable;

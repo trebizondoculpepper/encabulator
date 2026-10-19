@@ -2,9 +2,8 @@ import { Box3, Matrix4, Quaternion, Vector3 } from 'three';
 import type { Camera, Object3D } from 'three';
 import { click, partAudio } from '../../core/audio/part-audio';
 import {
-  BIN_REACH,
-  aimsAtBin,
-  overBin,
+  BIN_MAGNET_REACH,
+  distanceToBin,
   arcSeconds,
   binArc,
   binRest,
@@ -36,9 +35,8 @@ const clang = click({
 /**
  * Throwing things into bins, for any room (`src/toolkit/components/site-dressing/logic/bin-toss.ts` is the
  * rule): pass `divert` to `createFirstPerson`, and a released object let
- * go facing a bin within reach, counted from its middle plus half its
- * length so a long skip can be reached from its end, flies in a parabola
- * into the bin faced most squarely, turning to lie flat along it, and
+ * go within two metres of the nearest edge of a bin's opening flies in a
+ * parabola into the nearest bin, turning to lie flat along it, and
  * lands with a clang on whatever is already there, where it stays,
  * locked. Bins can be added at any time, so a room may conjure one up.
  * Objects are in the scene's frame, `metre` units to the metre.
@@ -69,7 +67,6 @@ export function createBinTossing({
     bin: TossBin;
   }[] = [];
   const eye = new Vector3();
-  const look = new Vector3();
   /** Where an object's middle is, in its own frame, scaled. */
   const middleOf = (object: Object3D) => {
     object.updateMatrixWorld(true);
@@ -128,15 +125,6 @@ export function createBinTossing({
       bin,
     });
   };
-  /** How far off the line of sight a bin is, radians. */
-  const off = (bin: TossBin) => {
-    const a =
-      Math.abs(
-        Math.atan2(bin.x - eye.x, bin.z - eye.z) - Math.atan2(look.x, look.z),
-      ) %
-      (Math.PI * 2);
-    return Math.min(a, Math.PI * 2 - a);
-  };
   return {
     bins: bins as readonly (TossBin & { filled: number })[],
     /** Add a bin to throw things into; it must already be in the scene. */
@@ -157,35 +145,29 @@ export function createBinTossing({
     /** For `createFirstPerson`: take a released object into a bin, or not. */
     divert(object: Object3D, portable: PortableObject) {
       camera.getWorldPosition(eye).divideScalar(m);
-      camera.getWorldDirection(look);
-      // Let go over a bin (or at its rim), it falls in, whichever way the
-      // player faces; it must never drop through the bin to the floor.
+      // Bin openings attract a carried object within two metres of their
+      // nearest edge, whichever way the player happens to face.
       const held = new Box3()
         .setFromObject(object)
         .getCenter(new Vector3())
         .divideScalar(m);
-      const under = bins.find((b) =>
-        overBin(
-          { x: held.x, z: held.z },
-          { x: b.x, z: b.z },
-          b.footprint,
-          b.group.rotation.y,
-        ),
-      );
-      if (under) {
-        toss(object, portable, under);
-        return true;
-      }
       const bin = bins
-        .filter((b) =>
-          aimsAtBin(
-            { x: eye.x, z: eye.z },
-            { x: look.x, z: look.z },
+        .map((b) => ({
+          bin: b,
+          distance: distanceToBin(
+            { x: held.x, z: held.z },
             { x: b.x, z: b.z },
-            BIN_REACH + b.footprint.x / 2,
+            b.footprint,
+            b.group.rotation.y,
           ),
-        )
-        .sort((a, b) => off(a) - off(b))[0];
+        }))
+        .filter(({ distance }) => distance <= BIN_MAGNET_REACH)
+        .sort(
+          (a, b) =>
+            a.distance - b.distance ||
+            Math.hypot(a.bin.x - eye.x, a.bin.z - eye.z) -
+              Math.hypot(b.bin.x - eye.x, b.bin.z - eye.z),
+        )[0]?.bin;
       if (!bin) return false;
       toss(object, portable, bin);
       return true;

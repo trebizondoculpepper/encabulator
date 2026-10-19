@@ -1,0 +1,3 @@
+# Room directory
+
+Added a lightweight HTML room index at `/`, with the playable levels first, then every numbered development room and the other standalone rooms. Links use relative `?room=` URLs so they work under the GitHub Pages base path. Direct room URLs still enter the renderer; returning to `/` suspends the current room and shows the index. The index includes dev20 Repair Workshop and leaves dev14 as the skip room. Verified the index visually in Chrome, followed a dev1 link, and used Back to return to the index. Chrome had exhausted its WebGL contexts during repeated local room testing, so it displayed the existing WebGL startup error after opening dev1; the room link and navigation worked.

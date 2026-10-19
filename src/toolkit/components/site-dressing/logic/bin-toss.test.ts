@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   BIN_LIP,
   BIN_REACH,
+  BIN_MAGNET_REACH,
   aimsAtBin,
+  distanceToBin,
   arcSeconds,
   binArc,
   binRest,
@@ -33,6 +35,16 @@ const shape: BinShape = {
 };
 
 describe('putting things in the bin', () => {
+  it('measures the magnetic action from the nearest opening edge', () => {
+    const size = { x: 1.8, z: 1.2 };
+    expect(distanceToBin({ x: 2.9, z: 0 }, bin, size, 0)).toBeCloseTo(
+      BIN_MAGNET_REACH,
+    );
+    expect(distanceToBin({ x: 0, z: 0 }, bin, size, 0)).toBe(0);
+    expect(distanceToBin({ x: 3, z: 0 }, bin, size, 0)).toBeGreaterThan(
+      BIN_MAGNET_REACH,
+    );
+  });
   it('takes what is let go of facing the bin, within a metre and a half', () => {
     // Standing a metre south of it, looking north at it.
     expect(aimsAtBin({ x: 0, z: 1 }, { x: 0, z: -1 }, bin)).toBe(true);

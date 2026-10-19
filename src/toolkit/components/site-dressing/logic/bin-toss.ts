@@ -6,6 +6,8 @@
 
 /** How near the bin, metres, the player must stand to get things into it. */
 export const BIN_REACH = 1.5;
+/** Magnetic action range from the nearest point of the bin opening. */
+export const BIN_MAGNET_REACH = 2;
 /** How far off the line of sight the bin may be and still be faced, radians. */
 export const BIN_FACING = (40 * Math.PI) / 180;
 
@@ -66,6 +68,22 @@ export function overBin(
   const x = dx * c - dz * s;
   const z = dx * s + dz * c;
   return Math.abs(x) <= size.x / 2 + lip && Math.abs(z) <= size.z / 2 + lip;
+}
+
+/** Horizontal distance from a part to the nearest edge of a turned bin. */
+export function distanceToBin(
+  point: Point,
+  bin: Point,
+  size: { x: number; z: number },
+  turn = 0,
+) {
+  const dx = point.x - bin.x;
+  const dz = point.z - bin.z;
+  const c = Math.cos(turn);
+  const s = Math.sin(turn);
+  const x = Math.max(0, Math.abs(dx * c - dz * s) - size.x / 2);
+  const z = Math.max(0, Math.abs(dx * s + dz * c) - size.z / 2);
+  return Math.hypot(x, z);
 }
 
 /** Seconds an object takes to fly `distance` metres into the bin. */

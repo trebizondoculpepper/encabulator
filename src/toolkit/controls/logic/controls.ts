@@ -13,6 +13,7 @@ export type ControlAction =
   | 'walk'
   | 'run'
   | 'look'
+  | 'inspect'
   | 'use'
   | 'knob'
   | 'zoom'
@@ -39,6 +40,11 @@ export const CONTROL_SCHEME: Record<
     mouse: 'click, then the mouse: look',
     touch: 'Right stick or drag: look',
     gamepad: 'Right stick: look',
+  },
+  inspect: {
+    mouse: 'hold X while carrying, move mouse: turn object',
+    touch: 'hold INSPECT, use right stick or drag: turn object',
+    gamepad: 'hold Y while carrying, right stick: turn object',
   },
   use: {
     mouse: 'click or E: use / pick up / drop',
@@ -76,6 +82,7 @@ const ORDER: readonly ControlAction[] = [
   'walk',
   'run',
   'look',
+  'inspect',
   'use',
   'knob',
   'zoom',

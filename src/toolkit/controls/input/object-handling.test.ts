@@ -13,7 +13,10 @@ import { createPortableBoard } from '../logic/portable-board';
 import { createObjectHandling } from './object-handling';
 import type { DropPlacement } from './object-handling';
 
-function fixture(redirectDrop?: (placement: DropPlacement) => DropPlacement) {
+function fixture(
+  redirectDrop?: (placement: DropPlacement) => DropPlacement,
+  heldAction?: () => boolean | 'refuse',
+) {
   const scene = new Scene();
   const parent = new Group();
   parent.scale.setScalar(2);
@@ -44,6 +47,8 @@ function fixture(redirectDrop?: (placement: DropPlacement) => DropPlacement) {
     undefined,
     undefined,
     redirectDrop,
+    undefined,
+    heldAction,
   );
   return {
     scene,
@@ -56,18 +61,46 @@ function fixture(redirectDrop?: (placement: DropPlacement) => DropPlacement) {
   };
 }
 
-it('keeps the pickup distance when the camera moves and turns, preserving world scale', () => {
+it('keeps a rejected insertion in hand, then hands it to the socket', () => {
+  let accept = false;
+  const f = fixture(undefined, () => (accept ? true : 'refuse'));
+  expect(f.handling.use(0, 0)).toBe(true);
+  expect(f.component.phase.value).toBe('held');
+  expect(f.handling.use(0, 0)).toBe(true);
+  expect(f.handling.holding()).toBe(true);
+  expect(f.component.phase.value).toBe('held');
+  accept = true;
+  expect(f.handling.use(0, 0)).toBe(true);
+  expect(f.handling.holding()).toBe(false);
+  f.handling.dispose();
+});
+
+it('rotates the carried part for inspection without turning the camera', () => {
+  const f = fixture();
+  f.handling.use(0, 0);
+  const looking = f.camera.quaternion.clone();
+  const before = f.object.quaternion.clone();
+  f.handling.rotate(0.3, -0.2);
+  f.handling.update(1 / 60);
+  expect(f.camera.quaternion.equals(looking)).toBe(true);
+  expect(f.object.quaternion.equals(before)).toBe(false);
+  f.handling.dispose();
+});
+
+it('brings a carried object to arm length when the camera moves and turns', () => {
   const f = fixture();
   expect(f.handling.use(0, 0)).toBe(true);
   expect(f.detached()).toBe(true);
-  const distance = f.object.position.distanceTo(f.camera.position);
   expect(f.object.scale.toArray()).toEqual([2, 2, 2]);
   f.camera.position.set(1, 1.7, 3);
   f.camera.lookAt(3, 1.7, 3);
-  f.handling.update(0.1);
-  expect(f.object.position.distanceTo(f.camera.position)).toBeCloseTo(distance);
+  for (let i = 0; i < 20; i++) f.handling.update(1 / 60);
+  expect(f.object.position.distanceTo(f.camera.position)).toBeLessThan(1.7);
+  expect(f.object.position.distanceTo(f.camera.position)).toBeGreaterThan(1.1);
   const ahead = f.object.position.clone().sub(f.camera.position).normalize();
-  expect(ahead.dot(f.camera.getWorldDirection(new Vector3()))).toBeCloseTo(1);
+  expect(ahead.dot(f.camera.getWorldDirection(new Vector3()))).toBeGreaterThan(
+    0.8,
+  );
   f.handling.dispose();
   expect(f.object.parent).toBe(f.parent);
 });

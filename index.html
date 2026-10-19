@@ -4,15 +4,164 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#16130f" />
-    <title>Encabulator</title>
+    <title>Encabulator — Rooms</title>
     <link rel="icon" href="data:," />
     <meta
       name="description"
-      content="A mysterious industrial machine, opaque to operate and profoundly unsafe."
+      content="Choose a level or development room in Encabulator."
     />
   </head>
   <body>
-    <main id="app">
+    <main id="room-index">
+      <div class="directory-shell">
+        <header class="directory-head">
+          <p class="directory-kicker">Neumann Dynamik · Encabulator</p>
+          <h1>Rooms</h1>
+          <p>Choose a level or a development room.</p>
+        </header>
+        <section aria-labelledby="levels-heading">
+          <h2 id="levels-heading">Levels</h2>
+          <div class="room-list level-list">
+            <a href="?room=level0"
+              ><span class="room-code">Level 0</span
+              ><span class="room-title">Free play</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=level2"
+              ><span class="room-code">Level 2</span
+              ><span class="room-title">Narrative experiment</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+          </div>
+        </section>
+        <section aria-labelledby="dev-heading">
+          <h2 id="dev-heading">Development rooms</h2>
+          <div class="room-list dev-list">
+            <a href="?room=dev0"
+              ><span class="room-code">dev0</span
+              ><span class="room-title">Buttons and displays</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev1"
+              ><span class="room-code">dev1</span
+              ><span class="room-title">Effects</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev2"
+              ><span class="room-code">dev2</span
+              ><span class="room-title">Hallucinations</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev3"
+              ><span class="room-code">dev3</span
+              ><span class="room-title">Racks</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev4"
+              ><span class="room-code">dev4</span
+              ><span class="room-title">Brands and logos</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev6"
+              ><span class="room-code">dev6</span
+              ><span class="room-title">Retro Encabulator</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev7"
+              ><span class="room-code">dev7</span
+              ><span class="room-title">Underground corridor</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev8"
+              ><span class="room-code">dev8</span
+              ><span class="room-title">Fire safety</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev9"
+              ><span class="room-code">dev9</span
+              ><span class="room-title">Wandering button</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev10"
+              ><span class="room-code">dev10</span
+              ><span class="room-title">Waking from the dream</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev11"
+              ><span class="room-code">dev11</span
+              ><span class="room-title">Button gallery</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev12"
+              ><span class="room-code">dev12</span
+              ><span class="room-title">Machine tones</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev13"
+              ><span class="room-code">dev13</span
+              ><span class="room-title">Computer beeps</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev14"
+              ><span class="room-code">dev14</span
+              ><span class="room-title">Putting things in the skip</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev15"
+              ><span class="room-code">dev15</span
+              ><span class="room-title">Appearing skip</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev16"
+              ><span class="room-code">dev16</span
+              ><span class="room-title">Graffiti gallery</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev17"
+              ><span class="room-code">dev17</span
+              ><span class="room-title">Warehouse training</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev18"
+              ><span class="room-code">dev18</span
+              ><span class="room-title">Building fittings</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev19"
+              ><span class="room-code">dev19</span
+              ><span class="room-title">Retro computing</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=dev20"
+              ><span class="room-code">dev20</span
+              ><span class="room-title">Repair workshop</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+          </div>
+        </section>
+        <section aria-labelledby="other-heading">
+          <h2 id="other-heading">Other rooms</h2>
+          <div class="room-list other-list">
+            <a href="?room=training"
+              ><span class="room-code">Training</span
+              ><span class="room-title">First steps</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=rhombus"
+              ><span class="room-code">Rhombus</span
+              ><span class="room-title">The plinths</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+            <a href="?room=hall"
+              ><span class="room-code">Hall</span
+              ><span class="room-title">Industrial hall</span
+              ><span class="room-arrow" aria-hidden="true">↗</span></a
+            >
+          </div>
+        </section>
+      </div>
+    </main>
+    <main id="app" hidden>
       <canvas id="scene" role="img" aria-label="A development room."></canvas>
       <h1 class="visually-hidden">Encabulator</h1>
       <p id="error" role="alert" hidden></p>

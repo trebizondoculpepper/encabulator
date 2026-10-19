@@ -4,6 +4,9 @@ import type { RoomId } from './toolkit/gallery/logic/dev-room-links';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#scene');
 if (!canvas) throw new Error('Scene canvas is missing.');
+const directory = document.querySelector<HTMLElement>('#room-index');
+const app = document.querySelector<HTMLElement>('#app');
+if (!directory || !app) throw new Error('Room page is incomplete.');
 
 const showError = (error: unknown) => {
   const message = document.querySelector<HTMLParagraphElement>('#error');
@@ -39,6 +42,20 @@ const resetEffects = async () => {
 const openRoom = async () => {
   const ownRevision = ++revision;
   const params = new URLSearchParams(location.search);
+  if (!params.has('room')) {
+    if (document.pointerLockElement) document.exitPointerLock();
+    window.dispatchEvent(new Event('blur'));
+    if (current) {
+      const old = rooms.get(current);
+      old?.handle.suspend?.();
+      if (old) old.root.hidden = true;
+    }
+    current = undefined;
+    app.hidden = true;
+    directory.hidden = false;
+    document.title = 'Encabulator — Rooms';
+    return;
+  }
   const room = resolveRoomId(params.get('room')) ?? 'dev0';
   let start: (canvas: HTMLCanvasElement) => RoomHandle;
   if (room === 'rhombus')
@@ -58,6 +75,9 @@ const openRoom = async () => {
   else if (room === 'dev19')
     start = (await import('./toolkit/gallery/rooms/retro-computing-room'))
       .startRetroComputingRoom;
+  else if (room === 'dev20')
+    start = (await import('./toolkit/gallery/rooms/repair-room'))
+      .startRepairRoom;
   else if (room === 'dev18')
     start = (await import('./toolkit/gallery/rooms/architectural-room'))
       .startArchitecturalGalleryRoom;
@@ -101,6 +121,9 @@ const openRoom = async () => {
       .startControlsRoom;
   await resetEffects();
   if (ownRevision !== revision) return;
+  directory.hidden = true;
+  app.hidden = false;
+  document.title = 'Encabulator';
   if (document.pointerLockElement) document.exitPointerLock();
   window.dispatchEvent(new Event('blur'));
   if (current) {

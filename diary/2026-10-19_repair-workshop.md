@@ -1,0 +1,5 @@
+# Repair workshop prototype
+
+Dev20 now is a separate room after the retro computing gallery. It has two PLC backplanes, a failed power card, isolator and fault controls, a separate stock bench, and a scrap skip. The shared carry controller brings held items toward a right-handed arm-length pose, checks coarse world solids, supports inspection rotation (X, touch INSPECT, gamepad Y), and lets the room handle insertion or disposal on use. A held part near an incompatible, occupied, or powered slot stays in hand. The skip accepts an action within two metres of its nearest edge. This is a development prototype for evaluating the repair loop before using it in gameplay.
+
+The owner asked to keep the earlier dev14 skip gallery, so the repair room moved to dev20. It now also has a true-size blown 2 A fuse station and a distinct replacement cartridge, visible status and refusal feedback, a short insertion animation, and a physical experiment reset. Dev14 remains the skip gallery and its concurrent materialisation work was preserved.
