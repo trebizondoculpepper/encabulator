@@ -18,6 +18,9 @@ import { countDraws } from '../toolkit/components/core/views/draw-count';
 import { createPanelKit } from '../toolkit/components/core/views/eighties-controls';
 import { EYE_HEIGHT_METRES } from '../toolkit/controls/input/first-person';
 import { LOOP_ROOMS, createDevCorridor } from './dev-corridor';
+import { createDevCourtyard } from './dev-courtyard';
+import { anchor } from '../game/courtyard-join';
+import { doorway } from '../game/dev-corridor-plan';
 
 beforeEach(() => {
   // Label canvases are made, but nothing is drawn.
@@ -67,6 +70,42 @@ describe('dev_corridor', () => {
       const draws = countDraws(scene, camera);
       expect(draws.total, JSON.stringify(draws)).toBeLessThanOrEqual(1000);
       corridor.parts.dispose();
+    },
+  );
+
+  it.each([
+    ['the corridor', -1.5],
+    ['the courtyard', 2.5],
+  ] as const)(
+    'draws within the budget with the courtyard’s door open, looking through it from %s',
+    (_name, along) => {
+      // Both rooms drawn, each its own scene, the courtyard behind the
+      // south side's inner door; the courtyard's sun draws it twice.
+      const corridor = createDevCorridor(createPanelKit());
+      const courtyard = createDevCourtyard(createPanelKit());
+      const a = anchor('south');
+      courtyard.group.position.set(a.x, 0, a.z);
+      courtyard.group.rotation.y = a.yaw;
+      const d = doorway({ side: 'south', t: 0, wall: 'inner' });
+      const x = d.x + d.out.x * along;
+      const z = d.z + d.out.z * along;
+      const seen = visibleZones(d.x - d.out.x, d.z - d.out.z);
+      for (const id of LOOP_ZONES)
+        corridor.zones.get(id)!.group.visible = seen.has(id);
+      const look = along < 0 ? 1 : -1;
+      const camera = new PerspectiveCamera(62, 16 / 9, 0.05, 400);
+      camera.position.set(x, EYE_HEIGHT_METRES, z);
+      camera.lookAt(x + d.out.x * look, EYE_HEIGHT_METRES, z + d.out.z * look);
+      const rooms = [new Scene(), new Scene()];
+      rooms[0].add(corridor.group);
+      rooms[1].add(courtyard.group);
+      for (const room of rooms) room.updateMatrixWorld();
+      const total =
+        countDraws(rooms[0], camera).total +
+        2 * countDraws(rooms[1], camera).total;
+      expect(total).toBeLessThanOrEqual(1000);
+      corridor.parts.dispose();
+      courtyard.parts.dispose();
     },
   );
 

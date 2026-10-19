@@ -13,6 +13,8 @@ import { createMicroLabel, kitPaint } from '../../core/views/eighties-controls';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import type { CapacitorHealth } from '../../core/logic/world/components';
 import { createSmokeEmitter } from '../../core/views/smoke-emitter';
+import { createShortSpark } from '../../core/views/button-effects';
+import { discharge } from '../../core/views/dazzle';
 
 /** A 35 mm snap-in can, based on the Chemi-Con KMQ format; origin at its base. */
 export function createElectrolyticCapacitorView(kit: PanelKit, height = 0.045) {
@@ -146,6 +148,15 @@ export function createElectrolyticCapacitorView(kit: PanelKit, height = 0.045) {
     effects.add(spark);
     return spark;
   });
+  // As it vents: a spray of sparks from its burst top, and a pop that
+  // dazzles whoever sees it (`discharge`), with its bang.
+  const burst = createShortSpark(kit, 14);
+  burst.group.rotation.x = -Math.PI / 2;
+  // Nor may it enlarge the exhibit's bounding box until it fires.
+  for (const sprite of burst.group.children) sprite.scale.setScalar(0);
+  effects.add(burst.group);
+  let wasBlown = false;
+  let lastAge = Infinity;
   const smoke = createSmokeEmitter(10, '100, 94, 86');
   smoke.group.scale.setScalar(0.16);
   smoke.group.visible = false;
@@ -162,6 +173,18 @@ export function createElectrolyticCapacitorView(kit: PanelKit, height = 0.045) {
       reducedMotion = false,
     ) {
       const blown = health === 'vented';
+      if (blown && !wasBlown && age < 0.5) {
+        burst.fire();
+        discharge(group);
+      }
+      burst.update(
+        blown && Number.isFinite(lastAge) && Number.isFinite(age)
+          ? Math.max(0, age - lastAge)
+          : 0,
+        reducedMotion,
+      );
+      wasBlown = blown;
+      lastAge = age;
       normal.visible = !blown;
       failed.visible = blown;
       top.scale.y = health === 'bulging' ? 2.5 : 1;

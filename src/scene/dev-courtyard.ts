@@ -9,6 +9,7 @@ import {
   Vector3,
 } from 'three';
 import type { Material, Object3D } from 'three';
+import { COURTYARD_HALF, COURTYARD_WALLS } from '../game/courtyard-join';
 import { LOOP_SIDES } from '../game/dev-corridor-plan';
 import type { LoopSide } from '../game/dev-corridor-plan';
 import {
@@ -36,23 +37,12 @@ import { LOOP_STRIPES } from './dev-corridor';
 /** Where the lamp post stands. */
 export const LAMP_POST = { x: -3.5, z: 0 };
 
-/** Half the courtyard's width: an 18 m square light well. */
-export const COURTYARD_HALF = 9;
+export { COURTYARD_HALF, COURTYARD_WALLS };
+
 /** Its storeys, ground first, and its height to the parapet's top. */
 export const COURTYARD_STOREYS = [3.6, 3.4, 3.4];
 export const COURTYARD_HEIGHT =
   COURTYARD_STOREYS.reduce((a, b) => a + b, 0) + 0.7;
-
-/**
- * Which wall leads back to which side of dev_corridor: the north wall's
- * door to Corridor A (the north side), and so on, round.
- */
-export const COURTYARD_WALLS: readonly LoopSide[] = [
-  'north',
-  'east',
-  'south',
-  'west',
-];
 
 /**
  * dev_courtyard: the light well in the middle of the office block that
@@ -61,7 +51,8 @@ export const COURTYARD_WALLS: readonly LoopSide[] = [
  * building's inner facades, blank buff brick on the ground floor (the
  * corridor behind it has no windows) with a spring door in the middle of
  * each back to its side of the corridor (under the side's letter, on its
- * stripe's colour), and two storeys of office windows above, a parapet at the top and a rainwater pipe at each corner.
+ * stripe's colour; the room that joins it to the corridor puts the
+ * corridor behind it), and two storeys of office windows above, a parapet at the top and a rainwater pipe at each corner.
  * Paving underfoot with a drain; planters, pedestal ashtrays under a
  * SMOKING AREA sign, bistro chairs, benches and a bin. The room above it
  * is the sky (`sky-dome.ts`). In metres; the room scales it.
@@ -209,9 +200,14 @@ export function createDevCourtyard(kit: PanelKit) {
       0.08,
     );
     down.castShadow = false;
-    // The door back to the corridor, under its side's letter.
+    // The door back to the corridor, under its side's letter. It faces
+    // into the courtyard, so a push from the courtyard (the only side it is
+    // pushed from: behind it is the corridor's own door) opens it away.
     const part = parts.add(
-      springDoor(kit, { name: `CORRIDOR ${LOOP_SIDES[side].letter} door` }),
+      springDoor(kit, {
+        name: `CORRIDOR ${LOOP_SIDES[side].letter} door`,
+        away: () => 1,
+      }),
     );
     wall.add(part.object);
     doors.push({ side, part });
@@ -225,17 +221,6 @@ export function createDevCourtyard(kit: PanelKit) {
     wall.updateMatrix();
     lights.push(light.applyMatrix4(wall.matrix));
     switchSpots.push({ wall, x: -1.0, y: 1.1 });
-    const lobby = kitPaint(kit, '#141617');
-    box(
-      face,
-      lobby,
-      SPRING_OPENING.width + 0.2,
-      SPRING_OPENING.height,
-      0.05,
-      0,
-      SPRING_OPENING.height / 2,
-      -1.6,
-    );
     const sign = createMicroLabel(kit, `CORRIDOR ${LOOP_SIDES[side].letter}`, {
       height: 0.09,
       ink: '#ffffff',

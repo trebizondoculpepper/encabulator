@@ -20,7 +20,7 @@ const showError = (error: unknown) => {
 
 // Rooms retain their apparatus state while only the current room draws.
 type RoomHandle = (() => void) & {
-  enter?: (from: string | null) => void;
+  enter?: (from: string | null, room: string) => void;
   suspend?: () => void;
   resume?: () => void;
 };
@@ -78,6 +78,8 @@ const openRoom = async () => {
   else if (room === 'dev20')
     start = (await import('./toolkit/gallery/rooms/repair-room'))
       .startRepairRoom;
+  else if (room === 'dev22')
+    start = (await import('./toolkit/gallery/rooms/fires-room')).startFiresRoom;
   else if (room === 'dev21')
     start = (await import('./toolkit/gallery/rooms/settling-room'))
       .startSettlingRoom;
@@ -110,10 +112,8 @@ const openRoom = async () => {
   else if (room === 'dev8')
     start = (await import('./toolkit/gallery/rooms/fittings-room'))
       .startFittingsRoom;
-  else if (room === 'dev_courtyard')
-    start = (await import('./rendering/dev-courtyard-room'))
-      .startDevCourtyardRoom;
-  else if (room === 'dev_corridor')
+  else if (room === 'dev_corridor' || room === 'dev_courtyard')
+    // One world: the courtyard is walked into from the corridor.
     start = (await import('./rendering/dev-corridor-room'))
       .startDevCorridorRoom;
   else if (room === 'dev3')
@@ -138,8 +138,10 @@ const openRoom = async () => {
     old.handle.suspend?.();
     old.root.hidden = true;
   }
-  current = room;
-  let loaded = rooms.get(room);
+  // The corridor and the courtyard are one world, kept as one.
+  const key = room === 'dev_courtyard' ? 'dev_corridor' : room;
+  current = key;
+  let loaded = rooms.get(key);
   if (!loaded) {
     const root = document.createElement('section');
     root.setAttribute('aria-label', `Room ${room}`);
@@ -155,15 +157,15 @@ const openRoom = async () => {
     canvas.style.display = 'none';
     canvas.id = 'scene-template';
     loaded = { root, handle: start(surface) };
-    rooms.set(room, loaded);
+    rooms.set(key, loaded);
   }
   for (const [id, entry] of rooms) {
-    entry.root.hidden = id !== room;
+    entry.root.hidden = id !== key;
     const surface = entry.root.querySelector('canvas');
-    if (surface) surface.id = id === room ? 'scene' : `scene-${id}`;
+    if (surface) surface.id = id === key ? 'scene' : `scene-${id}`;
   }
   loaded.root.hidden = false;
-  loaded.handle.enter?.(params.get('from'));
+  loaded.handle.enter?.(params.get('from'), room);
   loaded.handle.resume?.();
 };
 const travel = (event: Event) => {

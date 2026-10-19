@@ -32,7 +32,8 @@ export type DevRoomId =
   | 'dev18'
   | 'dev19'
   | 'dev20'
-  | 'dev21';
+  | 'dev21'
+  | 'dev22';
 export type RoomId =
   | DevRoomId
   | 'hall'
@@ -73,6 +74,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev19',
   'dev20',
   'dev21',
+  'dev22',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -119,6 +121,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev19: 'DEV19 · RETRO COMPUTING',
   dev20: 'DEV20 · REPAIR WORKSHOP',
   dev21: 'DEV21 · SETTLING OBJECTS INTO SKIPS',
+  dev22: 'DEV22 · FIRES',
   hall: 'THE HALL',
   dev_courtyard: 'COURTYARD',
   rhombus: 'RHOMBUS',
@@ -149,6 +152,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev19: '#b99b6c',
   dev20: '#798b91',
   dev21: '#c4a24a',
+  dev22: '#e0602a',
   hall: '#c9c23a',
   dev_courtyard: '#7fa36a',
   rhombus: '#d8d4c8',

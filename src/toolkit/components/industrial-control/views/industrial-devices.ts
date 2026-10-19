@@ -1,6 +1,15 @@
 import { pcbMaterials } from './pcb-textures';
 import { createElectrolyticCapacitorView } from './electrolytic-capacitor';
-import { BoxGeometry, Color, CylinderGeometry, Group, Mesh } from 'three';
+import {
+  BoxGeometry,
+  Color,
+  CylinderGeometry,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+} from 'three';
+import { createCanvasTexture } from '../../core/views/screens';
 import type { BufferGeometry, Material, Object3D } from 'three';
 import { createBrandBadge } from '../../core/views/brand-badge';
 import {
@@ -546,14 +555,100 @@ export interface CapacitorBoardView {
     embers?: number,
   ): void;
   update(seconds: number, delta: number, reducedMotion: boolean): void;
+  /** Clean the soot off the board. */
+  clean(): void;
   dispose(): void;
+}
+
+/**
+ * Soot blown over a board (`width` by `depth`, metres, its top face) round
+ * a capacitor that has vented: a canvas over the whole board of dark blots
+ * and streaks, thickest at the can's foot, flung out further one way than
+ * another, different every time, and never off the board's edge.
+ * `blacken(x, z)` adds another blow's worth round (x, z) on the board; it
+ * stays (the board is damaged) until `clean()`.
+ */
+function createSoot(kit: PanelKit, width: number, depth: number) {
+  /** Canvas pixels to a metre. */
+  const scale = 1200;
+  const w = Math.round(width * scale);
+  const h = Math.round(depth * scale);
+  const { context, texture } = createCanvasTexture(w, h);
+  kit.textures.push(texture);
+  context.clearRect(0, 0, w, h);
+  texture.needsUpdate = true;
+  const material = new MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  });
+  kit.materials.push(material);
+  const decal = new Mesh(new PlaneGeometry(width, depth), material);
+  decal.rotation.x = -Math.PI / 2;
+  decal.name = 'Capacitor soot';
+  // It appears and is cleaned away: never merged.
+  decal.userData.live = true;
+  decal.visible = false;
+  const blot = (x: number, y: number, r: number, alpha: number) => {
+    const g = context.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(18, 13, 9, ${alpha})`);
+    g.addColorStop(0.6, `rgba(28, 20, 14, ${alpha * 0.55})`);
+    g.addColorStop(1, 'rgba(30, 22, 16, 0)');
+    context.fillStyle = g;
+    context.fillRect(x - r, y - r, 2 * r, 2 * r);
+  };
+  return {
+    decal,
+    blacken(x: number, z: number, random: () => number = Math.random) {
+      // The can's foot on the canvas: x across, z down it.
+      const cx = (x / width + 0.5) * w;
+      const cy = (z / depth + 0.5) * h;
+      // Thick round the can's foot, then flung out, more one way.
+      const lean = random() * Math.PI * 2;
+      blot(cx, cy, 44 + 10 * random(), 0.97);
+      for (let i = 0; i < 44; i++) {
+        const a = lean + (random() - 0.5) * (i % 3 === 0 ? 6.3 : 2.2);
+        const out = 16 + random() * 44;
+        blot(
+          cx + Math.cos(a) * out,
+          cy + Math.sin(a) * out,
+          4 + random() * 14,
+          0.5 + 0.45 * random(),
+        );
+      }
+      // Streaks where the blast ran across the board.
+      context.lineCap = 'round';
+      for (let i = 0; i < 14; i++) {
+        const a = lean + (random() - 0.5) * 2.8;
+        const from = 16 + random() * 8;
+        const to = 40 + random() * 22;
+        context.strokeStyle = `rgba(20, 15, 11, ${0.4 + 0.4 * random()})`;
+        context.lineWidth = 1.5 + random() * 4;
+        context.beginPath();
+        context.moveTo(cx + Math.cos(a) * from, cy + Math.sin(a) * from);
+        context.lineTo(cx + Math.cos(a) * to, cy + Math.sin(a) * to);
+        context.stroke();
+      }
+      texture.needsUpdate = true;
+      decal.visible = true;
+    },
+    clean() {
+      context.clearRect(0, 0, w, h);
+      texture.needsUpdate = true;
+      decal.visible = false;
+    },
+  };
 }
 
 /**
  * A drive's power board: green fibreglass with its copper, two big
  * electrolytic capacitors in blue sleeves with scored aluminium tops,
  * and smaller parts round them. A stressed capacitor's top domes; a
- * vented one has burst its score, stands blackened and smokes.
+ * vented one bursts its score with a pop, a spray of sparks and a cloud
+ * of soot blown over the board round it, and stands blackened, smoking.
+ * A new can is fitted clean, but the soot stays on the board.
  */
 export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
   const group = new Group();
@@ -604,12 +699,17 @@ export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
       0.045,
     );
   box(group, 0.06, 0.016, 0.014, kitPaint(kit, '#3b6b46'), -0.02, 0.012, 0.062);
+  // The soot of a vented can, over the whole board's top.
+  const soot = createSoot(kit, 0.2, 0.15);
+  soot.decal.position.y = 0.0042;
+  group.add(soot.decal);
   const cans = [0, 1].map((i) => {
     const view = createElectrolyticCapacitorView(kit, 0.05);
     view.group.position.set(-0.05 + i * 0.07, 0.004, -0.02);
     group.add(view.group);
     return {
       view,
+      at: { x: -0.05 + i * 0.07, z: -0.02 },
       health: 'good' as 'good' | 'bulging' | 'vented',
       smoke: 0,
       age: Infinity,
@@ -620,7 +720,14 @@ export function createCapacitorBoardView(kit: PanelKit): CapacitorBoardView {
     group,
     cans: cans.map((can) => can.view.group),
     set(index, health, smoke, age = Infinity, embers = 0) {
-      Object.assign(cans[index], { health, smoke, age, embers });
+      const can = cans[index];
+      // The moment it vents, soot is blown over the board.
+      if (health === 'vented' && can.health !== 'vented' && age < 0.5)
+        soot.blacken(can.at.x, can.at.z);
+      Object.assign(can, { health, smoke, age, embers });
+    },
+    clean() {
+      soot.clean();
     },
     update(_seconds, _delta, reducedMotion) {
       for (const can of cans)

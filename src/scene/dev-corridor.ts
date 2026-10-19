@@ -97,7 +97,16 @@ export const LOOP_ROOMS: readonly (RoomId | null)[] = LOOP_DOORS.filter(
  * Built in zones (`LOOP_ZONES`), each merged on its own, so that a zone
  * that cannot be seen is hidden whole. In metres; the room scales it.
  */
-export function createDevCorridor(kit: PanelKit) {
+export function createDevCorridor(
+  kit: PanelKit,
+  options: {
+    /**
+     * Which way a push opens `door` (+1 away from the corridor, −1 into
+     * it, for a door the player may come back through); +1 if not said.
+     */
+    away?: (door: LoopDoor) => 1 | -1;
+  } = {},
+) {
   const group = new Group();
   group.name = 'dev_corridor';
   const parts = createPartSet();
@@ -484,7 +493,12 @@ export function createDevCorridor(kit: PanelKit) {
         : room
           ? DEV_ROOM_NAMES[room]
           : 'STORE';
-    const part = parts.add(springDoor(kit, { name: `${name} door` }));
+    const part = parts.add(
+      springDoor(kit, {
+        name: `${name} door`,
+        away: () => options.away?.(door) ?? 1,
+      }),
+    );
     // Its face to the corridor: the part faces +z, turned to face inward.
     const yaw =
       s.along === 'x'
@@ -497,52 +511,56 @@ export function createDevCorridor(kit: PanelKit) {
     part.object.position.set(x, 0, z);
     part.object.rotation.y = yaw;
     zone.group.add(part.object);
-    // The dark lobby behind it, for now: it leads nowhere yet.
+    // The dark lobby behind an outer door, for now: what is behind it is a
+    // room of its own, not drawn here. Behind an inner door is the
+    // courtyard, which the room draws there while it is open.
     const lobby = new Group();
-    lobby.position.set(x, 0, z);
-    lobby.rotation.y = yaw;
-    zone.still.add(lobby);
-    box(
-      lobby,
-      mat.dark,
-      SPRING_OPENING.width + 0.2,
-      SPRING_OPENING.height + 0.1,
-      0.05,
-      0,
-      (SPRING_OPENING.height + 0.1) / 2,
-      -LOBBY,
-    );
-    for (const sx of [-1, 1])
+    if (door.wall === 'outer') {
+      lobby.position.set(x, 0, z);
+      lobby.rotation.y = yaw;
+      zone.still.add(lobby);
       box(
         lobby,
         mat.dark,
-        0.05,
+        SPRING_OPENING.width + 0.2,
         SPRING_OPENING.height + 0.1,
-        LOBBY,
-        sx * (SPRING_OPENING.width / 2 + 0.1),
+        0.05,
+        0,
         (SPRING_OPENING.height + 0.1) / 2,
+        -LOBBY,
+      );
+      for (const sx of [-1, 1])
+        box(
+          lobby,
+          mat.dark,
+          0.05,
+          SPRING_OPENING.height + 0.1,
+          LOBBY,
+          sx * (SPRING_OPENING.width / 2 + 0.1),
+          (SPRING_OPENING.height + 0.1) / 2,
+          -LOBBY / 2,
+        );
+      box(
+        lobby,
+        mat.dark,
+        SPRING_OPENING.width + 0.2,
+        0.05,
+        LOBBY,
+        0,
+        SPRING_OPENING.height + 0.1,
         -LOBBY / 2,
       );
-    box(
-      lobby,
-      mat.dark,
-      SPRING_OPENING.width + 0.2,
-      0.05,
-      LOBBY,
-      0,
-      SPRING_OPENING.height + 0.1,
-      -LOBBY / 2,
-    );
-    box(
-      lobby,
-      mat.dark,
-      SPRING_OPENING.width + 0.2,
-      0.05,
-      LOBBY,
-      0,
-      0,
-      -LOBBY / 2,
-    );
+      box(
+        lobby,
+        mat.dark,
+        SPRING_OPENING.width + 0.2,
+        0.05,
+        LOBBY,
+        0,
+        0,
+        -LOBBY / 2,
+      );
+    }
     // Its room's name over it, on its colour.
     const colour = room
       ? DEV_ROOM_COLOURS[room]

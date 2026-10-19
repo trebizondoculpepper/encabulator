@@ -24,6 +24,7 @@ import {
 } from '../../components/core/views/eighties-controls';
 import { knobDirection } from '../../controls/input/knob-turning';
 import { partAudio } from '../../components/core/audio/part-audio';
+import { createDazzle } from '../../components/core/views/dazzle';
 import { createFirstPerson } from '../../controls/input/first-person';
 import {
   createPs1Material,
@@ -362,6 +363,13 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   observer.observe(canvas);
   resize();
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  // A part that goes off with a flash (a capacitor venting) dazzles.
+  const dazzle = createDazzle(
+    canvas,
+    camera,
+    Math.random,
+    () => reducedMotion?.matches ?? false,
+  );
 
   // A handle for scripted views and checks.
   (window as unknown as { devControls: unknown }).devControls = {
@@ -392,23 +400,53 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   };
 
   let last = 0;
-  renderer.setAnimationLoop((time) => {
-    if (canvas.parentElement?.hidden) {
-      last = 0;
-      return;
-    }
-    const delta = last ? Math.min(0.1, (time - last) / 1000) : 0;
+  const frame = (time: number) => {
+    const delta = last ? Math.min(0.1, Math.max(0, (time - last) / 1000)) : 0;
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     passages.update(delta, walk.walker.x, walk.walker.z);
     for (const fitting of fittings)
       fitting.update(time / 1000, delta, reducedMotion?.matches ?? false);
+    dazzle.update(delta);
     partAudio.listen(camera, m);
     renderer.render(scene, camera);
+  };
+  renderer.setAnimationLoop((time) => {
+    if (canvas.parentElement?.hidden) {
+      last = 0;
+      return;
+    }
+    frame(time);
   });
+  Object.assign(
+    (window as unknown as { devControls: Record<string, unknown> }).devControls,
+    {
+      /**
+       * Run `seconds` of frames at once (where the browser is not
+       * drawing, as in a hidden tab) and give the last as a PNG data URL,
+       * with whatever dazzles the eye drawn over it.
+       */
+      shot(seconds = 0, width = 1280, height = 720) {
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        let time = last || 1000;
+        for (let t = 0; t <= seconds; t += 1 / 30) frame((time += 1000 / 30));
+        const picture = document.createElement('canvas');
+        picture.width = width;
+        picture.height = height;
+        const context = picture.getContext('2d')!;
+        context.drawImage(canvas, 0, 0, width, height);
+        dazzle.paint(context, width, height);
+        resize();
+        return picture.toDataURL('image/png');
+      },
+    },
+  );
   const dispose = () => {
     renderer.setAnimationLoop(null);
+    dazzle.dispose();
     observer.disconnect();
     walk.dispose();
     passages.dispose();
