@@ -595,7 +595,19 @@ describe('a fire in the machine', () => {
     const p = plant(RUNNING);
     run(p, 5, 0.5);
     p.ignite();
+    // First the electrical fault: no fire yet.
+    expect(p.kindling.value).toBe(true);
+    expect(p.faults.value.map((f) => f.code)).not.toContain('S04');
+    expect(p.faults.value.find((f) => f.code === 'F11')?.text).toContain(
+      'ELECTRICAL FAULT',
+    );
+    run(p, PLANT.kindleSeconds + 0.5, 0.5);
+    // Then it catches.
+    expect(p.kindling.value).toBe(false);
     expect(p.faults.value.map((f) => f.code)).toContain('S04');
+    expect(p.faults.value.find((f) => f.code === 'F11')?.text).toContain(
+      'BURNING',
+    );
     // Each burning unit's window goes red at once.
     for (const seat of FIRE_SEATS)
       expect(

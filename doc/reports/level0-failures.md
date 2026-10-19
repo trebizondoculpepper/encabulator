@@ -38,3 +38,12 @@ Completion notes for `doc/plans/level0-failures.md`, for the owner and the next 
 - **Burning units go red** at once: each of the three seats (`FIRE_SEATS` in `level0-plant.ts`, shared with the smoke) raises a failure on its own window (F11 M-103 AUX MOTOR BURNING, F12 PAN MONITOR BURNING, F13 GRAMMETER BURNING), besides S04 on EARTH/DOORS.
 - **The FIRE symptom is now SMOKING** (owner's name), so that FIRE means only the real fault.
 - **The last stand, revised** (owner): INCOMING, DISTRIBUTION and the annunciator hold out 12 s longer than the rest (`lastStandSeconds`); the annunciator then sputters out over a random 1 to 3 s with a crackle; then INCOMING or DISTRIBUTION, drawn at random (`plant.lastToFail`), gives way in a volley of big sparks and a bang, taking everything with it (DISTRIBUTION's breaker trips; if INCOMING went, its meters die too, through its feed gate: the line-up's incoming-side units now honour a `bucketFeed` gate).
+
+## 2026-10-19, the fire tells its story
+
+The owner's story, in order: something inside the cabinets fails, an electrical fault, it catches fire, the smoke, the detectors, and on.
+
+- **The fault before the fire** (`PLANT.kindleSeconds`, 5 s): FIRE now starts with each of the three units failing inside: a sharp crack and a couple of sparks at each, staggered; their windows go red at once (F11 to F13 ELECTRICAL FAULT); the wiring smoulders, embers rising from the seams. Only then does it catch (the faults become BURNING, S04 FIRE IN CABINETS) and the smoke begins. Water or cutting the power during the fault stops it before it catches.
+- **The burning units fail first**: each glitches, its supply stuttering a few times a second, from 2, 4 and 5 s into the fault, and then gives out for good at 6, 9 and 11 s (`FIRE_SEATS`, `plant.seatStates`, through the line-up's `bucketFeed` gates).
+- **Smoke damage inside**: everything in a burning unit's works is blackened and dulled as the fire goes on, unevenly and more higher up (`createSmokeDamage` in `src/toolkit/components/core/views/smoke-damage.ts`, tested: its own materials, nothing shared touched, cleaned back exactly on RESET); the line-up's face map now carries each unit's `interior`.
+- Secondary faults after the water now spare INCOMING and DISTRIBUTION, which hold out for their last stand.

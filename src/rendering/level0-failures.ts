@@ -10,6 +10,8 @@ import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import type { SoundRecipe } from '../toolkit/components/core/audio/part-audio';
 import { beginPart } from '../toolkit/components/core/parts/parts';
 import { createShortSpark } from '../toolkit/components/core/views/button-effects';
+import { createSmokeDamage } from '../toolkit/components/core/views/smoke-damage';
+import { createEmbers } from '../toolkit/components/fire/views/embers';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import { createSmokeEmitter } from '../toolkit/components/core/views/smoke-emitter';
 import { machineTone } from '../toolkit/components/sound/audio/machine-tones';
@@ -35,6 +37,23 @@ const SEIZE: SoundRecipe = {
         decay: 0.03,
         level: 0.45,
         repeat: [8, 0.03],
+      },
+    },
+  ],
+};
+
+/** A part failing inside a unit: a sharp crack and a short fizz. */
+const CRACK: SoundRecipe = {
+  sequence: [
+    { at: 0, click: { band: 2600, q: 1, decay: 0.05, level: 0.55 } },
+    {
+      at: 0.04,
+      click: {
+        band: 4200,
+        q: 1.3,
+        decay: 0.02,
+        level: 0.25,
+        repeat: [5, 0.04],
       },
     },
   ],
@@ -224,8 +243,32 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         (u) => u.bay === source.bay && u.face.bottom >= source.face.bottom,
       )
       .map((u) => u.face);
+    // The story's start: a part fails inside with a crack and a couple of
+    // sparks, then the wiring smoulders, embers rising from the seams.
+    const spark = createShortSpark(kit, 12);
+    spark.group.scale.setScalar(2.2);
+    spark.group.position.set(
+      source.centre,
+      (source.face.bottom + source.face.top) / 2,
+      mcc.doorFront + 0.04,
+    );
+    source.section.add(spark.group);
+    const embers = createEmbers(18);
+    embers.group.position.set(
+      source.centre,
+      source.face.top + 0.01,
+      mcc.doorFront + 0.03,
+    );
+    embers.group.visible = false;
+    source.section.add(embers.group);
     return {
+      spark,
+      embers,
+      /** Seconds into the fault at which this unit sparks. */
+      sparksAt: [0.3 + i * 0.8, 1.6 + i * 0.9],
       soot: 0,
+      // Its works behind the door, blackened as the face is sooted.
+      damage: createSmokeDamage(source.interior),
       view: createUnitSmoke(source.section, {
         x: source.centre,
         width: source.face.width,
@@ -277,6 +320,8 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     }
     fate = now;
   });
+  let faultClock = 0;
+  let wasKindling = false;
   let flashes = 0;
   let wasDrowned = plant.drowned.peek();
   const stopDrowning = effect(() => {
@@ -286,7 +331,13 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       flashes = 12;
       partAudio.play(SEIZE, shorting[0].group);
       // Secondary faults in the wet units.
-      const eligible = machine.eligible();
+      // INCOMING and DISTRIBUTION hold out for their last stand.
+      const eligible = machine
+        .eligible()
+        .filter(
+          (id) =>
+            !id.endsWith(UNITS.incoming) && !id.endsWith(UNITS.distribution),
+        );
       for (let i = 0; i < 2 && eligible.length; i++)
         machine.inflict(
           eligible.splice(Math.floor(Math.random() * eligible.length), 1)[0],
@@ -308,7 +359,10 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
     },
     /** Cleaned up, as if it had never burnt (the simulator's RESET). */
     clean() {
-      for (const seat of burning) seat.soot = 0;
+      for (const seat of burning) {
+        seat.soot = 0;
+        seat.damage.set(0);
+      }
     },
     /** `symptom`: oil the simulator's OIL LEAK has spread, 0 to 1. */
     update(delta: number, symptom = 0) {
@@ -340,6 +394,29 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         }
         last.spark.update(delta, reducedMotion());
       }
+      // The fault: each unit cracks and sparks, twice, then smoulders.
+      const kindling = plant.kindling.value;
+      if (kindling && !wasKindling) faultClock = 0;
+      wasKindling = kindling;
+      if (kindling) faultClock += delta;
+      for (const seat of burning) {
+        if (kindling)
+          for (const at of seat.sparksAt)
+            if (faultClock - delta < at && faultClock >= at) {
+              seat.spark.fire();
+              partAudio.play(CRACK, seat.spark.group);
+            }
+        seat.spark.update(delta, reducedMotion());
+        // Embers from the start of the smouldering, more as it burns.
+        const glow = plant.fireSize.value;
+        const embering = kindling
+          ? Math.min(0.6, Math.max(0, (faultClock - 1.2) / 3))
+          : glow > 0
+            ? Math.min(1, 0.5 + glow)
+            : 0;
+        seat.embers.group.visible = embering > 0;
+        if (embering > 0) seat.embers.update(clock, embering, reducedMotion());
+      }
       // The fire's smoke, thicker as it grows, and the soot it leaves.
       // Plainly smoking from the start, pouring as it takes hold.
       const size = plant.fireSize.value;
@@ -347,6 +424,8 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       for (const seat of burning) {
         seat.soot = sootAfter(seat.soot, smoke, delta);
         seat.view.update(clock, smoke, seat.soot);
+        // Inside, where it burns, worse and sooner than on the door.
+        seat.damage.set(Math.min(1, seat.soot * 1.6));
       }
       for (const hazard of hazards) {
         if (hazard.sparks > 0 && Math.random() < delta * 6) {
@@ -365,7 +444,11 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       stop();
       stopDrowning();
       stopDistribution();
-      for (const seat of burning) seat.view.dispose();
+      for (const seat of burning) {
+        seat.view.dispose();
+        seat.damage.dispose();
+        seat.embers.dispose();
+      }
       waterMaterial.dispose();
       oil.dispose();
       spill.geometry.dispose();

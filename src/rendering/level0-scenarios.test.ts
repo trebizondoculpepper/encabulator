@@ -8,7 +8,7 @@ import {
   it,
   vi,
 } from 'vite-plus/test';
-import { PLANT } from '../game/level0-plant';
+import { FIRE_SEATS, PLANT } from '../game/level0-plant';
 import { UNITS } from '../scene/level0-faces';
 import {
   createPanelKit,
@@ -467,7 +467,24 @@ describe('the Hyperplasc Scenario Simulator', () => {
     useOf(panel, 'FULL ON states switch')();
     step(40);
     useOf(panel, 'FIRE faults switch')();
-    step(15);
+    // The burning units glitch, their supply stuttering, then give out.
+    const seats = FIRE_SEATS.map((seat) =>
+      machine.mcc.circuits.get(seat.unit)!,
+    );
+    expect(seats.every((u) => u.powered.value)).toBe(true);
+    let flickered = false;
+    for (let t = 0; t < 6; t += 0.1) {
+      machine.update(0.1);
+      if (
+        machine.plant.seatStates.value[0] === 'glitching' &&
+        !seats[0].powered.value
+      )
+        flickered = true;
+    }
+    expect(flickered).toBe(true);
+    step(9);
+    expect(machine.plant.seatStates.value).toEqual(['dead', 'dead', 'dead']);
+    expect(seats.some((u) => u.powered.value)).toBe(false);
     const f = machine.plant.fire;
     // The smoke has set the detectors off: the alarm is investigating.
     expect(f.detector.value).toBe(true);

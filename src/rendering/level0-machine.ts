@@ -3,7 +3,11 @@ import { computed, effect, signal } from '@preact/signals-core';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
 import type { Object3D, Quaternion } from 'three';
 import { createIncidentScheduler } from '../game/level0-incidents';
-import { CARD_KINDS, createLevel0Plant } from '../game/level0-plant';
+import {
+  CARD_KINDS,
+  FIRE_SEATS,
+  createLevel0Plant,
+} from '../game/level0-plant';
 import type { CardKind } from '../game/level0-plant';
 import { createLevel0Dresser, level0Tones, UNITS } from '../scene/level0-faces';
 import {
@@ -85,6 +89,20 @@ export function createLevel0Machine(
     diagnosticsAvailable,
     // After the water, INCOMING may be the last to give way: its meters die.
     bucketFeed: {
+      // A burning unit glitches, its supply stuttering, then gives out.
+      ...Object.fromEntries(
+        FIRE_SEATS.map((seat, i) => [
+          seat.unit,
+          computed(() => {
+            const state = plant.seatStates.value[i];
+            if (state === 'dead') return false;
+            if (state === 'ok') return true;
+            // Stuttering: off for irregular moments, a few times a second.
+            const tick = Math.floor(plant.state.clock.value * 7) + i * 13;
+            return ((tick * 2654435761) >>> 0) % 5 > 1;
+          }),
+        ]),
+      ),
       [UNITS.incoming]: computed(
         () =>
           plant.distributionFate.value !== 'dead' ||

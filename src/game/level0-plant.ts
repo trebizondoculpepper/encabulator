@@ -76,6 +76,8 @@ export const PLANT = {
   wetCabinets: 0.08,
   /** A machine fire as it starts, and how fast it grows while fed, a second. */
   fireStart: 0.04,
+  /** Seconds from the fault's first sparks to the flames. */
+  kindleSeconds: 5,
   fireGrowth: 0.012,
   /** How fast it dies down with its power cut, and under water, a second. */
   fireStarved: 0.005,
@@ -283,10 +285,30 @@ export function severityOf(code: string): Severity {
  * unit (by bucket id) and its annunciator window, red while it burns.
  */
 export const FIRE_SEATS = [
-  { unit: 'section2.bucket3', window: 'M-103', name: 'M-103 AUX MOTOR' },
-  { unit: 'section4.bucket4', window: 'PAN MONITOR', name: 'PAN MONITOR' },
-  { unit: 'section7.bucket4', window: 'GRAMMETER', name: 'GRAMMETER' },
+  {
+    unit: 'section2.bucket3',
+    window: 'M-103',
+    name: 'M-103 AUX MOTOR',
+    glitches: 2,
+    dies: 6,
+  },
+  {
+    unit: 'section4.bucket4',
+    window: 'PAN MONITOR',
+    name: 'PAN MONITOR',
+    glitches: 4,
+    dies: 9,
+  },
+  {
+    unit: 'section7.bucket4',
+    window: 'GRAMMETER',
+    name: 'GRAMMETER',
+    glitches: 5,
+    dies: 11,
+  },
 ] as const;
+/** A burning unit, seconds into the fire: `glitches`, then `dies`. */
+export type SeatState = 'ok' | 'glitching' | 'dead';
 
 export const MODULE_WINDOWS = [
   ['INCOMING', 'INCOMING'],
@@ -479,6 +501,14 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     fireSize: g.state('machine.fire', 0),
     /** Seconds the fire has raged at its fiercest: long enough, burnt out. */
     burnedFor: g.state('machine.burnedFor', 0),
+    /** Seconds since the fire started: its units glitch, then give out. */
+    burningFor: g.state('machine.burningFor', 0),
+    /**
+     * Seconds left before the flames: something inside each unit has
+     * failed, an electrical fault sparks and the wiring smoulders to
+     * embers, before it catches.
+     */
+    kindling: g.state('machine.kindling', 0),
     /**
      * Seconds since the water shorted the bus. INCOMING, DISTRIBUTION and
      * the annunciator, better shielded than the rest (for drama), hold out
@@ -1023,6 +1053,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.drowned,
       s.fireSize,
       s.burnedFor,
+      s.kindling,
     ],
     (
       incoming,
@@ -1062,6 +1093,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       drowned,
       fireNow,
       burned,
+      kindling,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -1140,18 +1172,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         else if (wear >= PLANT.wearGrinding)
           add({ code: warn, text: `${name} WORN`, window });
       }
-      if (fireNow > 0) {
+      if (fireNow > 0)
         add({ code: 'S04', text: 'FIRE IN CABINETS', window: 'SAFETY' });
-        // Each burning unit's own window, red at once.
+      // Each failing unit's own window, red at once: first its electrical
+      // fault, then its fire.
+      if (kindling > 0 || fireNow > 0)
         FIRE_SEATS.forEach((seat, i) =>
           add({
             code: `F1${i + 1}`,
-            text: `${seat.name} BURNING`,
+            text: `${seat.name} ${fireNow > 0 ? 'BURNING' : 'ELECTRICAL FAULT'}`,
             window: seat.window,
             severity: 'failure',
           }),
         );
-      }
       if (burned >= PLANT.burnOutSeconds)
         add({ code: 'S05', text: 'MACHINE BURNT OUT', window: 'SAFETY' });
       if (drowned)
@@ -1449,11 +1482,24 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   );
   g.process(
     'machine fire',
-    [raining, e.mains, s.fireSize, s.burnedFor],
-    [s.fireSize, s.burnedFor],
+    [raining, e.mains, s.fireSize, s.burnedFor, s.burningFor, s.kindling],
+    [s.fireSize, s.burnedFor, s.burningFor, s.kindling],
     (dt) => {
+      // The fault, sparking and smouldering, before it catches.
+      const kindling = s.kindling.peek();
+      if (kindling > 0) {
+        s.burningFor.set(s.burningFor.peek() + dt);
+        // Water, or the power cut, stops it before it catches.
+        if (raining.peek() || !e.mains.peek()) s.kindling.set(0);
+        else if (kindling - dt <= 0) {
+          s.kindling.set(0);
+          s.fireSize.set(PLANT.fireStart);
+        } else s.kindling.set(kindling - dt);
+        return;
+      }
       const size = s.fireSize.peek();
       if (size <= 0) return;
+      s.burningFor.set(s.burningFor.peek() + dt);
       // Fed by the live bus, starved without it, quenched by the water.
       const rate = raining.peek()
         ? -PLANT.fireQuench
@@ -1523,6 +1569,33 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     {
       where: 'the last burst of sparks',
     },
+  );
+  /**
+   * Each burning unit as the fire takes it: working, glitching (its supply
+   * stuttering as its wiring burns) and then dead, for good (until RESET).
+   */
+  const seatStates = g.output(
+    'machine.fireSeats',
+    [s.burningFor],
+    (t) =>
+      FIRE_SEATS.map((seat): SeatState =>
+        t <= 0 || t < seat.glitches
+          ? 'ok'
+          : t < seat.dies
+            ? 'glitching'
+            : 'dead',
+      ),
+    {
+      where: 'the burning units, failing',
+      equals: (a: SeatState[], b: SeatState[]) => a.every((v, i) => v === b[i]),
+    },
+  );
+  /** The fault before the fire: sparking and smouldering to embers. */
+  const kindlingShown = g.output(
+    'machine.kindlingShown',
+    [s.kindling],
+    (k) => k > 0,
+    { where: 'sparks and embers in the failing units' },
   );
   /** How big the fire is, 0 to 1: its smoke and soot. */
   const fireSize = g.output('machine.fireShown', [s.fireSize], (f) => f, {
@@ -1685,9 +1758,13 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.fireSize,
       s.burnedFor,
       s.shortedFor,
+      s.burningFor,
+      s.kindling,
     ],
     () => {
       // The fire out, dried out, and its shorted bus and burnt works repaired.
+      s.burningFor.set(0);
+      s.kindling.set(0);
       s.shortedFor.set(0);
       s.fireSize.set(0);
       s.burnedFor.set(0);
@@ -1747,9 +1824,9 @@ export function createLevel0Plant(g: Graph = createGraph()) {
    * heat bursting the heads over the machine; their water shorting a live
    * bus; and the machine ruined, by the water or by burning out.
    */
-  const ignite = g.action('scenario.fire', [], [s.fireSize], () => {
-    if (s.fireSize.peek() > 0) return false;
-    s.fireSize.set(PLANT.fireStart);
+  const ignite = g.action('scenario.fire', [], [s.kindling], () => {
+    if (s.fireSize.peek() > 0 || s.kindling.peek() > 0) return false;
+    s.kindling.set(PLANT.kindleSeconds);
     return true;
   });
   const countReset = g.action(
@@ -2076,6 +2153,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     ignite,
     distributionFate,
     lastToFail,
+    seatStates,
+    kindling: kindlingShown,
     fireSize,
     ruined,
     strain,

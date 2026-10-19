@@ -344,7 +344,14 @@ export interface MccView {
   /** Every unit's face, by its bucket id: where smoke can come from. */
   unitFaces: ReadonlyMap<
     string,
-    { section: Group; bay: number; face: SootedFace; centre: number }
+    {
+      /** The unit's works behind its door. */
+      interior: Group;
+      section: Group;
+      bay: number;
+      face: SootedFace;
+      centre: number;
+    }
   >;
   /** Where the doors' fronts are, for smoke along their seams. */
   doorFront: number;
@@ -639,7 +646,14 @@ export function createRetroEncabulatorMcc(
   /** Every unit's face, by its bucket id, for the smoke to stain. */
   const unitFaces = new Map<
     string,
-    { section: Group; bay: number; face: SootedFace; centre: number }
+    {
+      /** The unit's works behind its door. */
+      interior: Group;
+      section: Group;
+      bay: number;
+      face: SootedFace;
+      centre: number;
+    }
   >();
   let left = -total / 2;
   BAY_WIDTHS.forEach((width, bayIndex) => {
@@ -910,6 +924,7 @@ export function createRetroEncabulatorMcc(
       hinge.position.set(faceX - faceW / 2, cy, 0.003);
       bay.add(hinge);
       unitFaces.set(bucketId, {
+        interior,
         section: bay,
         bay: bayIndex,
         centre: faceX,
