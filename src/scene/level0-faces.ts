@@ -8,6 +8,7 @@ import {
 } from '../game/level0-plant';
 import type { Level0Plant } from '../game/level0-plant';
 import { STAGE_NAMES } from '../game/dimensionality';
+import { createLinkGlitches } from '../game/level0-link-glitches';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
 import {
   createStatusScanner,
@@ -290,6 +291,7 @@ export function createLevel0Dresser(
         // A slow 1980s scanner: one window at a time, recovering through
         // flashing green (`createStatusScanner`).
         const scanner = createStatusScanner(labels.length);
+        const linkGlitches = createLinkGlitches(labels.length);
         let testUntil = 0;
         let now = 0;
         // On the station battery, charged from the incoming side.
@@ -318,6 +320,7 @@ export function createLevel0Dresser(
           const fate = p.distributionFate.value;
           const alive = powered.value && fate !== 'dead';
           const shown = scanner.step(delta, alive, targets);
+          const linkShown = linkGlitches.step(delta, alive, shown, targets);
           if (alive && fate === 'sputtering') {
             const surge = Math.random() < 0.35;
             panel.show(
@@ -335,7 +338,7 @@ export function createLevel0Dresser(
             return;
           }
           panel.show(
-            shown.map((light) => {
+            linkShown.map((light) => {
               const colour = statusColour(light, clock);
               return colour && LAMP[colour];
             }),
