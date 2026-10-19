@@ -10,7 +10,6 @@ import { voiceAlarm } from '../toolkit/components/fire/parts/fire-parts';
 import {
   LEVEL0_CHAIRS,
   LEVEL0_MACHINE,
-  LEVEL0_WORKSTATION,
   LEVEL0_MACHINE_HEADS,
   LEVEL0_SCENARIOS,
 } from '../game/level0-room-plan';
@@ -136,15 +135,12 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
   scene.add(mcc.group);
   // Only the side of the machine in view is drawn.
   const machineSides = createMachineSideCulling(mcc.group);
-  // Out in front of the machine, facing it, so it can be watched from
-  // the BBC Micro's chair.
   const workstation = addMachineWorkstation(
     kit,
     LEVEL0_MACHINE,
     m,
     mcc.rear.dataPort,
     machine.diagnostics,
-    LEVEL0_WORKSTATION,
   );
   const stopDiagnosticLink = effect(() => {
     diagnosticsAvailable.value = workstation.diagnosticsAvailable.value;
