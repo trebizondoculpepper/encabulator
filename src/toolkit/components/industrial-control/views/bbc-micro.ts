@@ -8,7 +8,7 @@ import {
   Mesh,
   PlaneGeometry,
 } from 'three';
-import { combineUnletteredKeys } from './unlettered-keys';
+import { mergeStatic } from '../../core/views/merge-static';
 import type { BufferGeometry, Material, Texture } from 'three';
 import { createPs1Material } from '../../core/parts/ps1-material';
 import {
@@ -80,23 +80,90 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
   keyboard.position.set(0, 0.0518, 0.073);
   keyboard.rotation.x = 0.208;
   group.add(keyboard);
-  box(0.386, 0.002, 0.19, '#191b18', 0, 0, 0, keyboard);
+  // The black moulded surround the keys stand in, proud of the cream
+  // case so it reads round them.
+  box(0.392, 0.004, 0.198, '#141513', 0, 0.002, 0.002, keyboard);
 
-  const caps: Mesh[] = [];
+  // The keys: shaped caps, their legends from one atlas, grey on the
+  // black surround, the function keys red and the modifiers brown. Once
+  // made they are merged, a few meshes in all (`mergeStatic`).
+  const GREY = '#5c5e5a';
+  const RED = '#bf382c';
+  const BROWN = '#6b5a3e';
+  const keys = new Group();
+  keys.name = 'BBC keyboard keys';
+  keyboard.add(keys);
+  const atlas = createCanvasTexture(1024, 512);
+  textures.push(atlas.texture);
+  const legendMaterial = createPs1Material(
+    { map: atlas.texture, transparent: true, depthWrite: false },
+    true,
+  );
+  materials.push(legendMaterial);
+  let legendIndex = 0;
+  const capShape = new Shape();
+  capShape.moveTo(-0.5, -0.5);
+  capShape.lineTo(0.5, -0.5);
+  capShape.lineTo(0.5, 0.5);
+  capShape.lineTo(-0.5, 0.5);
+  capShape.closePath();
+  const capGeometry = new ExtrudeGeometry(capShape, {
+    depth: 0.24,
+    bevelEnabled: true,
+    bevelSize: 0.09,
+    bevelThickness: 0.07,
+    bevelSegments: 1,
+    steps: 1,
+  });
+  capGeometry.rotateX(-Math.PI / 2);
   const key = (
-    _legend: string,
+    legend: string,
     x: number,
     z: number,
     width = 0.019,
-    color = '#292b27',
+    color = GREY,
   ) => {
-    const cap = new Mesh(new BoxGeometry(width, 0.008, 0.017), paint(color));
-    cap.position.set(x, 0.006, z);
-    keyboard.add(cap);
-    caps.push(cap);
+    const cap = new Mesh(capGeometry, paint(color));
+    cap.scale.set(width / 1.18, 0.023, 0.017 / 1.18);
+    cap.position.set(x, 0.002, z);
+    keys.add(cap);
+    if (!legend) return;
+    const index = legendIndex++;
+    const col = index % 16,
+      row = Math.floor(index / 16);
+    atlas.context.fillStyle = '#eee7d6';
+    atlas.context.font = `bold ${legend.length > 3 ? 13 : 22}px monospace`;
+    atlas.context.textAlign = 'center';
+    atlas.context.textBaseline = 'middle';
+    const parts = legend.split(' ');
+    parts.forEach((part, line) =>
+      atlas.context.fillText(
+        part,
+        col * 64 + 32,
+        row * 64 + 32 + (line - (parts.length - 1) / 2) * 15,
+        58,
+      ),
+    );
+    const geometry = new PlaneGeometry(width * 0.8, 0.013);
+    const uv = geometry.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++)
+      uv.setXY(i, (col + uv.getX(i)) / 16, 1 - (row + 1 - uv.getY(i)) / 8);
+    const label = new Mesh(geometry, legendMaterial);
+    label.rotation.x = -Math.PI / 2;
+    label.position.set(x, 0.0095, z);
+    keys.add(label);
   };
+  /** The modifier keys, brown on the original. */
+  const MODIFIERS = new Set([
+    'ESCAPE',
+    'TAB',
+    'CAPS LOCK',
+    'CTRL',
+    'SHIFT LOCK',
+    'SHIFT',
+  ]);
   for (let i = 0; i < 10; i++)
-    key(`f${i}`, -0.11 + i * 0.023, -0.07, 0.019, '#bf382c');
+    key(`f${i}`, -0.11 + i * 0.023, -0.07, 0.019, RED);
   key('BREAK', 0.151, -0.07, 0.019);
   const rows = [
     [
@@ -140,19 +207,21 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
         -0.161 + i * 0.0224 + (r === 1 ? 0.002 : 0),
         -0.045 + r * 0.025,
         i === 0 ? 0.021 : 0.019,
+        MODIFIERS.has(legend.trim()) ? BROWN : GREY,
       ),
     ),
   );
   // Distinct cursor cluster and wider Return/Shift, as on the original layout.
-  key('LEFT', 0.153, -0.045, 0.018, '#5b523c');
-  key('RIGHT', 0.176, -0.045, 0.018, '#5b523c');
-  key('UP', 0.153, -0.021, 0.018, '#5b523c');
-  key('DOWN', 0.176, -0.021, 0.018, '#5b523c');
-  key('RETURN', 0.148, 0.004, 0.041);
-  key('SHIFT', 0.127, 0.03, 0.039);
-  key('DELETE', 0.158, 0.03, 0.019);
-  key('COPY', 0.181, 0.03, 0.019, '#5b523c');
+  key('LEFT', 0.153, -0.045, 0.018, BROWN);
+  key('RIGHT', 0.176, -0.045, 0.018, BROWN);
+  key('UP', 0.153, -0.021, 0.018, BROWN);
+  key('DOWN', 0.176, -0.021, 0.018, BROWN);
+  key('RETURN', 0.148, 0.004, 0.041, BROWN);
+  key('SHIFT', 0.127, 0.03, 0.039, BROWN);
+  key('DELETE', 0.158, 0.03, 0.019, BROWN);
+  key('COPY', 0.181, 0.03, 0.019, BROWN);
   key('', -0.007, 0.065, 0.184);
+  atlas.texture.needsUpdate = true;
 
   const deckLabel = (
     text: string,
@@ -220,15 +289,17 @@ export function createBbcMicro(worldUnitsPerMetre: number) {
     'SHIFT LOCK',
   ].entries()) {
     const x = -0.153 + i * 0.027;
-    deckLabel(text, 0.025, 0.01, x, 0.003, 0.069, keyboard);
+    deckLabel(text, 0.025, 0.01, x, 0.0045, 0.069, keyboard);
     const led = new Mesh(
       new CylinderGeometry(0.0018, 0.0018, 0.001, 8),
       paint('#7f2620'),
     );
-    led.position.set(x, 0.003, 0.08);
+    led.position.set(x, 0.0045, 0.08);
     keyboard.add(led);
   }
-  combineUnletteredKeys(keyboard, caps);
+  // A hundred-odd caps and legends draw as one mesh a colour, and one for
+  // all the legends.
+  mergeStatic(keys, Infinity);
   // Rear DIN sockets, RGB connector, moulding seam and rocker switch.
   for (const x of [-0.08, -0.025, 0.03]) {
     const socket = new Mesh(

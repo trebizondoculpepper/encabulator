@@ -7,6 +7,7 @@ import {
   vi,
 } from 'vite-plus/test';
 import { Box3, Mesh, TubeGeometry, Vector3 } from 'three';
+import type { Color, Material } from 'three';
 import { partAudio } from '../../core/audio/part-audio';
 import { createPanelKit, disposeKit } from '../../core/views/eighties-controls';
 import { bbcWorkstation } from './bbc-workstation';
@@ -52,15 +53,26 @@ describe('BBC workstation exhibit', () => {
     disposeKit(kit, exhibit.object);
   });
 
-  it('uses one unlettered keyboard mesh and seats the player facing the monitor', () => {
+  it('draws its lettered grey, red and brown keys in a few meshes, and seats the player facing the monitor', () => {
     const kit = createPanelKit();
     const exhibit = bbcWorkstation(kit);
-    const keyboard = exhibit.view.bbc.group.getObjectByName(
-      'BBC keyboard — unlettered',
-    ) as Mesh;
-    expect(keyboard).toBeInstanceOf(Mesh);
-    expect(Array.isArray(keyboard.material)).toBe(false);
-    expect('map' in keyboard.material && keyboard.material.map).toBe(null);
+    const keys = exhibit.view.bbc.group.getObjectByName('BBC keyboard keys')!;
+    const meshes: Mesh[] = [];
+    keys.traverse((o) => {
+      if (o instanceof Mesh) meshes.push(o);
+    });
+    // One a colour of cap, and one for every legend, from one atlas.
+    expect(meshes.length).toBeLessThanOrEqual(5);
+    const colours = new Set(
+      meshes
+        .map((m) => m.material as Material & { color?: Color; map?: unknown })
+        .filter((m) => !m.map)
+        .map((m) => `#${m.color!.getHexString()}`),
+    );
+    expect(colours).toEqual(new Set(['#5c5e5a', '#bf382c', '#6b5a3e']));
+    expect(meshes.some((m) => (m.material as { map?: unknown }).map)).toBe(
+      true,
+    );
     const seat = vi.fn();
     exhibit.onSit(seat);
     exhibit.uses.get(exhibit.view.chair.group)!();

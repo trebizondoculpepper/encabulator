@@ -67,7 +67,7 @@ The Level 2 narrator has been replaced by the owner's own performance (Sal Fadhl
 
 The October 2026 throw-switch thocks in `src/toolkit/components/core/parts/parts.ts` and `src/toolkit/components/industrial-control/parts/machine-components.ts` are original project synthesis: lower filtered noise, short 105–145 Hz body impacts and reduced metallic ringing. No new recording or sample was used.
 
-The VirtualBeeb comparison derivative `resources/models/bbc-micro/virtualbeeb/beeb-low.glb` retains Ant Mercer's attribution and the source restrictions above. Edits: glTF Transform 4.5.1 mesh simplification and texture resizing; runtime opaque material conversion, static mesh merging, unlettered combined keyboard and inset curved live CRT. The original GLB is retained unchanged. The procedural baseline keyboard is also combined into one unlettered mesh.
+The development-only comparison loads the original `resources/models/bbc-micro/virtualbeeb/beeb.glb`, unchanged on disk, with its own keycaps; runtime edits only: opaque material conversion, static mesh merging by material and an inset curved live CRT. The decimated derivative `beeb-low.glb` (glTF Transform 4.5.1 simplification, which collapsed the keys) is no longer loaded; it retains Ant Mercer's attribution and the source restrictions above. The procedural baseline keyboard keeps shaped, lettered caps, merged by colour.
 
 The procedural four-way UK floor extension at the BBC workstation is modelled to the 321 × 60 × 33 mm dimensions of the [Masterplug EXS1342W-01](https://www.masterplug.com/uk/products/work/heavy-duty-extension-leads/EXS1342W-01). Geometry, plugs, power cords and monitor signal cable are original project work; no manufacturer mesh or photograph is included.
 

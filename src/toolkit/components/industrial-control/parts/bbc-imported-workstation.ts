@@ -8,7 +8,6 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import { createCrtSurface } from '../views/crt-surface';
-import { combineUnletteredKeys } from '../views/unlettered-keys';
 import { mergeStatic } from '../../core/views/merge-static';
 import { bbcWorkstation } from './bbc-workstation';
 
@@ -19,7 +18,7 @@ export async function bbcImportedWorkstation(
 ) {
   if (!import.meta.env.DEV) return null;
   const url = new URL(
-    'resources/models/bbc-micro/virtualbeeb/beeb-low.glb',
+    'resources/models/bbc-micro/virtualbeeb/beeb.glb',
     document.baseURI,
   );
   const gltf = await new GLTFLoader().loadAsync(url.href);
@@ -49,7 +48,6 @@ export async function bbcImportedWorkstation(
   picture.name = 'Cub Mode 7 display';
   monitor?.add(tube, picture);
   if (rocker) part.uses.set(rocker, part.model.power.flip);
-  const keys: Mesh[] = [];
   const originals = new Set<import('three').BufferGeometry>();
   const originalMaterials = new Set<import('three').Material>();
   model.traverse((object) => {
@@ -60,20 +58,16 @@ export async function bbcImportedWorkstation(
       ? object.material[0]
       : object.material;
     originalMaterials.add(material);
-    if (object.name.startsWith('JOINED_KEYBOARD')) keys.push(object);
   });
-  const keyboard = combineUnletteredKeys(model, keys);
+  // Its own keycaps, black, red and brown, lettered, are kept as modelled
+  // (the full model, not a decimated one, whose keys collapsed): merged by
+  // material below, they cost a few draws, not a hundred.
   const replacements = new Map<
     import('three').Material,
     MeshStandardMaterial
   >();
   model.traverse((object) => {
-    if (
-      !(object instanceof Mesh) ||
-      object === keyboard ||
-      object === picture ||
-      object === tube
-    )
+    if (!(object instanceof Mesh) || object === picture || object === tube)
       return;
     const source = object.material as MeshStandardMaterial;
     let material = replacements.get(source);
@@ -91,12 +85,7 @@ export async function bbcImportedWorkstation(
   mergeStatic(
     model,
     Infinity,
-    new Set([
-      picture,
-      tube,
-      ...(rocker ? [rocker] : []),
-      ...(keyboard ? [keyboard] : []),
-    ]),
+    new Set([picture, tube, ...(rocker ? [rocker] : [])]),
   );
   // The imported shell and monitor share merged meshes. A close-fitting
   // computer-only hit volume keeps the monitor and desk from switching it.
@@ -108,7 +97,6 @@ export async function bbcImportedWorkstation(
   powerTarget.position.copy(model.position).add({ x: 0, y: 0.05, z: 0 });
   part.object.add(powerTarget);
   part.uses.set(powerTarget, part.model.power.flip);
-  if (keyboard) part.uses.set(keyboard, part.model.power.flip);
   const update = part.update;
   const dispose = part.dispose;
   return {
