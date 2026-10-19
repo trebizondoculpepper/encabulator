@@ -9,13 +9,28 @@ import { slide } from '../toolkit/controls/logic/walk-collision';
 import { createPortals } from '../toolkit/gallery/views/portals';
 import { LOOP_ROOMS } from './dev-corridor';
 
-vi.mock('../toolkit/components/core/views/screens', () => ({
-  createLabelTexture: () => ({
-    texture: new Texture(),
-    width: 256,
-    height: 48,
-  }),
-}));
+vi.mock('../toolkit/components/core/views/screens', () => {
+  // Labels' canvases are made, but nothing is drawn on them.
+  const context = new Proxy(
+    { measureText: (text: string) => ({ width: text.length * 7 }) },
+    {
+      get: (target, key) =>
+        key in target ? Reflect.get(target, key) : () => {},
+    },
+  );
+  return {
+    createLabelTexture: () => ({
+      texture: new Texture(),
+      width: 256,
+      height: 48,
+    }),
+    createCanvasTexture: (width: number, height: number) => ({
+      canvas: { width, height },
+      context,
+      texture: new Texture(),
+    }),
+  };
+});
 afterEach(() => vi.unstubAllGlobals());
 
 /** Where each journey went: the `dev-room` events dispatched. */
@@ -26,6 +41,8 @@ function journeys() {
 }
 
 const bounds = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 };
+/** The rooms with doors of their own, which a use goes through at once. */
+const PATCHES: readonly string[] = ['training', 'rhombus', 'dev17', 'dev18'];
 const WALKER_RADIUS = 0.25;
 
 /**
@@ -54,6 +71,9 @@ describe('the doors and ways out', () => {
           z: Math.cos(start.yaw) * 0.05,
         };
         let at = { x: start.x, z: start.z };
+        // A door of its own (most rooms: a spring door) is pushed open first.
+        const [use] = [...portals.uses.values()];
+        if (!PATCHES.includes(id)) use();
         for (let i = 0; i < 80 && went().length === 0; i++) {
           at = slide(walls, at.x, at.z, step.x, step.z, WALKER_RADIUS);
           portals.update(1 / 60, at.x, at.z);
@@ -62,15 +82,17 @@ describe('the doors and ways out', () => {
         portals.dispose();
       });
 
-      it(`${id}: its way out can be clicked`, () => {
+      it(`${id}: its way out can be worked from where one stands`, () => {
         const went = journeys();
         const portals = createPortals(id, devPortals(id, bounds, 1), 0, 1);
-        const patch = [...portals.uses.keys()].find(
-          (m) => m.name === `Portal to ${portal.to}`,
+        const [use] = [...portals.uses.values()];
+        expect(use).toBeDefined();
+        use();
+        // The rooms whose doors are their own travel at a use; a spring
+        // door only opens, and is walked through.
+        expect(went()).toEqual(
+          PATCHES.includes(id) ? [{ to: portal.to, from: id }] : [],
         );
-        expect(patch).toBeDefined();
-        portals.uses.get(patch!)!();
-        expect(went()).toEqual([{ to: portal.to, from: id }]);
         portals.dispose();
       });
 

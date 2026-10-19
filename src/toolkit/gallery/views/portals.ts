@@ -1,5 +1,24 @@
-import { BoxGeometry, Group, Mesh, PlaneGeometry } from 'three';
-import type { Material, Texture } from 'three';
+import {
+  AlwaysDepth,
+  AlwaysStencilFunc,
+  BoxGeometry,
+  EqualStencilFunc,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  ReplaceStencilOp,
+  ShaderMaterial,
+} from 'three';
+import type { Material, Object3D, Texture } from 'three';
+import {
+  createMicroLabel,
+  createPanelKit,
+  disposeKit,
+} from '../../components/core/views/eighties-controls';
+import { createPartSet } from '../../components/core/parts/parts';
+import { springDoor } from '../../components/architectural/parts/building-parts';
+import { SPRING_OPENING } from '../../components/architectural/views/spring-door';
 import {
   DEV_ROOM_COLOURS,
   DEV_ROOM_NAMES,
@@ -26,12 +45,65 @@ const INWARD: Record<Portal['side'], { x: number; z: number; yaw: number }> = {
   east: { x: -1, z: 0, yaw: -Math.PI / 2 },
 };
 
+/** How deep the dark lobby behind a room's door is, metres. */
+const LOBBY = 1.6;
+/** How near the doorway's face, and within how much of its middle, one goes through. */
+const THROUGH = { face: 0.6, half: 0.5 };
+
 /**
- * A room's portals: each a glowing patch on the wall in the colour of the
- * room it leads to, with that room's name over it. Walk into one, or click
- * it, and you are in that room, standing in front of its portal back. `update` takes
- * where the walker is; `arrival` says where to stand having come from a
- * room. Built in scene units, `metre` per metre, on a floor at `floorY`.
+ * Stencil drawing for a doorway in a wall the room built solid: the
+ * doorway marks where it is seen (`mask`), the depth there is pushed back
+ * (`deepen`), and the lobby and the door's swinging leaf are drawn only
+ * there, so the wall looks cut through without being changed. Needs the
+ * renderer's stencil buffer (`createRenderer` has one).
+ */
+const DOORWAY_ORDER = 10;
+function doorwayMaterials() {
+  const mask = new MeshBasicMaterial({
+    colorWrite: false,
+    depthWrite: false,
+    stencilWrite: true,
+    stencilRef: 1,
+    stencilFunc: AlwaysStencilFunc,
+    stencilZPass: ReplaceStencilOp,
+  });
+  const deepen = new ShaderMaterial({
+    vertexShader: /* glsl */ `
+      void main() {
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        // As far off as can be: what is behind the doorway may be drawn.
+        gl_Position.z = gl_Position.w;
+      }
+    `,
+    fragmentShader: /* glsl */ `void main() { gl_FragColor = vec4(0.0); }`,
+    colorWrite: false,
+    depthFunc: AlwaysDepth,
+    stencilWrite: true,
+    stencilRef: 1,
+    stencilFunc: EqualStencilFunc,
+  });
+  /** Make `material` draw only in the doorway. */
+  const within = <T extends Material>(material: T) => {
+    material.stencilWrite = true;
+    material.stencilRef = 1;
+    material.stencilFunc = EqualStencilFunc;
+    return material;
+  };
+  return { mask, deepen, within };
+}
+
+/**
+ * A room's ways out (`portals`), each a double-action spring door in the
+ * wall, as on the corridor (the `springDoor` part), under the name of
+ * the room it leads to on that room's colour. A use pushes it open, away
+ * from you, onto a dark lobby (drawn into the solid wall through a
+ * stencil, `doorwayMaterials`); it eases shut on its spring, and stays
+ * open while you stand in its doorway; walk through it while it is open
+ * and you are in that room, in front of its door back. The training
+ * room, the Rhombus and the warehouse rooms have doors of their own.
+ * `update` takes the time and where the walker is; `arrival` says where to
+ * stand having come from a room. Built in scene units, `metre` per metre,
+ * on a floor at `floorY`.
  */
 export function createPortals(
   from: RoomId,
@@ -49,7 +121,16 @@ export function createPortals(
   // (by polygon offset), so whatever covers the wall runs on under them.
   const face = (WALL_THICKNESS / 2) * metre + 0.002 * metre;
   let leaving = false;
-  const uses = new Map<Mesh, () => void>();
+  const uses = new Map<Object3D, (direction?: number) => void>();
+  // The spring doors, their parts and the doorway's stencil materials.
+  const kit = createPanelKit();
+  const parts = createPartSet();
+  const doorway = doorwayMaterials();
+  materials.push(doorway.mask, doorway.deepen);
+  const doors: {
+    portal: Portal;
+    part: ReturnType<typeof springDoor>;
+  }[] = [];
   const travel = (to: RoomId) => {
     if (leaving) return;
     leaving = true;
@@ -226,42 +307,70 @@ export function createPortals(
       }
       continue;
     }
-    const glow = createPs1Material(
-      { color: DEV_ROOM_COLOURS[portal.to] },
-      true,
-      true,
+    // A spring door in the wall, built in metres.
+    const door = new Group();
+    door.scale.setScalar(metre);
+    frame.add(door);
+    const part = parts.add(
+      springDoor(kit, { name: `${DEV_ROOM_NAMES[portal.to]} door` }),
     );
-    glow.polygonOffset = true;
-    glow.polygonOffsetFactor = -1;
-    glow.polygonOffsetUnits = -4;
-    materials.push(glow);
-    const patch = new Mesh(new PlaneGeometry(width, height), glow);
-    patch.position.y = height / 2;
-    patch.name = `Portal to ${portal.to}`;
-    patch.userData.noCollision = true;
-    frame.add(patch);
-    // A click on the patch, from anywhere it can be seen, goes too.
-    uses.set(patch, () => travel(portal.to));
-    const label = createLabelTexture(DEV_ROOM_NAMES[portal.to], {
-      ink: '#f2efe4',
-      plate: '#1c2422',
-      size: 24,
+    door.add(part.object);
+    for (const [object, use] of part.uses) uses.set(object, use);
+    doors.push({ portal, part });
+    // The leaf, which swings into the wall, is drawn only in the doorway.
+    part.object.traverse((o) => {
+      if (!o.userData.live) return;
+      o.traverse((leaf) => {
+        if (!(leaf instanceof Mesh)) return;
+        leaf.material = doorway.within((leaf.material as Material).clone());
+        materials.push(leaf.material as Material);
+        leaf.renderOrder = DOORWAY_ORDER + 3;
+      });
     });
-    textures.push(label.texture);
-    const sign = createPs1Material({ map: label.texture }, true, true);
-    sign.polygonOffset = true;
-    sign.polygonOffsetFactor = -1;
-    sign.polygonOffsetUnits = -4;
-    materials.push(sign);
-    const plate = new Mesh(
-      new PlaneGeometry(
-        width * 1.4,
-        (width * 1.4 * label.height) / label.width,
-      ),
-      sign,
-    );
-    plate.position.set(0, height + 0.2 * metre, 0.002 * metre);
-    frame.add(plate);
+    // The doorway, and the dark lobby behind it.
+    const { width: w, height: h } = SPRING_OPENING;
+    const mask = new Mesh(new PlaneGeometry(w, h), doorway.mask);
+    mask.position.set(0, h / 2, 0);
+    mask.renderOrder = DOORWAY_ORDER;
+    mask.raycast = () => {};
+    door.add(mask);
+    const deepen = new Mesh(new PlaneGeometry(w, h), doorway.deepen);
+    deepen.position.copy(mask.position);
+    deepen.renderOrder = DOORWAY_ORDER + 1;
+    deepen.raycast = () => {};
+    door.add(deepen);
+    const dark = doorway.within(new MeshBasicMaterial({ color: '#0d0e0f' }));
+    materials.push(dark);
+    const lobby = (
+      pw: number,
+      ph: number,
+      x: number,
+      y: number,
+      z: number,
+      rx: number,
+      ry: number,
+    ) => {
+      const face = new Mesh(new PlaneGeometry(pw, ph), dark);
+      face.position.set(x, y, z);
+      face.rotation.set(rx, ry, 0);
+      face.renderOrder = DOORWAY_ORDER + 2;
+      face.raycast = () => {};
+      door.add(face);
+    };
+    lobby(w, h, 0, h / 2, -LOBBY, 0, 0);
+    lobby(LOBBY, h, -w / 2, h / 2, -LOBBY / 2, 0, Math.PI / 2);
+    lobby(LOBBY, h, w / 2, h / 2, -LOBBY / 2, 0, -Math.PI / 2);
+    lobby(w, LOBBY, 0, h, -LOBBY / 2, Math.PI / 2, 0);
+    lobby(w, LOBBY, 0, 0, -LOBBY / 2, -Math.PI / 2, 0);
+    // The name of the room it leads to over it, on that room's colour.
+    const sign = createMicroLabel(kit, DEV_ROOM_NAMES[portal.to], {
+      height: 0.075,
+      ink: '#101214',
+      plate: DEV_ROOM_COLOURS[portal.to],
+      maxWidth: 1.6,
+    });
+    sign.position.set(0, h + 0.32, 0.1);
+    door.add(sign);
   }
   return {
     group,
@@ -274,6 +383,8 @@ export function createPortals(
       const portal = portals.find((p) => p.to === previous);
       if (!portal) return null;
       leaving = false;
+      // Come back through its door: shut behind you now.
+      for (const d of doors) d.part.door.snapShut();
       const inward = INWARD[portal.side];
       const reach = (WALL_THICKNESS / 2 + ARRIVAL_DISTANCE) * metre;
       return {
@@ -284,9 +395,29 @@ export function createPortals(
       };
     },
     /** Travel if the walker, at (x, z), has walked into a portal. */
-    update(_delta: number, x: number, z: number) {
+    update(delta: number, x: number, z: number) {
+      parts.update(delta);
+      // A door is held open while someone stands in its doorway, and
+      // walking through it while it is open goes to its room.
+      for (const { portal, part } of doors) {
+        const inward = INWARD[portal.side];
+        const off =
+          ((x - portal.x) * inward.x + (z - portal.z) * inward.z) / metre -
+          WALL_THICKNESS / 2;
+        const along =
+          Math.abs((x - portal.x) * inward.z - (z - portal.z) * inward.x) /
+          metre;
+        const inDoorway = along <= THROUGH.half && off <= THROUGH.face;
+        part.hold(inDoorway && part.door.open);
+        if (!leaving && inDoorway && part.door.open && off >= -0.05) {
+          travel(portal.to);
+          return;
+        }
+      }
       if (leaving) return;
       for (const portal of portals) {
+        // The rooms with doors of their own travel as their portals did.
+        if (doors.some((d) => d.portal === portal)) continue;
         const across = portal.side === 'east' || portal.side === 'west';
         const off = across ? Math.abs(x - portal.x) : Math.abs(z - portal.z);
         const along = across ? Math.abs(z - portal.z) : Math.abs(x - portal.x);
@@ -297,6 +428,8 @@ export function createPortals(
       }
     },
     dispose() {
+      parts.dispose();
+      disposeKit(kit, group);
       group.traverse((o) => {
         if (o instanceof Mesh) o.geometry.dispose();
       });

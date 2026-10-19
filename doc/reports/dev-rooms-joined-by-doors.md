@@ -32,3 +32,16 @@ Limitations and next steps:
 - One scene a room, rather than one scene, was chosen so each room keeps its own lights. A room seen through a door is not lit by the other's lights, which is right for a door, though light does not spill through it.
 - The two doors' frames differ a little (the courtyard's frame shows only on its other three doors).
 - The Hall and the levels still have no way back but the room list.
+
+## 2026-10-19: every dev room's way out a spring door
+
+Built: the coloured portal patches are gone. Every dev room's way back to the corridor is now a double-action spring door in its wall, the same `springDoor` part as the corridor's, under DEV CORRIDOR on the corridor's colour, made once for every room by `createPortals` (`src/toolkit/gallery/views/portals.ts`) where `devPortals` has always put the way out. A use pushes it open, away from you; it eases shut on its spring, stays open while you stand in its doorway, and walking through it while it is open takes you to the corridor, in front of that room's door there. Coming back, you stand in front of it, shut. So every connection between the corridor and a dev room is now a spring door at both ends.
+
+How the doorway is made without touching the rooms: the rooms build their walls solid (`devWalls`) and walk against them, and 21 rooms build and collide with their walls each in their own way. Rather than cut a hole in each, the door stands in the wall face and the doorway is drawn into the wall with the stencil buffer: the doorway marks where it is seen, the depth there is pushed back, and a dark lobby 1.6 m deep and the door's swinging leaf are drawn only there. The wall is still solid to walk against, as the corridor's are; travel happens on reaching the open doorway, as it does on the corridor. `createRenderer` now asks for a stencil buffer for this.
+
+Kept as they were: the training room's beech fire door, the Rhombus's EXIT door and the warehouse's escape door in dev17 and dev18 are their rooms' own physical doors, and still travel at a use or a walk into them. The levels and the Hall still have no way back but the room list.
+
+Tests: `src/toolkit/gallery/views/portals.test.ts` (a shut door goes nowhere, a use opens it without travelling, walking through it open travels once, it swings shut again) and `src/scene/portal-network.test.ts` (every room's door opens with a use and can be walked through to the corridor from where one arrives). Checked in the browser: dev22's door shut and open onto its lobby, walked through to the corridor; dev0's door.
+
+Not yet: seeing through. An open door between the corridor and a dev room shows a dark lobby on both sides, since each dev room is still drawn by its own renderer on its own canvas. The courtyard is seen through because it was made a room module the corridor draws; doing that for every room means reworking each room's start function. A cheaper way to try first: keep each room as it is, put the other room's canvas underneath, have its camera follow the player through the join (its controls ignoring input), and draw the doorway as transparent instead of a dark lobby. It needs a way to drive a room's camera from outside (in `createFirstPerson`, for every room at once), a transparent doorway in place of the lobby, and the two doors at a joint shown as one.
+

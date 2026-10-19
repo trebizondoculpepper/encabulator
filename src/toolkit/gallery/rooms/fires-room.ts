@@ -501,6 +501,8 @@ export function startFiresRoom(canvas: HTMLCanvasElement) {
     size(value: number | null) {
       held = value === null ? null : Math.max(0, Math.min(1, value));
     },
+    /** Use whatever is at (x, y) on the screen (−1 to 1), as a use would. */
+    use: (x = 0, y = 0) => usableAt(x, y)?.(),
     stats: () => ({ ...renderer.info.render }),
     /**
      * Run `seconds` of frames at once (where the browser is not drawing,

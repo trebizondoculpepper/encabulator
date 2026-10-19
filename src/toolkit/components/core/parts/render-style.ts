@@ -36,7 +36,13 @@ const MAX_PIXEL_RATIO = 2;
 
 /** A WebGL renderer for a room (the Hall has its own, hall-pipeline.ts). */
 export function createRenderer(canvas: HTMLCanvasElement) {
-  const renderer = new WebGLRenderer({ canvas, antialias: true });
+  // A stencil buffer, for doorways that look into a space the room does
+  // not build (a door's lobby, drawn only where the doorway is seen).
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: true,
+    stencil: true,
+  });
   renderer.setPixelRatio(
     Math.min(globalThis.devicePixelRatio ?? 1, MAX_PIXEL_RATIO),
   );
