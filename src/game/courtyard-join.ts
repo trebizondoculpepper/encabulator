@@ -209,13 +209,3 @@ export function inJoinedDoorway(a: Anchor, x: number, z: number) {
     along <= DOORWAY_HALF + 0.1 && depth >= -0.7 && depth <= JOIN_DEPTH + 0.7
   );
 }
-
-/**
- * Which way to push the corridor's door joining it to the courtyard, for
- * someone at (x, z): away from them, +1 into the courtyard from the
- * corridor's side, −1 back from the courtyard's.
- */
-export function pushAway(a: Anchor, x: number, z: number): 1 | -1 {
-  const d = doorway({ side: a.side, t: 0, wall: 'inner' });
-  return (x - d.x) * d.out.x + (z - d.z) * d.out.z > 0 ? -1 : 1;
-}

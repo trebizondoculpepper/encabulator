@@ -9,7 +9,6 @@ import {
   inCourtyard,
   inJoinedDoorway,
   joinedWalls,
-  pushAway,
   toLocal,
   toWorld,
 } from './courtyard-join';
@@ -86,14 +85,12 @@ describe('the courtyard joined to the corridor', () => {
     expect(inCourtyard(a, n.x, n.z + 0.8)).toBe(false);
   });
 
-  it('holds its door open while someone passes, pushed away from them', () => {
+  it('holds its door open while someone passes', () => {
     const a = anchor('west');
     const d = doorway({ side: 'west', t: 0, wall: 'inner' });
     expect(inJoinedDoorway(a, d.x - 0.3 * d.out.x, d.z)).toBe(true);
     expect(inJoinedDoorway(a, d.x + 0.6 * d.out.x, d.z)).toBe(true);
     expect(inJoinedDoorway(a, d.x - 2 * d.out.x, d.z)).toBe(false);
-    expect(pushAway(a, d.x - d.out.x, d.z)).toBe(1);
-    expect(pushAway(a, d.x + d.out.x, d.z)).toBe(-1);
   });
 
   it.each(LOOP_SIDE_IDS)(

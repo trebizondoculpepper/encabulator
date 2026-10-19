@@ -201,12 +201,12 @@ export function createDevCourtyard(kit: PanelKit) {
     );
     down.castShadow = false;
     // The door back to the corridor, under its side's letter. It faces
-    // into the courtyard, so a push from the courtyard (the only side it is
-    // pushed from: behind it is the corridor's own door) opens it away.
+    // into the courtyard and, as the corridor's door it stands for, opens
+    // into the courtyard: pulled from here.
     const part = parts.add(
       springDoor(kit, {
         name: `CORRIDOR ${LOOP_SIDES[side].letter} door`,
-        away: () => 1,
+        opens: -1,
       }),
     );
     wall.add(part.object);

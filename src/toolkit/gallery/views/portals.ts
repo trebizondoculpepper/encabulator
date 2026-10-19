@@ -173,7 +173,9 @@ export function createPortals(
     door.scale.setScalar(metre);
     frame.add(door);
     const part = parts.add(
-      springDoor(kit, { name: `${DEV_ROOM_NAMES[portal.to]} door` }),
+      // It opens into the room, as the corridor's door it stands for
+      // does: pulled from in here.
+      springDoor(kit, { name: `${DEV_ROOM_NAMES[portal.to]} door`, opens: -1 }),
     );
     door.add(part.object);
     for (const [object, use] of part.uses) uses.set(object, use);
@@ -193,17 +195,7 @@ export function createPortals(
     /** What the doorway shows: its dark lobby, or the room beyond. */
     const lobbyFaces: Mesh[] = [];
     let hole: Mesh | null = null;
-    // The leaf, which swings into the wall, is drawn only in the doorway.
-    if (!opening)
-      part.object.traverse((o) => {
-        if (!o.userData.live) return;
-        o.traverse((leaf) => {
-          if (!(leaf instanceof Mesh)) return;
-          leaf.material = doorway.within((leaf.material as Material).clone());
-          materials.push(leaf.material as Material);
-          leaf.renderOrder = DOORWAY_ORDER + 3;
-        });
-      });
+    // The leaf swings into the room, in front of the wall: drawn as it is.
     // The doorway, and the dark lobby behind it.
     const { width: w, height: h } = SPRING_OPENING;
     if (opening) {

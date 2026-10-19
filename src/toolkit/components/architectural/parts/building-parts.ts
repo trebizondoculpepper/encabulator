@@ -164,27 +164,31 @@ const DOOR_SETTLES = click({
 });
 
 /**
- * A double-action spring door (`spring-door.ts`): a use pushes it open
- * away from the side it is pushed from (`away`, +1 into its back, −1 out of
- * its face), and it eases shut on its spring a while after it is let go,
- * settling with a soft thud; `hold` while someone stands in its doorway;
- * `snapShut` closes it at once and silently.
+ * A spring door (`spring-door.ts`) that opens one way only, `opens`: +1
+ * away from its face (pushed from in front, pulled from behind), −1
+ * towards it; its push plate and pull handle say which, whichever side
+ * it is worked from. A use opens it, and it eases shut on its spring a
+ * while after it is let go, settling with a soft thud; `hold` while
+ * someone stands in its doorway; `snapShut` closes it at once and
+ * silently.
  */
 export function springDoor(
   kit: PanelKit,
-  props: { name?: string; away?: () => 1 | -1 } = {},
+  props: { name?: string; opens?: 1 | -1 } = {},
 ): Part & {
   door: ReturnType<typeof createSpringDoor>;
   hold(held: boolean): void;
 } {
   const a = beginPart(kit, props.name ?? 'spring door');
-  const view = createSpringDoorView(kit);
+  const opens = props.opens ?? 1;
+  const view = createSpringDoorView(kit, opens);
   a.object.add(view.group);
   const door = createSpringDoor();
   const e = emitter();
   a.voice(e, { off: DOOR_SETTLES });
   let held = false;
-  a.uses.set(view.leaf, () => door.push(props.away?.() ?? 1));
+  for (const grip of [view.leaf, ...view.grips])
+    a.uses.set(grip, () => door.push(opens));
   let shown = 0;
   a.updates.push((delta) => {
     const before = door.angle;

@@ -28,7 +28,6 @@ import {
   inCourtyard,
   inJoinedDoorway,
   joinedWalls,
-  pushAway,
   toWorld,
 } from '../game/courtyard-join';
 import type { Anchor } from '../game/courtyard-join';
@@ -113,14 +112,7 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
   const kit = createPanelKit();
   /** Where the player is, metres: set each frame, read by the doors. */
   const here = { x: 0, z: 0 };
-  const corridor = createDevCorridor(kit, {
-    // The door to the courtyard opens away from whichever side it is
-    // pushed from; the rest only ever from the corridor.
-    away: (door) =>
-      door.wall === 'inner' && door.side === courtyard.placed.side
-        ? pushAway(courtyard.placed, here.x, here.z)
-        : 1,
-  });
+  const corridor = createDevCorridor(kit);
   corridor.group.scale.setScalar(m);
   scene.add(corridor.group);
   // A few real lights, moved each frame to the battens nearest the player
@@ -378,14 +370,14 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
    * The doors between the rooms. An inner door opened elsewhere brings
    * the courtyard behind it (unseen: every other door snaps shut). One of
    * the courtyard's own doors opened brings the courtyard, and the player
-   * in it, behind that side's inner door, and opens that instead, away
-   * from them: it is the door between the two.
+   * in it, behind that side's inner door, and opens that instead, into
+   * the courtyard, towards them: it is the door between the two.
    */
   const courtyardDoors = () => {
     for (const d of courtyard.doors) {
       if (d.side === courtyard.placed.side || !d.part.door.open) continue;
       moveCourtyard(d.side);
-      innerDoors.get(d.side)!.part.door.push(-1);
+      innerDoors.get(d.side)!.part.door.push(1);
       return;
     }
     for (const [side, d] of innerDoors)
@@ -531,8 +523,8 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
      */
     open(side: LoopSide) {
       if (side === courtyard.placed.side)
-        innerDoors.get(side)!.part.door.push(-1);
-      else courtyard.doors.find((d) => d.side === side)?.part.door.push(1);
+        innerDoors.get(side)!.part.door.push(1);
+      else courtyard.doors.find((d) => d.side === side)?.part.door.push(-1);
     },
     stats: () => ({ ...renderer.info.render }),
     shot: (seconds = 0, width = 1280, height = 720) =>

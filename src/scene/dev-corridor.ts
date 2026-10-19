@@ -103,13 +103,9 @@ export const LOOP_ROOMS: readonly (RoomId | null)[] = LOOP_DOORS.filter(
  */
 export function createDevCorridor(
   kit: PanelKit,
-  options: {
-    /**
-     * Which way a push opens `door` (+1 away from the corridor, −1 into
-     * it, for a door the player may come back through); +1 if not said.
-     */
-    away?: (door: LoopDoor) => 1 | -1;
-  } = {},
+  // Every door opens away from the corridor, into its room or the
+  // courtyard (as a room door should, never into an escape route): pushed
+  // from the corridor, pulled from the other side.
 ) {
   const group = new Group();
   group.name = 'dev_corridor';
@@ -517,7 +513,6 @@ export function createDevCorridor(
     const part = parts.add(
       springDoor(kit, {
         name: `${name} door`,
-        away: () => options.away?.(door) ?? 1,
       }),
     );
     // Its face to the corridor: the part faces +z, turned to face inward.
