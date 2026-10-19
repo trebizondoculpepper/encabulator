@@ -80,7 +80,7 @@ export const FITTINGS = [-3.6, 0, 3.6].flatMap((x) =>
   [-2.9, 0.1, 3.1].map((z) => ({ x, z })),
 );
 /** The company whose reception this is. */
-const BRAND = 'meridale' as const;
+const BRAND = 'neumann-dynamik' as const;
 
 /** Named places to stand, metres: x, z, yaw (0 north, π/2 east), pitch. */
 export const RECEPTION_VIEWS: Record<

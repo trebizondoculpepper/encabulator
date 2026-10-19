@@ -55,3 +55,8 @@ In the browser: `?room=dev23` did not start the room at the time of this run, be
 - No lowered wheelchair-accessible counter section yet (present-day Approved Document M would expect one even in an old fit-out); no hearing loop sign at the desk.
 - The receptionist's chair is the VX3's worn 1980s task chair, somewhat older and shabbier than the tidy brief.
 - No diary entry was written: left to the lead, who owns the session.
+
+## 2026-10-19: Neumann Dynamik's office
+
+The owner corrected the company: the reception is a Neumann Dynamik office, not Meridale's. `BRAND` in `src/toolkit/gallery/rooms/reception.ts` is now `neumann-dynamik`, so the logo behind the desk, its tagline, the brochures, the course register and the directional sign and the First floor offices plate take Neumann Dynamik's mark and colours (navy and steel grey). Its tagline, from `brands.ts`, is German ("Präzision in Bewegung"), as the brand's own.
+
