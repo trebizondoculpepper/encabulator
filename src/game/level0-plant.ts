@@ -260,14 +260,15 @@ export interface PlantFault {
 /**
  * How bad a fault is, from its code: a halted PLC, an earth fault, a
  * tripped drive and failed DC bus parts are critical; lost lube, lost I/O,
- * protective devices operated and wiring faults are failures; the rest
+ * protective devices operated, an emergency stop pushed and wiring faults
+ * are failures; the rest
  * (hot, unlocked, drifting, a door open) are warnings.
  */
 export function severityOf(code: string): Severity {
   if (/^(E01|E10|E11|E20|F04|F07|S0\d)$|-(C1|A1)$/.test(code))
     return 'critical';
   if (
-    /^(E02|E3\d|E4\d|E5\d|E6\d|A01|A11|A13)$|-(Q|F1|F2|KM|K\d|X\d|RU\d)$/.test(
+    /^(E02|E3\d|E4\d|E5\d|E6\d|A01|A11|A13)$|-(Q|F1|F2|KM|K\d|X\d|RU\d|ES)$/.test(
       code,
     )
   )

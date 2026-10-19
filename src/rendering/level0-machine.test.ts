@@ -843,6 +843,42 @@ it('warns BEWARE once when a unit fails after the steady state, however many fol
   dispose();
 });
 
+it.each([
+  ['FEED MOTOR', UNITS.feed, 'M-102'],
+  ['AUXILIARY MOTOR', UNITS.auxMotor, 'M-103'],
+] as const)(
+  "reports the %s's emergency stop as a failure, and warns BEWARE",
+  (label, unit, window) => {
+    const { machine, run, dispose } = sandbox();
+    const bbc = createBbcComputer(machine.diagnostics);
+    bbc.power.flip();
+    const both = (seconds: number) => {
+      run(seconds);
+      bbc.step(seconds);
+    };
+    createLevel0Scenarios(machine).fullOn();
+    both(100);
+    expect(machine.diagnostics.units!.value[window]).toBe('green');
+    const stop = within(machine, label, 'EMERGENCY STOP');
+    machine.mcc.parts.uses.get(stop)!();
+    both(2);
+    expect(machine.mcc.circuits.get(unit)!.running.value).toBe(false);
+    expect(machine.plant.faults.value.map((f) => f.text)).toContain(
+      `${label} EMERGENCY STOP`,
+    );
+    expect(machine.diagnostics.units!.value[window]).toBe('failed');
+    expect(bbc.beware.value).toBe(1);
+    // Pulled out, the fault clears.
+    machine.mcc.parts.uses.get(stop)!();
+    both(2);
+    expect(machine.plant.faults.value.map((f) => f.text)).not.toContain(
+      `${label} EMERGENCY STOP`,
+    );
+    bbc.dispose();
+    dispose();
+  },
+);
+
 it('lets a front click reach every VFD keypad key and its speed knob', () => {
   const { machine, dispose } = sandbox();
   machine.mcc.group.updateMatrixWorld(true);

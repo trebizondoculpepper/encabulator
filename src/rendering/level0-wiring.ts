@@ -209,6 +209,8 @@ export function componentReports(machine: MccView): PlantFault[] {
     const breaker = circuit.breaker;
     if (breaker?.faulted.value) report('Q', 'BREAKER TRIPPED');
     if (!breaker?.active.value) continue;
+    // A motor stopped on its emergency stop, until it is pulled out.
+    if (circuit.emergency.value) report('ES', 'EMERGENCY STOP');
     let relays = 0;
     let chassis = 0;
     let terminals = 0;
