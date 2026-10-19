@@ -31,6 +31,7 @@ import {
   createSectionBoard,
 } from '../../components/core/views/signage';
 import {
+  createMicroLabel,
   createPanelKit,
   disposeKit,
   kitPaint,
@@ -47,8 +48,10 @@ import {
   fusedSpur,
   intercom,
   lightSwitch,
+  closerDoor,
   occupancySensor,
   pullCordSwitch,
+  risingButtDoor,
   radiator,
   thermostat,
   twinSocket,
@@ -508,6 +511,57 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   luxMap.visible = false;
   room.add(luxMap);
 
+  // ---- Self-closing doors ----------------------------------------------------
+  // Two single-action doors in freestanding frames in the middle of the
+  // room, side by side, the way each closes itself on show (their hinge
+  // side, and the closer, towards the room's middle): on an overhead door
+  // closer, and on rising butts. Each is held open while someone stands
+  // in its doorway.
+  const SELF_CLOSING = [
+    {
+      x: -1.6,
+      part: closerDoor(kit, { name: 'door on an overhead closer' }),
+      title: 'OVERHEAD DOOR CLOSER',
+      how: 'After the Dorma TS 83: a spring in an oil-filled body, its arm to the frame. It sweeps shut, then slows to latch.',
+    },
+    {
+      x: 1.6,
+      part: risingButtDoor(kit, { name: 'door on rising butts' }),
+      title: 'RISING BUTT HINGES',
+      how: 'Helical knuckles lift the door as it opens; its own weight brings it down and shut. No spring.',
+    },
+  ];
+  const SELF_CLOSING_Z = -1.5;
+  const selfClosingSolids: Footprint[] = [];
+  for (const { x, part, title, how } of SELF_CLOSING) {
+    parts.add(part);
+    part.object.position.set(x, 0, SELF_CLOSING_Z);
+    room.add(part.object);
+    const caption = createMicroLabel(kit, `${title}\n${how}`, {
+      height: 0.03,
+      maxWidth: 1.1,
+      ink: '#253a42',
+      plate: '#e5e8df',
+    });
+    // On a plate fixed on top of the frame's head.
+    const plate = new Mesh(
+      new BoxGeometry(1.12, 0.22, 0.02),
+      kitPaint(kit, '#e5e8df'),
+    );
+    plate.position.set(x, 2.31, SELF_CLOSING_Z);
+    room.add(plate);
+    caption.position.set(x, 2.31, SELF_CLOSING_Z + 0.012);
+    room.add(caption);
+    // The jambs and their feet are solid; the doorway is not.
+    for (const side of [-1, 1])
+      selfClosingSolids.push({
+        minX: (x + side * 0.53 - 0.06) * m,
+        maxX: (x + side * 0.53 + 0.06) * m,
+        minZ: (SELF_CLOSING_Z - 0.35) * m,
+        maxZ: (SELF_CLOSING_Z + 0.35) * m,
+      });
+  }
+
   // ---- Walking --------------------------------------------------------------
   const portals = createPortals('dev18', devPortals('dev18', bounds, m), 0, m);
   scene.add(portals.group);
@@ -535,6 +589,8 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   views.specimens = { x: 0, z: 4 * m, yaw: Math.PI, pitch: 0.02 };
   views.office = { x: 7.5 * m, z: -1.5 * m, yaw: Math.PI / 2, pitch: 0.02 };
   views.power = { x: -7.5 * m, z: 2 * m, yaw: -Math.PI / 2, pitch: 0.02 };
+  // In front of the self-closing doors, their closing side.
+  views.closers = { x: 0, z: 2.6 * m, yaw: 0, pitch: 0.02 };
   const params = new URLSearchParams(location.search);
   const walk = createFirstPerson({
     canvas,
@@ -546,7 +602,7 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
       views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ??
       views.room,
-    solids: () => outer,
+    solids: () => [...outer, ...selfClosingSolids],
     use: (x, y) => portalAt(x, y)?.(),
     aimed: () => Boolean(portalAt(0, 0)),
   });
@@ -562,6 +618,8 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   observer.observe(canvas);
   resize();
   (window as unknown as { devFittingsGallery: unknown }).devFittingsGallery = {
+    /** Use whatever is at (x, y) on the screen (−1 to 1), as a use would. */
+    use: (x = 0, y = 0) => portalAt(x, y)?.(),
     view(name: string) {
       const pose = views[name];
       if (pose) walk.place(pose.x, pose.z, pose.yaw, pose.pitch);
@@ -626,6 +684,11 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
         if (detects(d, x / m, z / m)) L.seen(zoneOf(d.x));
     }
     model.tick(delta);
+    // A self-closing door waits while someone stands in its doorway.
+    for (const { x: dx, part } of SELF_CLOSING)
+      part.hold(
+        Math.abs(x / m - dx) < 0.5 && Math.abs(z / m - SELF_CLOSING_Z) < 0.6,
+      );
     parts.update(delta);
     // The light bounced about the room follows the room's own.
     const lit = lamps.reduce((sum, l) => sum + l.output(), 0) / lamps.length;

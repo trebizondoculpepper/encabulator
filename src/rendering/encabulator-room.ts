@@ -30,6 +30,7 @@ import {
   MCC_WIDTH,
 } from '../scene/retro-encabulator-mcc';
 import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import { isHeldPortableHit } from '../toolkit/controls/input/object-handling';
 import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
@@ -159,10 +160,9 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
   /** What a click at (x, y) on the screen would work, if anything in reach. */
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects(
-      [portals.group, mcc.group, failures.group],
-      true,
-    )[0];
+    const hit = raycaster
+      .intersectObjects([portals.group, mcc.group, failures.group], true)
+      .find((hit) => !isHeldPortableHit(hit.object));
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -216,6 +216,12 @@ export function startEncabulatorRoom(canvas: HTMLCanvasElement) {
       views.lineup,
     solids: () => [...walls, ...footprints],
     use,
+    useWhileHolding: (_object, x, y) => {
+      const action = usableAt(x, y);
+      if (!action) return false;
+      action();
+      return true;
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   const resize = () => {

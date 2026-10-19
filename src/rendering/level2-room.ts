@@ -51,6 +51,7 @@ import {
 import type { BetaformId } from '../game/level2-cues';
 import { METRE } from '../toolkit/components/core/logic/units';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
+import { isHeldPortableHit } from '../toolkit/controls/input/object-handling';
 import type { PortableObject } from '../toolkit/controls/input/object-handling';
 import {
   createPanelKit,
@@ -459,10 +460,9 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects(
-      [mcc.group, workstation.group, ...room.fittings],
-      true,
-    )[0];
+    const hit = raycaster
+      .intersectObjects([mcc.group, workstation.group, ...room.fittings], true)
+      .find((hit) => !isHeldPortableHit(hit.object));
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -544,6 +544,12 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
       return true;
     },
     use: (x, y) => usableAt(x, y)?.(),
+    useWhileHolding: (_object, x, y) => {
+      const action = usableAt(x, y);
+      if (!action) return false;
+      action();
+      return true;
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   workstation.onSit(({ x, z, yaw, pitch, y }) =>

@@ -42,6 +42,7 @@ import type { MachineDevice } from '../../components/industrial-control/parts/ma
 import { createSkip } from '../../components/site-dressing/views/skip';
 import { createBinTossing } from '../../components/site-dressing/parts/bin-tossing';
 import { createFirstPerson } from '../../controls/input/first-person';
+import { isHeldPortableHit } from '../../controls/input/object-handling';
 import type { PortableObject } from '../../controls/input/object-handling';
 import type { Footprint } from '../../controls/logic/walk-collision';
 import { devPortals, devWalls } from '../logic/dev-room-links';
@@ -396,7 +397,9 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects([room, portals.group], true)[0];
+    const hit = raycaster
+      .intersectObjects([room, portals.group], true)
+      .find((hit) => !isHeldPortableHit(hit.object));
     if (!hit || hit.distance > 4 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -649,6 +652,13 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       portals.arrival(params.get('from')) ??
       views.room,
     use: (x, y) => usableAt(x, y)?.(),
+    useWhileHolding: (_object, x, y) => {
+      if (aimedSocket(x, y)) return false;
+      const action = usableAt(x, y);
+      if (!action) return false;
+      action();
+      return true;
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   const resize = () => {

@@ -245,8 +245,11 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
    * those in view from its door.
    */
   let shown = '';
+  /** The zones in view last frame. */
+  let inView = visibleZones(0, 0);
   const showZones = (x: number, z: number) => {
     const seen = visibleZones(x, z);
+    inView = seen;
     if (!drawn.corridor) return seen;
     const key = [...seen].sort().join();
     if (key === shown) return seen;
@@ -431,15 +434,18 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
     joined().part.hold(inJoinedDoorway(placed, here.x, here.z));
     corridor.parts.update(delta);
     courtyard.update(delta, time / 1000, camera);
-    const inside = inCourtyard(placed, here.x, here.z);
+    const inside = !walk.following && inCourtyard(placed, here.x, here.z);
     const through = joined().part.door.open;
     drawn.corridor = !inside || through;
     drawn.courtyard = inside || through;
-    // From the courtyard, the corridor is seen as from its door.
+    // From the courtyard, the corridor is seen as from its door; seen
+    // through another room's door, from the eye carried through it.
     const d = doorway({ side: placed.side, t: 0, wall: 'inner' });
-    const [vx, vz] = inside
-      ? [d.x - d.out.x * 0.5, d.z - d.out.z * 0.5]
-      : [here.x, here.z];
+    const [vx, vz] = walk.following
+      ? [camera.position.x / m, camera.position.z / m]
+      : inside
+        ? [d.x - d.out.x * 0.5, d.z - d.out.z * 0.5]
+        : [here.x, here.z];
     const seen = showZones(vx, vz);
     placeLights(vx, vz, seen);
     goThrough(here.x, here.z);
@@ -474,7 +480,7 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
       walk.place(x * m, z * m, yaw, pitch);
     },
     /** The zones drawn from where the player stands. */
-    zones: () => [...visibleZones(walk.walker.x / m, walk.walker.z / m)],
+    zones: () => [...inView],
     /** The doors: each one's room, and whether it is open. */
     doors: () =>
       corridor.doors.map((d) => ({

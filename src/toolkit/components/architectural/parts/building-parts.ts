@@ -4,6 +4,11 @@ import { createLedDriver } from '../logic/led-driver';
 import { createFluorescentTube } from '../logic/fluorescent-gear';
 import { createSpringDoor } from '../logic/spring-door';
 import { createSpringDoorView } from '../views/spring-door';
+import {
+  createOverheadCloser,
+  createRisingButtDoor,
+} from '../logic/door-closers';
+import { createSelfClosingDoorView } from '../views/self-closing-doors';
 import type { GearEvent } from '../logic/fluorescent-gear';
 import { machineTone } from '../../sound/audio/machine-tones';
 import { createArchitecturalFixture } from '../views/architectural-fixtures';
@@ -219,6 +224,65 @@ export function springDoor(
       held = on;
     },
   };
+}
+
+/**
+ * A single-action door in a freestanding frame that closes itself on an
+ * overhead door closer (`createOverheadCloser`): a use opens it; let go, it
+ * sweeps back, slows for its last degrees and latches with a click. It
+ * waits while someone stands in its doorway (`hold`).
+ */
+export function closerDoor(
+  kit: PanelKit,
+  props: { name?: string } = {},
+): Part & {
+  door: ReturnType<typeof createOverheadCloser>;
+  hold(held: boolean): void;
+} {
+  const a = beginPart(kit, props.name ?? 'door on an overhead closer');
+  const view = createSelfClosingDoorView(kit, 'closer');
+  a.object.add(view.group);
+  const door = createOverheadCloser();
+  const e = emitter();
+  // It latches shut with a click.
+  a.voice(e, { off: DOOR_SHUT });
+  a.uses.set(view.leaf, () => door.push());
+  let shown = -1;
+  a.updates.push((delta) => {
+    const event = door.step(delta);
+    if (event) e.emit('off');
+    if (door.angle !== shown) view.set((shown = door.angle));
+  });
+  return { ...a.part(), door, hold: (held) => door.hold(held) };
+}
+
+/**
+ * A single-action door in a freestanding frame hung on rising butts
+ * (`createRisingButtDoor`): a use opens it, lifting it on their helix; let
+ * go, its own weight swings it shut, quickly, with a soft knock.
+ */
+export function risingButtDoor(
+  kit: PanelKit,
+  props: { name?: string } = {},
+): Part & {
+  door: ReturnType<typeof createRisingButtDoor>;
+  hold(held: boolean): void;
+} {
+  const a = beginPart(kit, props.name ?? 'door on rising butts');
+  const view = createSelfClosingDoorView(kit, 'rising-butt');
+  a.object.add(view.group);
+  const door = createRisingButtDoor();
+  const e = emitter();
+  // It lands shut with a soft knock.
+  a.voice(e, { off: DOOR_SETTLES });
+  a.uses.set(view.leaf, () => door.push());
+  let shown = -1;
+  a.updates.push((delta) => {
+    const event = door.step(delta);
+    if (event) e.emit('off');
+    if (door.angle !== shown) view.set((shown = door.angle), door.lift);
+  });
+  return { ...a.part(), door, hold: (held) => door.hold(held) };
 }
 
 /** A rotary dimmer: a click on its left half dims, its right brightens. */

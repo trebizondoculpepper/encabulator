@@ -51,6 +51,7 @@ import {
   createFirstPerson,
   EYE_HEIGHT_METRES,
 } from '../toolkit/controls/input/first-person';
+import { isHeldPortableHit } from '../toolkit/controls/input/object-handling';
 import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
@@ -157,7 +158,10 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
         [mcc.group, workstation.group, simulator.group, ...room.fittings],
         true,
       )
-      .find((hit) => !hit.object.userData.noCollision);
+      .find(
+        (hit) =>
+          !hit.object.userData.noCollision && !isHeldPortableHit(hit.object),
+      );
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -282,6 +286,13 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
         front: LEVEL0_MACHINE.z + 0.08,
       }),
     use: (x, y) => usableAt(x, y)?.(),
+    useWhileHolding: (object, x, y) => {
+      if (cabinetPlacement.aimedSocket(object, x, y)) return false;
+      const action = usableAt(x, y);
+      if (!action) return false;
+      action();
+      return true;
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   // As the machine nears breakdown the room grows strange (dev1's and

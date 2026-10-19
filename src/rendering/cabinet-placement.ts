@@ -83,6 +83,9 @@ export function createCabinetPlacement(
     return socket;
   };
   return {
+    aimedSocket(object: Object3D, x: number, y: number) {
+      return aimed(object, x, y) !== null;
+    },
     targetFeedback(
       object: Object3D,
       _portable: PortableObject,

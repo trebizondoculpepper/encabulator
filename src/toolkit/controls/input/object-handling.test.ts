@@ -16,6 +16,7 @@ import type { DropPlacement } from './object-handling';
 function fixture(
   redirectDrop?: (placement: DropPlacement) => DropPlacement,
   heldAction?: () => boolean | 'refuse',
+  targetFeedback?: () => 'accept' | 'reject' | null,
 ) {
   const scene = new Scene();
   const parent = new Group();
@@ -49,6 +50,8 @@ function fixture(
     redirectDrop,
     undefined,
     heldAction,
+    undefined,
+    targetFeedback,
   );
   return {
     scene,
@@ -240,5 +243,25 @@ it('leaves a carried part in hand while use operates a door latch', () => {
   f.camera.lookAt(0, 1.2, -1);
   expect(f.handling.use(0, 0)).toBe(false);
   expect(f.handling.holding()).toBe(true);
+  f.handling.dispose();
+});
+
+it('gives an aimed socket priority over a clickable control behind it', () => {
+  const f = fixture(
+    undefined,
+    () => true,
+    () => 'accept',
+  );
+  f.handling.use(0, 0);
+  const control = new Mesh(
+    new BoxGeometry(0.2, 0.2, 0.05),
+    new MeshBasicMaterial(),
+  );
+  control.position.set(0, 1.2, -1);
+  control.userData.useWhileCarrying = true;
+  f.scene.add(control);
+  f.camera.lookAt(0, 1.2, -1);
+  expect(f.handling.use(0, 0)).toBe(true);
+  expect(f.handling.holding()).toBe(false);
   f.handling.dispose();
 });

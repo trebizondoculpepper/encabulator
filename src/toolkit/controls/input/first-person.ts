@@ -150,6 +150,8 @@ export interface FirstPersonOptions {
   allowPickup?: (object: Object3D, portable: PortableObject) => boolean;
   /** Use whatever is at a normalised screen point (centre is 0, 0). */
   use: (x: number, y: number) => void;
+  /** Operate a separate control while carrying, without releasing the part. */
+  useWhileHolding?: (object: Object3D, x: number, y: number) => boolean;
   /** Whether something usable is under the crosshair. */
   aimed?: () => boolean;
   reducedMotion?: () => boolean;
@@ -201,6 +203,8 @@ export function createFirstPerson(options: FirstPersonOptions) {
       )
     : null;
   const use = (x: number, y: number) => {
+    const carried = handling?.heldObject();
+    if (carried && options.useWhileHolding?.(carried, x, y)) return;
     if (!handling?.use(x, y)) options.use(x, y);
   };
   const walker = {

@@ -26,6 +26,7 @@ import { knobDirection } from '../../controls/input/knob-turning';
 import { partAudio } from '../../components/core/audio/part-audio';
 import { createDazzle } from '../../components/core/views/dazzle';
 import { createFirstPerson } from '../../controls/input/first-person';
+import { isHeldPortableHit } from '../../controls/input/object-handling';
 import {
   createPs1Material,
   ps1Uniforms,
@@ -256,21 +257,21 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
   const use = (x: number, y: number) => {
     pointer.set(x, y);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(
-      [...passages.uses.keys(), ...uses.keys()],
-      true,
-    )[0];
-    if (!hit) return;
+    const hit = raycaster
+      .intersectObjects([...passages.uses.keys(), ...uses.keys()], true)
+      .find((hit) => !isHeldPortableHit(hit.object));
+    if (!hit) return false;
     if (passages.uses.has(hit.object as Mesh)) {
       passages.uses.get(hit.object as Mesh)?.();
-      return;
+      return true;
     }
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
       const work = uses.get(o);
       if (!work) continue;
       work(knobDirection(o, hit.point, camera));
-      return;
+      return true;
     }
+    return false;
   };
 
   const views: Record<
@@ -334,6 +335,7 @@ export function startControlsRoom(canvas: HTMLCanvasElement) {
       ...footprints,
     ],
     use,
+    useWhileHolding: (_object, x, y) => use(x, y),
   });
   const notes = document.createElement('div');
   notes.textContent = `DEV0 · Controls and Displays: controls and displays on the north wall, machine components on ${MACHINE_GALLERY_LAYOUT.length} plinths, plus ${EMPTY_GALLERY_LAYOUT.length} temporarily empty exhibits · Portals: the training room west, dev1 east`;

@@ -43,6 +43,7 @@ import { createBinTossing } from '../../components/site-dressing/parts/bin-tossi
 import { createFirstPerson } from '../../controls/input/first-person';
 import { machineComponent } from '../../components/industrial-control/parts/machine-components';
 import type { MachineDevice } from '../../components/industrial-control/parts/machine-components';
+import { isHeldPortableHit } from '../../controls/input/object-handling';
 import type { PortableObject } from '../../controls/input/object-handling';
 import { createPartSet } from '../../components/core/parts/parts';
 import { ps1Uniforms } from '../../components/core/parts/ps1-material';
@@ -252,7 +253,9 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects([room, portals.group], true)[0];
+    const hit = raycaster
+      .intersectObjects([room, portals.group], true)
+      .find((hit) => !isHeldPortableHit(hit.object));
     if (!hit || hit.distance > 4 * m) return null;
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
       const travel = portals.uses.get(o as Mesh);
@@ -312,6 +315,12 @@ export function startBinRoom(canvas: HTMLCanvasElement) {
       })),
     ],
     use: (x, y) => usableAt(x, y)?.(),
+    useWhileHolding: (_object, x, y) => {
+      const action = usableAt(x, y);
+      if (!action) return false;
+      action();
+      return true;
+    },
     aimed: () => Boolean(usableAt(0, 0)),
   });
   const resize = () => {

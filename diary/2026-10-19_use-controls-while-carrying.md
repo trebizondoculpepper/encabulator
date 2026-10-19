@@ -1,0 +1,3 @@
+# Use controls while carrying
+
+Pulled `main` (already current), preserving uncommitted architectural door work. The shared first-person controller now gives a room's clickable control a chance to handle Use while a part is carried; an operated control leaves the part in hand. Dev0, dev6, dev14, dev20, Level 0 and Level 2 route control clicks this way and ignore the held model when raycasting past it. Targeted repair sockets keep insertion priority, and the object handler still releases normally elsewhere. In the dev20 browser room, a card remained visibly held while the other backplane's isolator was switched off and on. Focused tests cover the socket/control precedence.

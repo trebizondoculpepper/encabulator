@@ -21,6 +21,15 @@ export interface PortableObject {
   detach(): void;
   flat: 'face' | 'side' | 'upright';
 }
+
+/** Ignore the carried model when aiming past it at a separate control. */
+export function isHeldPortableHit(object: Object3D): boolean {
+  for (let at: Object3D | null = object; at; at = at.parent) {
+    const portable = at.userData.portable as PortableObject | undefined;
+    if (portable?.component.phase.value === 'held') return true;
+  }
+  return false;
+}
 export interface SupportSurface {
   minX: number;
   maxX: number;
@@ -336,6 +345,7 @@ export function createObjectHandling(
   };
   return {
     holding: () => held !== null,
+    heldObject: () => held?.object ?? null,
     targetFeedback(x: number, y: number) {
       if (!held) return null;
       const portable = records.get(held.object)!.portable;
@@ -365,10 +375,13 @@ export function createObjectHandling(
     },
     use(x: number, y: number) {
       if (held) {
-        const hit = hitAt(x, y);
-        if (hit && hit.distance <= 3.2 * metre)
-          for (let at: Object3D | null = hit.object; at; at = at.parent)
-            if (at.userData.useWhileCarrying) return false;
+        const portable = records.get(held.object)!.portable;
+        if (!targetFeedback?.(held.object, portable, x, y)) {
+          const hit = hitAt(x, y);
+          if (hit && hit.distance <= 3.2 * metre)
+            for (let at: Object3D | null = hit.object; at; at = at.parent)
+              if (at.userData.useWhileCarrying) return false;
+        }
         release(x, y);
         return true;
       }

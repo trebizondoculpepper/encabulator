@@ -123,7 +123,7 @@ export const SKIES: Record<SkyId, Sky> = {
     cloudLit: [1, 1, 0.98],
     cloudShade: [0.64, 0.68, 0.76],
     wind: 2,
-    layers: 1,
+    layers: 2,
     layerSpeed: 1.6,
     quake: 0,
     stars: 0,

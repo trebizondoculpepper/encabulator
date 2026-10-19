@@ -85,8 +85,8 @@ export function createSkyDome(radius: number) {
           star *= 0.6 + 0.4 * sin(time * 2.0 + h * 40.0);
           colour += vec3(star) * stars * up;
         }
-        // Cloud on a plane overhead, drifting, thinning to the horizon: up to
-        // three layers, each smaller, fainter and faster than the last.
+        // Cloud on planes overhead. The second layer of the fair-weather
+        // preset is a higher, thin cirrus sheet above the low cumulus.
         if (cover > 0.001 && d.y > 0.02) {
           vec2 base = d.xz / d.y;
           base.x /= stretch;
@@ -102,8 +102,10 @@ export function createSkyDome(radius: number) {
             float turn = layer * spread * 2.1;
             vec2 dir = vec2(cos(turn) * way.x - sin(turn) * way.y,
                             sin(turn) * way.x + cos(turn) * way.y);
-            vec2 p = base * 0.9 * scale * (1.0 + 0.55 * layer)
+            bool highCirrus = quake < 0.5 && i == 1;
+            vec2 p = base * 0.9 * scale * (highCirrus ? 0.38 : 1.0 + 0.55 * layer)
               + dir * drift * speed + vec2(layer * 17.3, layer * 5.1);
+            if (highCirrus) p.x /= 5.0;
             float n = fbm(p);
             float horizonFade = smoothstep(0.02, 0.25, d.y);
             if (quake > 0.5 && i == 0) {
@@ -112,13 +114,15 @@ export function createSkyDome(radius: number) {
               colour = mix(colour, back, horizonFade);
             } else {
               // Cloud with holes in it: clear where the noise is low.
-              float c = smoothstep(edge - softness, edge + softness * 0.5, n);
+              float c = highCirrus
+                ? smoothstep(0.38, 0.64, n) * 0.38
+                : smoothstep(edge - softness, edge + softness * 0.5, n);
               c *= horizonFade * (1.0 - 0.15 * layer * (1.0 - quake));
               float thick = smoothstep(edge, 1.0, n);
               float tone = clamp(lit - thick * 0.6 + layer * 0.15, 0.0, 1.0);
               // Quake's front layers are brighter than the back, each a shade lighter.
               tone = mix(tone, 0.55 + 0.22 * layer + 0.3 * thick, quake);
-              vec3 cloud = mix(cloudShade, cloudLit, tone);
+              vec3 cloud = mix(cloudShade, cloudLit, highCirrus ? 0.88 : tone);
               colour = mix(colour, cloud, c);
             }
             speed *= layerSpeed;
