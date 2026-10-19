@@ -54,3 +54,21 @@ it('keeps the blown cartridge failed and conducts only with a distinct replaceme
   parts.dispose();
   fuse.dispose();
 });
+
+it('makes further new cartridges for the bench to restock with', () => {
+  const parts = createPartSet();
+  const fuse = createRepairFuse(createPanelKit(), parts);
+  const spare = fuse.spare();
+  expect(spare.object).not.toBe(fuse.fresh.object);
+  expect(fuse.has(spare.object)).toBe(true);
+  fuse.old.portable.component.pickUp();
+  fuse.old.portable.detach();
+  spare.portable.component.pickUp();
+  spare.portable.detach();
+  expect(fuse.insert(spare.object)).toBe(true);
+  expect(fuse.connected(true)).toBe(true);
+  fuse.fault();
+  expect(fuse.connected(true)).toBe(false);
+  parts.dispose();
+  fuse.dispose();
+});

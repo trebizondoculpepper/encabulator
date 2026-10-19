@@ -31,6 +31,8 @@ import {
   disposeKit,
   kitPaint,
 } from '../../components/core/views/eighties-controls';
+import { createShortSpark } from '../../components/core/views/button-effects';
+import { createMaterialise } from '../../components/core/views/materialise';
 import { createSectionBoard } from '../../components/core/views/signage';
 import { machineComponent } from '../../components/industrial-control/parts/machine-components';
 import type { MachineDevice } from '../../components/industrial-control/parts/machine-components';
@@ -48,6 +50,11 @@ import { createRepairFuse } from './repair-fuse';
 const FLOOR = { minX: -6, maxX: 6, minZ: -5, maxZ: 5 };
 const CEILING = 3.2;
 const SOCKET_AIM_REACH = 3.2;
+
+/** How long a bench place stands empty before its new part boils in, s. */
+const RESTOCK = 1.5;
+/** How long a new part takes to boil in, s. */
+const MATERIALISE = 2;
 
 /** Where the scrap skip stands, on the floor plan, metres. */
 const SKIP_AT = { x: -3.25, z: 1.6 };
@@ -135,6 +142,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     'WRONG BOARD',
     'SLOT OCCUPIED',
     'REMOVE A CARD',
+    'PULLED LIVE',
     'INSERTING',
     'INSTALLED',
     'POWER OFF',
@@ -241,14 +249,23 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   label('NEW REPLACEMENT PARTS', benchX, 1.13, benchZ + 0.57, 2.2);
   const stock: { card: MachineDevice; rack: number; x: number; z: number }[] =
     [];
+  const cardOwners = new Map<Object3D, number>();
+  // Each place on the bench keeps its part: once the part is installed or
+  // thrown in the skip, a new one boils in where it stood.
+  const shelf: { item: Object3D; make: () => Object3D; due: number }[] = [];
   for (const [index, rack] of racks.entries()) {
     for (const [j, kind] of (['plc-power', 'plc-cpu'] as const).entries()) {
-      const card = parts.add(rack.device.spare!(kind));
       const x = benchX - 0.8 + index * 1.05;
       const z = benchZ - 0.2 + j * 0.45;
-      card.object.position.set(x, 0.94, z);
-      room.add(card.object);
-      stock.push({ card, rack: index, x, z });
+      const make = () => {
+        const card = parts.add(rack.device.spare!(kind));
+        card.object.position.set(x, 0.94, z);
+        room.add(card.object);
+        stock.push({ card, rack: index, x, z });
+        cardOwners.set(card.object, index);
+        return card.object;
+      };
+      shelf.push({ item: make(), make, due: 0 });
       label(
         `${index + 1} ${kind === 'plc-power' ? 'POWER' : 'CPU'}`,
         x,
@@ -270,8 +287,17 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   room.add(fusePlate);
   fuse.holder.position.set(fuseX, 1.55, -4.62);
   room.add(fuse.holder);
-  fuse.fresh.object.position.set(benchX + 0.85, 0.96, benchZ + 0.06);
-  room.add(fuse.fresh.object);
+  const placeFuse = (object: Object3D) => {
+    object.position.set(benchX + 0.85, 0.96, benchZ + 0.06);
+    room.add(object);
+    cardOwners.set(object, 2);
+    return object;
+  };
+  shelf.push({
+    item: placeFuse(fuse.fresh.object),
+    make: () => placeFuse(fuse.spare().object),
+    due: 0,
+  });
   label('2 A CONTROL FUSE', fuseX, 1.94, -4.62, 0.9);
   label('NEW 2 A FUSE', benchX + 0.85, 0.96, benchZ + 0.34, 0.8);
   const fuseSwitch = new Mesh(
@@ -324,7 +350,20 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   room.add(reset);
   label('RESET EXPERIMENT', 0, 1.05, -4.57, 1.1);
   controls.set(reset, () => location.reload());
-  const tossing = createBinTossing({ camera, metre: m });
+  const reducedMotion = () =>
+    globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ??
+    false;
+  const appearing = new Set<ReturnType<typeof createMaterialise>>();
+  /** A part has gone for good from wherever it was: restock its place. */
+  const used = (object: Object3D) => {
+    const place = shelf.find((entry) => entry.item === object);
+    if (place && place.due <= 0) place.due = RESTOCK;
+  };
+  const tossing = createBinTossing({
+    camera,
+    metre: m,
+    onLanded: (object) => used(object),
+  });
   const skip = tossing.add({
     name: 'scrap skip',
     ...createSkip(kit),
@@ -390,11 +429,10 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       new Vector3((benchX + 1.35) * m, 0.94 * m, (benchZ + 0.55) * m),
     ),
   ];
-  const cardOwners = new Map<Object3D, number>();
   for (const [index, rack] of racks.entries())
     for (const card of rack.device.cards!) cardOwners.set(card.object, index);
-  for (const entry of stock) cardOwners.set(entry.card.object, entry.rack);
-  for (const cartridge of fuse.cartridges) cardOwners.set(cartridge.object, 2);
+  for (const cartridge of fuse.cartridges)
+    if (!cardOwners.has(cartridge.object)) cardOwners.set(cartridge.object, 2);
   const pending: {
     object: Object3D;
     portable: PortableObject;
@@ -463,6 +501,9 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       }),
     );
     target.position.copy(socket.position).add(new Vector3(0, 0, 0.16 * m));
+    // Hidden, so the pickup ray passes through to the part in the socket;
+    // the socket ray still finds it.
+    target.visible = false;
     scene.add(target);
     return target;
   });
@@ -547,6 +588,11 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     notice(socket.board, 'INSERTING');
     return true;
   };
+  // A part pulled out live comes out, but arcs as it breaks contact.
+  const arc = createShortSpark(kit, 14);
+  arc.group.scale.setScalar(3 * m);
+  scene.add(arc.group);
+  const crack = click({ band: 3200, q: 0.7, decay: 0.09, level: 0.35 });
   const allowPickup = (object: Object3D) => {
     const liveRack = racks.findIndex(
       (rack, index) =>
@@ -554,13 +600,18 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         cardOwners.get(object) === index &&
         object.parent === rack.device.object,
     );
-    if (liveRack >= 0) {
-      refusal(liveRack, 'LIVE · ISOLATE FIRST', object);
-      return false;
-    }
-    if (fusePower.value && fuse.occupant?.object === object) {
-      refusal(2, 'LIVE · ISOLATE FIRST', object);
-      return false;
+    const station =
+      liveRack >= 0
+        ? liveRack
+        : fusePower.value && fuse.occupant?.object === object
+          ? 2
+          : -1;
+    if (station >= 0) {
+      object.getWorldPosition(arc.group.position);
+      arc.group.position.z += 0.03 * m;
+      arc.fire();
+      partAudio.play(crack, object);
+      notice(station, 'PULLED LIVE');
     }
     return true;
   };
@@ -624,6 +675,8 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
               : null,
       },
       scrap: skip.filled,
+      restocking: shelf.filter((place) => place.due > 0).length,
+      bench: shelf.length,
     }),
     targets: () =>
       sockets.map((socket) => ({
@@ -651,6 +704,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     tossing.update(delta);
     parts.update(delta);
     fuse.update(delta);
+    arc.update(delta, reducedMotion());
     for (let i = pending.length - 1; i >= 0; i--) {
       const insertion = pending[i];
       insertion.age += delta;
@@ -665,6 +719,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       const seated = insertion.seat();
       insertion.portable.component.setLocked(false);
       if (seated) {
+        used(insertion.object);
         notice(insertion.station, 'INSTALLED');
         partAudio.play(
           click({ band: 1250, q: 2.5, decay: 0.07, level: 0.14 }),
@@ -675,6 +730,20 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
         refusal(insertion.station, 'SLOT OCCUPIED', insertion.object);
       }
     }
+    for (const place of shelf) {
+      if (place.due <= 0) continue;
+      place.due -= delta;
+      if (place.due > 0) continue;
+      place.item = place.make();
+      appearing.add(
+        createMaterialise(place.item, {
+          seconds: MATERIALISE,
+          reduced: reducedMotion(),
+        }),
+      );
+    }
+    for (const effect of appearing)
+      if (!effect.update(delta)) appearing.delete(effect);
     for (const display of notices) {
       if (display.left <= 0) continue;
       display.left -= delta;

@@ -19,6 +19,7 @@ export function createRepairFuse(kit: PanelKit, parts: PartSet) {
     object: Group;
     portable: PortableObject;
     fuse: ReturnType<typeof createFuse>;
+    current: ReturnType<typeof signal<number>>;
     view: ReturnType<typeof createFuseHolderView>;
   }[] = [];
   let occupant: (typeof cartridges)[number] | null = null;
@@ -44,6 +45,7 @@ export function createRepairFuse(kit: PanelKit, parts: PartSet) {
       object: part.object,
       portable: part.object.userData.portable as PortableObject,
       fuse,
+      current,
       view,
     };
     cartridges.push(cartridge);
@@ -55,13 +57,17 @@ export function createRepairFuse(kit: PanelKit, parts: PartSet) {
   old.current.value = 12;
   old.cartridge.fuse.step(0.1);
   old.current.value = 0;
-  const spareView = createFuseHolderView(kit, '2 A');
-  const fresh = makeCartridge(spareView, 'new 2 A control fuse');
+  const spare = () =>
+    makeCartridge(createFuseHolderView(kit, '2 A'), 'new 2 A control fuse')
+      .cartridge;
+  const fresh = spare();
   const position = new Vector3();
   return {
     holder,
     old: old.cartridge,
-    fresh: fresh.cartridge,
+    fresh,
+    /** Another new cartridge, for the bench to restock with. */
+    spare,
     cartridges,
     get occupant() {
       return occupant;
@@ -77,10 +83,9 @@ export function createRepairFuse(kit: PanelKit, parts: PartSet) {
     },
     fault() {
       if (!occupant) return;
-      const current = occupant === old.cartridge ? old.current : fresh.current;
-      current.value = 12;
+      occupant.current.value = 12;
       occupant.fuse.step(0.1);
-      current.value = 0;
+      occupant.current.value = 0;
     },
     insert(object: Object3D) {
       const cartridge = cartridges.find((entry) => entry.object === object);
