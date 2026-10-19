@@ -55,6 +55,8 @@ export function createMachineDeviceView(
     body.add(mesh);
     return mesh;
   };
+  /** Where along the card its circuit board's middle is (cards only). */
+  let pcbCentre = depth / 2;
   if (kind.startsWith('plc-')) {
     // The withdrawn module exposes its card, not a solid plastic brick.
     box(width, height, 0.024, 0, 0, depth - 0.012);
@@ -69,6 +71,7 @@ export function createMachineDeviceView(
     );
     pcb.name = 'Textured green daughterboard';
     pcb.position.set(0, 0, (shoulder + depth - 0.024) / 2);
+    pcbCentre = pcb.position.z;
     body.add(pcb);
     const tab = new Mesh(new BoxGeometry(0.0016, 0.17, shoulder), board);
     tab.name = 'Daughterboard edge tab';
@@ -170,16 +173,18 @@ export function createMachineDeviceView(
     );
     mark.position.set(0, height * 0.25, face);
     if (kind.startsWith('plc-')) {
-      // Pepperdyne's logo, from its one definition, screen-printed on the
-      // board's non-component side (-x), not on the faceplate, where a red
-      // mark would pass for a lamp: large, 30 mm tall, most of the board's
-      // length, as a maker proud of its boards prints it.
+      // Pepperdyne's logo, from its one definition, screen-printed large on
+      // the non-component side (-x) of every one of its boards, as its
+      // branding (not on the faceplate, where a red mark would pass for a
+      // lamp): 45 mm tall, centred on the board and, being too long to
+      // run across it, running along it, reading upwards.
       const maker = createBrandBadge(kit, 'pepperdyne', {
-        height: 0.03,
+        height: 0.045,
         ink: '#e4e8ca',
       });
       maker.rotation.y = -Math.PI / 2;
-      maker.position.set(-0.0009, height * 0.2, depth * 0.5);
+      maker.rotateZ(Math.PI / 2);
+      maker.position.set(-0.0009, 0, pcbCentre);
       body.add(maker);
       const boardMark = createMicroLabel(kit, cardDesignation(kind)!.face, {
         height: 0.002,
