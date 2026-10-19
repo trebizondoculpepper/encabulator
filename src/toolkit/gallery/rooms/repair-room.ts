@@ -32,6 +32,7 @@ import {
   kitPaint,
 } from '../../components/core/views/eighties-controls';
 import { createShortSpark } from '../../components/core/views/button-effects';
+import { createDazzle } from '../../components/core/views/dazzle';
 import { createMaterialise } from '../../components/core/views/materialise';
 import { createSectionBoard } from '../../components/core/views/signage';
 import { machineComponent } from '../../components/industrial-control/parts/machine-components';
@@ -593,6 +594,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   arc.group.scale.setScalar(3 * m);
   scene.add(arc.group);
   const crack = click({ band: 3200, q: 0.7, decay: 0.09, level: 0.35 });
+  const dazzle = createDazzle(canvas, camera);
   const allowPickup = (object: Object3D) => {
     const liveRack = racks.findIndex(
       (rack, index) =>
@@ -611,6 +613,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       arc.group.position.z += 0.03 * m;
       arc.fire();
       partAudio.play(crack, object);
+      dazzle.flash(object, { reduced: reducedMotion() });
       notice(station, 'PULLED LIVE');
     }
     return true;
@@ -690,6 +693,8 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
           .toArray(),
       })),
     reset: () => location.reload(),
+    /** Be dazzled by a discharge at the fuse holder. */
+    dazzle: () => dazzle.flash(fuse.holder),
   };
   let last = 0;
   renderer.setAnimationLoop((time) => {
@@ -705,6 +710,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     parts.update(delta);
     fuse.update(delta);
     arc.update(delta, reducedMotion());
+    dazzle.update(delta);
     for (let i = pending.length - 1; i >= 0; i--) {
       const insertion = pending[i];
       insertion.age += delta;
@@ -779,6 +785,7 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     portals.dispose();
     parts.dispose();
     fuse.dispose();
+    dazzle.dispose();
     disposeKit(kit, scene as unknown as Group);
     freeEnvironment();
     renderer.dispose();
