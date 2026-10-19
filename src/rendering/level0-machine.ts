@@ -8,7 +8,7 @@ import {
   FIRE_SEATS,
   createLevel0Plant,
 } from '../game/level0-plant';
-import type { CardKind } from '../game/level0-plant';
+import type { CardKind, SeatState } from '../game/level0-plant';
 import { createLevel0Dresser, level0Tones, UNITS } from '../scene/level0-faces';
 import {
   UNIT_ROLES,
@@ -84,23 +84,29 @@ export function createLevel0Machine(
         computed(() => wiring(id).run.value && (permits[id]?.value ?? true)),
       ]),
   );
+  /**
+   * A unit's supply as a fire takes it: whole, stuttering off for
+   * irregular moments a few times a second, or gone.
+   */
+  const failing = (state: () => SeatState, seed: number) =>
+    computed(() => {
+      const now = state();
+      if (now === 'dead') return false;
+      if (now === 'ok') return true;
+      const tick = Math.floor(plant.state.clock.value * 7) + seed * 13;
+      return ((tick * 2654435761) >>> 0) % 5 > 1;
+    });
   const mcc = createRetroEncabulatorMcc(kit, {
     incomingOn: false,
     diagnosticsAvailable,
     // After the water, INCOMING may be the last to give way: its meters die.
     bucketFeed: {
       // A burning unit glitches, its supply stuttering, then gives out.
+      // And the unit above, cooked by the heat rising into it, after it.
       ...Object.fromEntries(
-        FIRE_SEATS.map((seat, i) => [
-          seat.unit,
-          computed(() => {
-            const state = plant.seatStates.value[i];
-            if (state === 'dead') return false;
-            if (state === 'ok') return true;
-            // Stuttering: off for irregular moments, a few times a second.
-            const tick = Math.floor(plant.state.clock.value * 7) + i * 13;
-            return ((tick * 2654435761) >>> 0) % 5 > 1;
-          }),
+        FIRE_SEATS.flatMap((seat, i) => [
+          [seat.unit, failing(() => plant.seatStates.value[i], i)],
+          [seat.above.unit, failing(() => plant.aboveStates.value[i], i + 7)],
         ]),
       ),
       [UNITS.incoming]: computed(

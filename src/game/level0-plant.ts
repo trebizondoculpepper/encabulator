@@ -291,6 +291,7 @@ export const FIRE_SEATS = [
     name: 'M-103 AUX MOTOR',
     glitches: 2,
     dies: 6,
+    above: { unit: 'section2.bucket2', window: 'M-102', name: 'M-102 FEED' },
   },
   {
     unit: 'section4.bucket4',
@@ -298,6 +299,7 @@ export const FIRE_SEATS = [
     name: 'PAN MONITOR',
     glitches: 4,
     dies: 9,
+    above: { unit: 'section4.bucket3', window: 'PHASE', name: 'PHASE REF' },
   },
   {
     unit: 'section7.bucket4',
@@ -305,8 +307,24 @@ export const FIRE_SEATS = [
     name: 'GRAMMETER',
     glitches: 5,
     dies: 11,
+    above: { unit: 'section7.bucket3', window: 'FAN', name: 'PAN FAN' },
   },
 ] as const;
+/**
+ * The unit above a burning one, cooked by the heat rising into it: it
+ * glitches between 10 and 20 s after the fire below catches (drawn when
+ * it does), for `ABOVE_GLITCH_SECONDS`, then gives out.
+ */
+export const ABOVE_GLITCH_SECONDS = 4;
+/** The unit above, `t` seconds into the fault, its glitch due `at` s after catching. */
+export function aboveState(t: number, at: number, kindle: number): SeatState {
+  const since = t - kindle - at;
+  return t <= kindle || since < 0
+    ? 'ok'
+    : since < ABOVE_GLITCH_SECONDS
+      ? 'glitching'
+      : 'dead';
+}
 /** A burning unit, seconds into the fire: `glitches`, then `dies`. */
 export type SeatState = 'ok' | 'glitching' | 'dead';
 
@@ -509,6 +527,15 @@ export function createLevel0Plant(g: Graph = createGraph()) {
      * embers, before it catches.
      */
     kindling: g.state('machine.kindling', 0),
+    /**
+     * Seconds after the fire catches at which each burning unit's
+     * neighbour above starts to glitch (10 to 20, drawn as it catches).
+     */
+    aboveAt: g.state<number[]>(
+      'machine.aboveAt',
+      FIRE_SEATS.map(() => 15),
+      { equals: (a: number[], b: number[]) => a.every((v, i) => v === b[i]) },
+    ),
     /**
      * Seconds since the water shorted the bus. INCOMING, DISTRIBUTION and
      * the annunciator, better shielded than the rest (for drama), hold out
@@ -1054,6 +1081,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       s.fireSize,
       s.burnedFor,
       s.kindling,
+      s.burningFor,
+      s.aboveAt,
     ],
     (
       incoming,
@@ -1094,6 +1123,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       fireNow,
       burned,
       kindling,
+      burningFor,
+      aboveAt,
     ) => {
       const list: PlantFault[] = [];
       const add = (fault: PlantFault) => list.push(fault);
@@ -1176,6 +1207,17 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         add({ code: 'S04', text: 'FIRE IN CABINETS', window: 'SAFETY' });
       // Each failing unit's own window, red at once: first its electrical
       // fault, then its fire.
+      // The units above, cooked by the rising heat.
+      if (fireNow > 0)
+        FIRE_SEATS.forEach((seat, i) => {
+          if (aboveState(burningFor, aboveAt[i], PLANT.kindleSeconds) !== 'ok')
+            add({
+              code: `F2${i + 1}`,
+              text: `${seat.above.name} OVERHEATED`,
+              window: seat.above.window,
+              severity: 'failure',
+            });
+        });
       if (kindling > 0 || fireNow > 0)
         FIRE_SEATS.forEach((seat, i) =>
           add({
@@ -1483,8 +1525,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
   g.process(
     'machine fire',
     [raining, e.mains, s.fireSize, s.burnedFor, s.burningFor, s.kindling],
-    [s.fireSize, s.burnedFor, s.burningFor, s.kindling],
-    (dt) => {
+    [s.fireSize, s.burnedFor, s.burningFor, s.kindling, s.aboveAt],
+    (dt, random) => {
       // The fault, sparking and smouldering, before it catches.
       const kindling = s.kindling.peek();
       if (kindling > 0) {
@@ -1494,6 +1536,8 @@ export function createLevel0Plant(g: Graph = createGraph()) {
         else if (kindling - dt <= 0) {
           s.kindling.set(0);
           s.fireSize.set(PLANT.fireStart);
+          // When the heat rising from each will get into the unit above.
+          s.aboveAt.set(FIRE_SEATS.map(() => 10 + 10 * random()));
         } else s.kindling.set(kindling - dt);
         return;
       }
@@ -1587,6 +1631,20 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       ),
     {
       where: 'the burning units, failing',
+      equals: (a: SeatState[], b: SeatState[]) => a.every((v, i) => v === b[i]),
+    },
+  );
+  /**
+   * Each burning unit's neighbour above, as the heat rising into it takes
+   * it: working, glitching, then dead (until RESET).
+   */
+  const aboveStates = g.output(
+    'machine.fireAbove',
+    [s.burningFor, s.aboveAt],
+    (t, at) =>
+      FIRE_SEATS.map((_, i) => aboveState(t, at[i], PLANT.kindleSeconds)),
+    {
+      where: 'the units above the fire, failing',
       equals: (a: SeatState[], b: SeatState[]) => a.every((v, i) => v === b[i]),
     },
   );
@@ -2154,6 +2212,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     distributionFate,
     lastToFail,
     seatStates,
+    aboveStates,
     kindling: kindlingShown,
     fireSize,
     ruined,

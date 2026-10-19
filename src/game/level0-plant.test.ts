@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vite-plus/test';
 import { BUILD_SECONDS } from './dimensionality';
 import { LEVEL0_MACHINE_HEADS } from './level0-room-plan';
-import { FIRE_SEATS, PLANT, WINDOWS, createLevel0Plant } from './level0-plant';
+import {
+  ABOVE_GLITCH_SECONDS,
+  FIRE_SEATS,
+  PLANT,
+  WINDOWS,
+  createLevel0Plant,
+} from './level0-plant';
 import type { Electrical } from './level0-plant';
 
 const RUNNING: Partial<Electrical> = {
@@ -654,5 +660,29 @@ describe('a fire in the machine', () => {
     p.fire.restore();
     expect(p.ruined.value).toBe(false);
     expect(p.fireSize.value).toBe(0);
+  });
+});
+
+describe('the units above a fire', () => {
+  it('glitch out 10 to 20 s after the fire below catches, then give out', () => {
+    const p = plant(RUNNING);
+    p.fire.riserValve.set(false);
+    p.ignite();
+    run(p, PLANT.kindleSeconds + 9.5, 0.5);
+    expect(p.aboveStates.value).toEqual(['ok', 'ok', 'ok']);
+    let glitched = false;
+    for (let t = 0; t < 11; t += 0.5) {
+      run(p, 0.5, 0.5);
+      if (p.aboveStates.value.includes('glitching')) glitched = true;
+    }
+    expect(glitched).toBe(true);
+    run(p, ABOVE_GLITCH_SECONDS, 0.5);
+    expect(p.aboveStates.value).toEqual(['dead', 'dead', 'dead']);
+    const codes = p.faults.value.map((f) => f.code);
+    for (const code of ['F21', 'F22', 'F23']) expect(codes).toContain(code);
+    for (const seat of FIRE_SEATS)
+      expect(
+        p.windowStates.value.find((w) => w.window === seat.above.window)?.worst,
+      ).toBe('failure');
   });
 });

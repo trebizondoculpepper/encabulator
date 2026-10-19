@@ -1,7 +1,7 @@
 import { computed, effect } from '@preact/signals-core';
 import { Mesh, MeshStandardMaterial, Shape, ShapeGeometry } from 'three';
 import type { Object3D } from 'three';
-import { FIRE_SEATS } from '../game/level0-plant';
+import { FIRE_SEATS, PLANT } from '../game/level0-plant';
 import { sootAfter } from '../game/machine-failure';
 import { UNITS } from '../scene/level0-faces';
 import { createUnitSmoke } from '../scene/mcc-smoke';
@@ -41,6 +41,9 @@ const SEIZE: SoundRecipe = {
     },
   ],
 };
+
+/** Seconds of fire that blacken a burning unit's works through. */
+const BLACKENED_SECONDS = 15;
 
 /** A part failing inside a unit: a sharp crack and a short fizz. */
 const CRACK: SoundRecipe = {
@@ -424,8 +427,18 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       for (const seat of burning) {
         seat.soot = sootAfter(seat.soot, smoke, delta);
         seat.view.update(clock, smoke, seat.soot);
-        // Inside, where it burns, worse and sooner than on the door.
-        seat.damage.set(Math.min(1, seat.soot * 1.6));
+        // Inside, where it burns: blackened through over the fire's first
+        // quarter-minute, and left so, burnt out, until it is repaired.
+        seat.damage.set(
+          Math.min(
+            1,
+            Math.max(
+              0,
+              (plant.state.burningFor.value - PLANT.kindleSeconds) /
+                BLACKENED_SECONDS,
+            ),
+          ),
+        );
       }
       for (const hazard of hazards) {
         if (hazard.sparks > 0 && Math.random() < delta * 6) {

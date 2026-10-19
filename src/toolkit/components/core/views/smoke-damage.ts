@@ -5,9 +5,10 @@ import type { Material, Object3D } from 'three';
 const SOOT = new Color('#16120f');
 
 interface Tinted {
-  material: Material & { color: Color; roughness?: number };
+  material: Material & { color: Color; roughness?: number; metalness?: number };
   colour: Color;
   roughness?: number;
+  metalness?: number;
   /** This part's share of the damage: smoke stains unevenly. */
   share: number;
 }
@@ -49,7 +50,8 @@ export function createSmokeDamage(root: Object3D) {
           material: copy,
           colour: copy.color.clone(),
           roughness: copy.roughness,
-          share: 0.55 + 0.3 * up + 0.15 * speckle,
+          metalness: (copy as { metalness?: number }).metalness,
+          share: 0.85 + 0.15 * up + 0.1 * speckle,
         });
         return copy;
       };
@@ -85,9 +87,12 @@ export function createSmokeDamage(root: Object3D) {
       parts ??= take();
       for (const p of parts) {
         const k = Math.min(1, amount * p.share);
-        p.material.color.copy(p.colour).lerp(SOOT, k * 0.9);
+        p.material.color.copy(p.colour).lerp(SOOT, k);
         if (p.roughness !== undefined)
           p.material.roughness = p.roughness + (1 - p.roughness) * k;
+        // Bright metal, coated in soot, no longer shines.
+        if (p.metalness !== undefined)
+          p.material.metalness = p.metalness * (1 - 0.8 * k);
       }
     },
     dispose() {
