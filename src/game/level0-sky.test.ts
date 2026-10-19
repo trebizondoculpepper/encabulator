@@ -1,5 +1,6 @@
 import { expect, it } from 'vite-plus/test';
-import { SKIES, mixColour, pickWeather, skyLook } from './level0-sky';
+import { SKIES as DOME_SKIES } from './skies';
+import { SKIES, domeSky, mixColour, pickWeather, skyLook } from './level0-sky';
 
 it('starts as asked, or at random among overcast, sunny and night', () => {
   expect(pickWeather('night')).toBe('night');
@@ -19,4 +20,11 @@ it('turns towards hell by degrees', () => {
   expect(half.daylight).toBeCloseTo(
     (SKIES.overcast.daylight + SKIES.hell.daylight) / 2,
   );
+});
+
+it('draws its sky as the courtyard does, turning to HELL', () => {
+  expect(domeSky('overcast', 0)).toEqual(DOME_SKIES.overcast);
+  expect(domeSky('sunny', 0)).toEqual(DOME_SKIES.cumulus);
+  expect(domeSky('night', 1).quake).toBe(1);
+  expect(domeSky('night', 1).name).toBe('HELL');
 });

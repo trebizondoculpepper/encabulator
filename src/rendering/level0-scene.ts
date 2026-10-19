@@ -106,6 +106,8 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
     { id: 'sprinkler.heads.shown' },
   );
   const room = createWarehouseTrainingRoom(kit, false, {
+    // The sky is the courtyard's sky dome, which the room adds.
+    sky: false,
     lighting: building,
     fire: createWarehouseFire(
       { ...fire, heads: shownHeads },

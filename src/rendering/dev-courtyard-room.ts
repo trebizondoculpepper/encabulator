@@ -34,7 +34,11 @@ import { createFirstPerson } from '../toolkit/controls/input/first-person';
 import { enterDevRoom } from '../toolkit/gallery/logic/dev-room-links';
 import { courtyardLink } from '../game/courtyard-link';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
-import { pushButton } from '../toolkit/components/core/parts/parts';
+import {
+  potentiometer,
+  pushButton,
+  selector,
+} from '../toolkit/components/core/parts/parts';
 import { lightSwitch } from '../toolkit/components/architectural/parts/building-parts';
 import { ps1Uniforms } from '../toolkit/components/core/parts/ps1-material';
 import {
@@ -116,8 +120,17 @@ export function startDevCourtyardRoom(canvas: HTMLCanvasElement) {
   sun.shadow.normalBias = 0.02 * m;
   scene.add(hemisphere, ambient, sun, sun.target);
   const lightFor = (time: number, dt: number) => {
-    const now = changer.step(dt);
-    sky.set(now, dt, time);
+    let now = changer.step(dt);
+    // HELL's own controls on the pedestal, as far as HELL is showing.
+    if (now.quake > 0) {
+      const q = now.quake;
+      now = {
+        ...now,
+        layers: now.layers + (hellLayers() - now.layers) * q,
+        layerSpeed: now.layerSpeed + (hellSpeed() - now.layerSpeed) * q,
+      };
+    }
+    sky.set(now, dt, time, hellSpread() * now.quake);
     const d = sunDirection(now);
     sun.position.set(d.x * 30 * m, d.y * 30 * m, d.z * 30 * m);
     sun.color.setRGB(...now.sunColour, SRGBColorSpace);
@@ -164,7 +177,7 @@ export function startDevCourtyardRoom(canvas: HTMLCanvasElement) {
   // Its desk slopes up towards whoever stands at it, on its +z side.
   top.rotation.x = 0.45;
   pedestal.add(top);
-  const slab = new Mesh(new BoxGeometry(0.62, 0.05, 0.3), desk);
+  const slab = new Mesh(new BoxGeometry(0.62, 0.05, 0.42), desk);
   slab.castShadow = slab.receiveShadow = true;
   top.add(slab);
   const heading = createMicroLabel(kit, 'AMBIENT', {
@@ -172,7 +185,7 @@ export function startDevCourtyardRoom(canvas: HTMLCanvasElement) {
     ink: '#f0f0ea',
   });
   heading.rotation.x = -Math.PI / 2;
-  heading.position.set(0, 0.027, -0.1);
+  heading.position.set(0, 0.027, -0.17);
   top.add(heading);
   const buttons = PEDESTAL_SKIES.map(({ id, legend, colour }, i) => {
     const button = pushButton(kit, {
@@ -183,11 +196,49 @@ export function startDevCourtyardRoom(canvas: HTMLCanvasElement) {
       action: () => changer.choose(id),
     });
     button.object.rotation.x = -Math.PI / 2;
-    button.object.position.set(-0.21 + i * 0.14, 0.026, 0.02);
+    button.object.position.set(-0.21 + i * 0.14, 0.026, -0.07);
     top.add(button.object);
     courtyard.parts.add(button);
     return button;
   });
+  // HELL's controls, a row below: how many layers of cloud (a three-way
+  // selector), how far each layer's way is turned from the one beneath
+  // (ALIGN: from all one way to each its own) and how much faster each
+  // layer is than the one beneath (SPEED: 1 to 1.3 times).
+  const hellHeading = createMicroLabel(kit, 'HELL', {
+    height: 0.022,
+    ink: '#e3a3c8',
+  });
+  hellHeading.rotation.x = -Math.PI / 2;
+  hellHeading.position.set(0, 0.027, 0.045);
+  top.add(hellHeading);
+  const layersKnob = selector(kit, {
+    name: 'HELL cloud layers selector',
+    legend: 'LAYERS 1 2 3',
+    positions: 3,
+    initial: 2,
+  });
+  const alignKnob = potentiometer(kit, {
+    name: 'HELL layer alignment knob',
+    legend: 'ALIGN',
+    steps: 10,
+    initial: 0,
+  });
+  const speedKnob = potentiometer(kit, {
+    name: 'HELL layer speed knob',
+    legend: 'SPEED ×1–1.3',
+    steps: 6,
+    initial: 0.5,
+  });
+  [layersKnob, alignKnob, speedKnob].forEach((knob, i) => {
+    knob.object.rotation.x = -Math.PI / 2;
+    knob.object.position.set(-0.14 + i * 0.14, 0.026, 0.12);
+    top.add(knob.object);
+    courtyard.parts.add(knob);
+  });
+  const hellLayers = () => 1 + layersKnob.position.value;
+  const hellSpread = () => alignKnob.share.value;
+  const hellSpeed = () => 1 + 0.3 * speedKnob.share.value;
 
   // ---- The courtyard's lights ---------------------------------------------
   // A bulkhead on each wall and the lamp post, cool white LED, all on one
@@ -393,6 +444,26 @@ export function startDevCourtyardRoom(canvas: HTMLCanvasElement) {
         switches[0].value = !switches[0].value;
       return lit.value;
     },
+    /**
+     * Turn one of HELL's knobs (`layers`, `align` or `speed`) `steps`
+     * detents, up (positive) or down, as clicks on it would.
+     */
+    turn(knob: 'layers' | 'align' | 'speed', steps: number) {
+      const part = { layers: layersKnob, align: alignKnob, speed: speedKnob }[
+        knob
+      ];
+      let use: ((direction?: number) => void) | undefined;
+      part.object.traverse((o) => {
+        use ??= courtyard.parts.uses.get(o);
+      });
+      for (let i = 0; i < Math.abs(steps); i++) use?.(Math.sign(steps));
+    },
+    /** HELL's controls: layers (1 to 3), alignment and speed (0 to 1 each). */
+    hell: () => ({
+      layers: hellLayers(),
+      spread: hellSpread(),
+      speed: hellSpeed(),
+    }),
     /** The sky showing, or changing to. */
     showing: () => changer.target,
     stats: () => ({ ...renderer.info.render }),

@@ -7,7 +7,8 @@ import {
   LEVEL0_START,
 } from '../game/level0-room-plan';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
-import { SKIES, pickWeather, skyLook } from '../game/level0-sky';
+import { domeSky, pickWeather, skyLook } from '../game/level0-sky';
+import { createSkyDome } from '../scene/sky-dome';
 import type { Weather } from '../game/level0-sky';
 import { ejectCabinetDrop } from '../game/cabinet-drop';
 import {
@@ -78,7 +79,6 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   } = createLevel0Scene(kit, m);
   const renderer = createRenderer(canvas);
   const freeEnvironment = useEnvironment(renderer, scene, LEVEL0_ENVIRONMENT);
-  renderer.setClearColor(SKIES.overcast.background);
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   // Merged detail too small to see from where the player stands is not drawn.
@@ -299,12 +299,20 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   // The sky: overcast, sunny or night, drawn as the game starts (or as
   // `?sky=` asks), turned to hell by the dimensional shift near the end.
   let weather = pickWeather(new URLSearchParams(location.search).get('sky'));
+  // Drawn by the courtyard's sky dome, round the camera inside its far
+  // plane, so it shows through the skylights and the open doors.
+  const dome = createSkyDome(80 * m);
+  scene.add(dome.dome);
   let shownSky = '';
-  let skyClock = 0;
   /** Development: the sky held this far into hell (null: as it is). */
   let hellHeld: number | null = null;
   let skySeconds: number | null = null;
   const showSky = (seconds: number, hell: number) => {
+    // The clouds drift on whatever happens; in hell they race.
+    const dt = seconds - (skySeconds ?? seconds);
+    skySeconds = seconds;
+    dome.dome.position.copy(camera.position);
+    dome.set(domeSky(weather, hell), Math.max(0, dt), seconds);
     // Hell's light breathes and gutters like a furnace.
     const flicker =
       hell > 0
@@ -314,16 +322,10 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
         : 1;
     const look = skyLook(weather, hell);
     look.daylight *= flicker;
-    // The clouds drift on whatever happens; in hell they churn.
-    skyClock += (seconds - (skySeconds ?? seconds)) * look.drift;
-    skySeconds = seconds;
-    room.sky.update(skyClock);
     const key = `${weather}|${hell.toFixed(3)}|${flicker.toFixed(3)}`;
     if (key === shownSky) return;
     shownSky = key;
     lighting.setSky(look);
-    room.sky.colour(look.glazing, look.clouds);
-    renderer.setClearColor(look.background);
   };
   showSky(0, 0);
   let last = 0;
@@ -378,6 +380,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     scene.traverse((object) => {
       if (object instanceof Mesh) object.geometry.dispose();
     });
+    dome.dispose();
     freeEnvironment();
     renderer.dispose();
     delete (window as unknown as { level0?: unknown }).level0;
@@ -415,6 +418,8 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      // The sky as it is now, round where the camera is now.
+      showSky(performance.now() / 1000, hellHeld ?? strangeness.level.hell);
       renderer.render(scene, camera);
       const url = canvas.toDataURL('image/png');
       resize();

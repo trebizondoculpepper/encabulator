@@ -1,24 +1,21 @@
+import { SKIES as DOME_SKIES, blendSkies } from './skies';
+import type { Sky, SkyId } from './skies';
+
 /**
  * Level 0's sky, as the skylights show it and the daylight it lets in: a
  * starting condition (overcast, sunny or night), drawn as the game starts,
  * and HELL, which the dimensional shift brings in as the machine nears a
  * breakdown (`strangeness().hell`), mixing the sky towards it, and which
- * goes at once when the machine breaks down. Pure: colours are hex strings,
- * mixed here; the room applies them to its lights and glazing.
+ * goes at once when the machine breaks down. The sky itself is drawn by
+ * the courtyard's sky dome (`skies.ts`, `domeSky`); the light it lets in
+ * is Level 0's own (`skyLook`). Pure: colours are hex strings, mixed here;
+ * the room applies them to its lights.
  */
 
 export type Weather = 'overcast' | 'sunny' | 'night';
 export const WEATHERS: readonly Weather[] = ['overcast', 'sunny', 'night'];
 
 export interface SkyLook {
-  /** The sky behind the clouds, seen through the skylights. */
-  glazing: string;
-  /** The clouds' colour, lit as they are. */
-  clouds: string;
-  /** How fast the clouds drift and churn: 1 a breeze. */
-  drift: number;
-  /** What shows through an open door: the clear colour. */
-  background: string;
   /** The hemisphere light's sky and ground colours. */
   sky: string;
   ground: string;
@@ -31,20 +28,12 @@ export interface SkyLook {
 export const SKIES: Record<Weather | 'hell', SkyLook> = {
   // A dark English day: the room lit mostly by its own battens.
   overcast: {
-    glazing: '#b9c4c9',
-    clouds: '#e4e9ec',
-    drift: 1,
-    background: '#cbd3d6',
     sky: '#e1e9ec',
     ground: '#6f7067',
     sun: '#edf3f5',
     daylight: 0.2,
   },
   sunny: {
-    glazing: '#78ade4',
-    clouds: '#ffffff',
-    drift: 0.7,
-    background: '#bcdcf5',
     sky: '#d6e9ff',
     ground: '#7d725f',
     sun: '#fff0d2',
@@ -52,22 +41,13 @@ export const SKIES: Record<Weather | 'hell', SkyLook> = {
   },
   // Moonlight through the skylights, faint and blue: the battens do it all.
   night: {
-    glazing: '#060b15',
-    clouds: '#1c2638',
-    drift: 0.5,
-    background: '#05080d',
     sky: '#22324f',
     ground: '#0a0a0c',
     sun: '#8fa6d8',
     daylight: 0.035,
   },
-  // Hell (the owner's hell is purple): a deep violet sky behind roiling
-  // violet and magenta clouds, and a lurid purple cast over everything.
+  // Hell (the owner's hell is purple): a lurid purple cast over everything.
   hell: {
-    glazing: '#14031f',
-    clouds: '#c04dff',
-    drift: 5,
-    background: '#1c0530',
     sky: '#a24dff',
     ground: '#2a0838',
     sun: '#cc5cff',
@@ -108,13 +88,23 @@ export function skyLook(weather: Weather, hell: number): SkyLook {
   const from = SKIES[weather];
   const to = SKIES.hell;
   return {
-    glazing: mixColour(from.glazing, to.glazing, k),
-    clouds: mixColour(from.clouds, to.clouds, k),
-    drift: from.drift + (to.drift - from.drift) * k,
-    background: mixColour(from.background, to.background, k),
     sky: mixColour(from.sky, to.sky, k),
     ground: mixColour(from.ground, to.ground, k),
     sun: mixColour(from.sun, to.sun, k),
     daylight: from.daylight + (to.daylight - from.daylight) * k,
   };
+}
+
+/** The courtyard's sky each starting condition is drawn as. */
+export const DOME: Record<Weather | 'hell', SkyId> = {
+  overcast: 'overcast',
+  sunny: 'cumulus',
+  night: 'night',
+  hell: 'quake',
+};
+
+/** The sky dome's sky now: `weather`, turned towards HELL by `hell`, 0 to 1. */
+export function domeSky(weather: Weather, hell: number): Sky {
+  const k = Math.max(0, Math.min(1, hell));
+  return blendSkies(DOME_SKIES[DOME[weather]], DOME_SKIES[DOME.hell], k);
 }

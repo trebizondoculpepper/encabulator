@@ -188,6 +188,12 @@ export function createWarehouseTrainingRoom(
      * one each is a specimen on its own.
      */
     fire?: WarehouseFire;
+    /**
+     * Whether to build its own sky of cloud sheets over the skylights
+     * (the default); a room with a sky of its own (Level 0's sky dome)
+     * says `false`.
+     */
+    sky?: boolean;
   } = {},
 ) {
   const group = new Group();
@@ -433,8 +439,8 @@ export function createWarehouseTrainingRoom(
     depthWrite: false,
   });
   kit.materials.push(glazing);
-  const sky = createSkyLayers(kit);
-  group.add(sky.group);
+  const sky = options.sky === false ? undefined : createSkyLayers(kit);
+  if (sky) group.add(sky.group);
   for (let z = -12; z <= 12; z += 6)
     for (let x = -12; x <= 12; x += 6) {
       const light = WAREHOUSE_SKYLIGHTS.find((s) => s.x === x && s.z === z);
@@ -740,7 +746,10 @@ export function createWarehouseTrainingRoom(
   return {
     group,
     parts,
-    /** The sky above the skylights: its colours, and its clouds' drift. */
+    /**
+     * The sky above the skylights, its colours and its clouds' drift
+     * (none if the room brings its own).
+     */
     sky,
     fittings: [...fitted],
     /** The fittings' still meshes merged away, for a development check. */

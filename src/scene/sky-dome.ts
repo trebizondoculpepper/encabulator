@@ -35,6 +35,7 @@ export function createSkyDome(radius: number) {
     layers: { value: 1 },
     layerSpeed: { value: 1.6 },
     quake: { value: 0 },
+    spread: { value: 0 },
     stars: { value: 0 },
     time: { value: 0 },
   };
@@ -52,7 +53,7 @@ export function createSkyDome(radius: number) {
     fragmentShader: /* glsl */ `
       uniform vec3 zenith, horizon, sunDir, sunColour, cloudLit, cloudShade;
       uniform float sunLevel, cover, softness, scale, stretch, drift, stars, time;
-      uniform float layers, layerSpeed, quake;
+      uniform float layers, layerSpeed, quake, spread;
       varying vec3 vDir;
       float hash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -97,8 +98,12 @@ export function createSkyDome(radius: number) {
           for (int i = 0; i < 3; i++) {
             float layer = float(i);
             if (layer >= layers) break;
+            // Each layer's way turned further off the last's, by spread.
+            float turn = layer * spread * 2.1;
+            vec2 dir = vec2(cos(turn) * way.x - sin(turn) * way.y,
+                            sin(turn) * way.x + cos(turn) * way.y);
             vec2 p = base * 0.9 * scale * (1.0 + 0.55 * layer)
-              + way * drift * speed + vec2(layer * 17.3, layer * 5.1);
+              + dir * drift * speed + vec2(layer * 17.3, layer * 5.1);
             float n = fbm(p);
             float horizonFade = smoothstep(0.02, 0.25, d.y);
             if (quake > 0.5 && i == 0) {
@@ -131,8 +136,11 @@ export function createSkyDome(radius: number) {
   let drift = 0;
   return {
     dome,
-    /** Show `sky`, the clouds drifted on by `dt` seconds. */
-    set(sky: Sky, dt: number, time: number) {
+    /**
+     * Show `sky`, the clouds drifted on by `dt` seconds; `spread` (0 to 1)
+     * turns each cloud layer's motion further from the one beneath's.
+     */
+    set(sky: Sky, dt: number, time: number, spread = 0) {
       const u = uniforms;
       u.zenith.value.setRGB(...sky.zenith, SRGBColorSpace);
       u.horizon.value.setRGB(...sky.horizon, SRGBColorSpace);
@@ -152,6 +160,7 @@ export function createSkyDome(radius: number) {
       u.layers.value = sky.layers;
       u.layerSpeed.value = sky.layerSpeed;
       u.quake.value = sky.quake;
+      u.spread.value = spread;
       u.time.value = time;
     },
     dispose() {
