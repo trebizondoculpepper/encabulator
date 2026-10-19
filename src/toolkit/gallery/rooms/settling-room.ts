@@ -39,6 +39,7 @@ import {
 import {
   createPartSet,
   potentiometer,
+  mushroomStop,
   pushButton,
 } from '../../components/core/parts/parts';
 import { createCanvasTexture } from '../../components/core/views/screens';
@@ -57,6 +58,7 @@ import {
 } from '../../components/site-dressing/views/skip';
 import { createPortals } from '../views/portals';
 import { createFirstPerson } from '../../controls/input/first-person';
+import { knobDirection } from '../../controls/input/knob-turning';
 import { machineComponent } from '../../components/industrial-control/parts/machine-components';
 import type { MachineDevice } from '../../components/industrial-control/parts/machine-components';
 import { ps1Uniforms } from '../../components/core/parts/ps1-material';
@@ -421,20 +423,33 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
   counted.position.set(-0.12, 0.028, 0.002);
   panel.add(counted);
   const running = signal(true);
+  const stopped = signal(false);
   const despawning = signal(false);
+  // STOP is a mushroom emergency stop: pushed in, it latches and stops
+  // the emitter; worked again (twisted out) it is released, and START
+  // runs it again. START does nothing while it is latched.
+  const stop = mushroomStop(kit, {
+    legend: 'STOP',
+    name: 'STOP emergency stop',
+    bound: {
+      get value() {
+        return stopped.value;
+      },
+      set(pushed: boolean) {
+        stopped.value = pushed;
+        if (pushed) running.value = false;
+      },
+    },
+  });
   const start = pushButton(kit, {
     colour: 'green',
     head: 'illuminated',
     legend: 'START',
     name: 'START push button',
     lamp: running,
-    action: () => (running.value = true),
-  });
-  const stop = pushButton(kit, {
-    colour: 'red',
-    legend: 'STOP',
-    name: 'STOP push button',
-    action: () => (running.value = false),
+    action: () => {
+      if (!stopped.value) running.value = true;
+    },
   });
   const despawnButton = pushButton(kit, {
     colour: 'amber',
@@ -528,7 +543,11 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
       const travel = portals.uses.get(o as Mesh);
       if (travel) return () => travel();
       const work = parts.uses.get(o);
-      if (work) return work;
+      if (work) {
+        // A knob turns down on its left half, up on its right.
+        const at = o;
+        return () => work(knobDirection(at, hit.point, camera));
+      }
     }
     return null;
   };
@@ -593,7 +612,9 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     },
     /** Stop or start the emitter. */
     pause: () => (running.value = false),
-    resume: () => (running.value = true),
+    resume: () => {
+      if (!stopped.value) running.value = true;
+    },
     /** Throw something in every `seconds`. */
     every: (seconds: number) => (meanOverride = Math.max(0.05, seconds)),
     /** Throw `n` things in at once. */
@@ -603,8 +624,15 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     empty,
     /** Press DESPAWN. */
     despawn,
+    /** A use at a point on the screen (-1 to 1), as a click there. */
+    use: (x: number, y: number) => usableAt(x, y)?.(),
+    /** Where the AVERAGE DELAY knob is, for aiming at it. */
+    knob: () => delay.object.getWorldPosition(new Vector3()),
     /** How many are in, and how high the pile stands over the skip's floor. */
     state: () => ({
+      running: running.value,
+      stopped: stopped.value,
+      delay: meanDelay(),
       count: pile.count,
       top: pile.top(),
       rim: SKIP_INSIDE.rim,
