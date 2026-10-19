@@ -172,9 +172,10 @@ export function createMachineDeviceView(
     if (kind.startsWith('plc-')) {
       // Pepperdyne's logo, from its one definition, screen-printed on the
       // board's non-component side (-x), not on the faceplate, where a red
-      // mark would pass for a lamp.
+      // mark would pass for a lamp: large, 30 mm tall, most of the board's
+      // length, as a maker proud of its boards prints it.
       const maker = createBrandBadge(kit, 'pepperdyne', {
-        height: 0.016,
+        height: 0.03,
         ink: '#e4e8ca',
       });
       maker.rotation.y = -Math.PI / 2;
