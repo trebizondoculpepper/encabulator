@@ -12,7 +12,7 @@ import {
 } from '../../core/parts/portable-board';
 import { createCardEdgeSlot, createPcbBackplane } from '../views/pcb-backplane';
 import { computed, signal } from '@preact/signals-core';
-import type { ReadonlySignal } from '@preact/signals-core';
+import type { ReadonlySignal, Signal } from '@preact/signals-core';
 import type { PortableObject } from '../../../controls/input/object-handling';
 import {
   MACHINE_COMPONENTS,
@@ -72,12 +72,28 @@ export interface MachineDevice extends Part {
    * once seated there; the room places it and adds it to its parts.
    */
   spare?(kind: (typeof EXPANSION_CARD_KINDS)[number]): MachineDevice;
-  /** Seat a card in an empty slot of its kind; whether it went in. */
+  /**
+   * Seat a card in an empty slot of its kind, whichever backplane made it
+   * (it is wired through this one from then on); whether it went in.
+   */
   insert?(card: MachineDevice, slot: number): boolean;
   service?: ReturnType<typeof createServiceComponent>;
   handle?: ReturnType<typeof createOperatingHandle>;
   breaker?: ReturnType<typeof createCircuitBreaker>;
 }
+
+/**
+ * The backplane an expansion card is wired through: whichever it is
+ * seated in, so a card moved from one backplane to another works there.
+ */
+interface CardHost {
+  seats: Signal<MachineDevice | null>[];
+  running: Readable<boolean>;
+  rackFeed: ReadonlySignal<boolean>;
+  processor: ReadonlySignal<boolean>;
+  known: MachineDevice[];
+}
+const cardHosts = new WeakMap<MachineDevice, Signal<CardHost>>();
 
 /** Same component, view, operator actions and sound in the MCC and gallery. */
 export function machineComponent(
@@ -196,27 +212,41 @@ export function machineComponent(
         return centre + 0.04;
       });
       const known: MachineDevice[] = [];
+      const here: CardHost = {
+        seats,
+        running: bus.running,
+        rackFeed,
+        processor,
+        known,
+      };
       const makeCard = (
         cardKind: (typeof EXPANSION_CARD_KINDS)[number],
         cardName: string,
       ) => {
         const self: { card: MachineDevice | null } = { card: null };
+        const host = signal(here);
         // Every seat is read, so this follows a card going in or out.
         const seated = computed(() =>
-          seats.map((seat) => seat.value).includes(self.card),
+          host.value.seats.map((seat) => seat.value).includes(self.card),
         );
         const card = machineComponent(kit, cardKind, {
           name: cardName,
           power: computed(
             () =>
               seated.value &&
-              (cardKind === 'plc-power' ? bus.running.value : rackFeed.value),
+              (cardKind === 'plc-power'
+                ? host.value.running.value
+                : host.value.rackFeed.value),
           ),
           indicatorPower: props.indicatorPower,
-          running: cardKind === 'plc-output' ? processor : props.running,
+          running:
+            cardKind === 'plc-output'
+              ? computed(() => host.value.processor.value)
+              : props.running,
           input: props.input,
         });
         self.card = card;
+        cardHosts.set(card, host);
         known.push(card);
         return card;
       };
@@ -278,13 +308,21 @@ export function machineComponent(
             current.object.userData.portable as PortableObject | undefined
           )?.component.phase.peek() === 'installed' &&
           current.object.parent === a.object;
+        const host = cardHosts.get(card);
         if (
-          !known.includes(card) ||
+          !host ||
           !portable ||
           EXPANSION_CARD_KINDS[index] !== card.kind ||
           occupied
         )
           return false;
+        // A card from another backplane is wired through this one now.
+        if (host.value !== here) {
+          const away = host.value.known;
+          if (away.includes(card)) away.splice(away.indexOf(card), 1);
+          known.push(card);
+          host.value = here;
+        }
         a.object.add(card.object);
         card.object.position.set(centres[index], 0, 0.004);
         card.object.quaternion.identity();

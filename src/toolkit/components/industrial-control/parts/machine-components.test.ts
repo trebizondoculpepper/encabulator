@@ -120,3 +120,39 @@ it('takes a seated card out of its slot when it is no longer installed there', (
   expect(assembly.slots![3].occupant.value).toBeNull();
   expect(output.active.value).toBe(false);
 });
+
+it('takes a card pulled from another backplane, and runs it from its own supply', () => {
+  const one = rack();
+  const two = rack();
+  // Board one's power card out and dropped; board two's out too.
+  pull(one.card('plc-power'), one.room);
+  one.assembly.update(0);
+  const moved = two.card('plc-power');
+  pull(moved, one.room);
+  two.assembly.update(0);
+  expect(one.assembly.active.value).toBe(false);
+  // Board two's card goes into board one's first slot and powers it.
+  expect(one.assembly.insert!(moved, 0)).toBe(true);
+  one.assembly.update(0);
+  two.assembly.update(0);
+  moved.update(0);
+  expect(moved.object.parent).toBe(one.assembly.object);
+  expect(one.assembly.slots![0].occupant.value).toBe(moved);
+  expect(one.card('plc-analog').active.value).toBe(true);
+  expect(one.assembly.active.value).toBe(true);
+  // It follows board one's supply now, not board two's.
+  two.power.value = false;
+  two.assembly.update(0);
+  expect(moved.active.value).toBe(true);
+  one.power.value = false;
+  one.assembly.update(0);
+  expect(moved.active.value).toBe(false);
+  // And board one's own card goes into board two in its place.
+  one.power.value = true;
+  two.power.value = true;
+  const back = one.card('plc-power');
+  expect(two.assembly.insert!(back, 0)).toBe(true);
+  two.assembly.update(0);
+  back.update(0);
+  expect(two.assembly.active.value).toBe(true);
+});
