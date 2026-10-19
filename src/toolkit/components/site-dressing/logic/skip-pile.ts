@@ -40,6 +40,8 @@ export interface Vec3 {
 
 /** Where a slab came to rest: its middle and its own axes. */
 export interface PileRest {
+  /** Which slab it is, to take it out again (`remove`). */
+  id: number;
   /** Its middle. */
   centre: Vec3;
   /** Unit vectors: along its length, up out of its face, across it. */
@@ -207,6 +209,19 @@ export function createSkipPile(bounds: PileBounds, { cell = 0.025 } = {}) {
   };
 
   let count = 0;
+  /** Each slab at rest, as stamped, so one can be taken out again. */
+  const resting = new Map<
+    number,
+    {
+      slab: Slab;
+      x: number;
+      z: number;
+      yaw: number;
+      plane: { a: number; b: number; c: number };
+      rise: number;
+    }
+  >();
+  let serial = 0;
   return {
     /**
      * Settle `slab` let fall flat at (x, z), turned `yaw` about the
@@ -256,9 +271,13 @@ export function createSkipPile(bounds: PileBounds, { cell = 0.025 } = {}) {
         z: z + normal.z * half,
       };
       // Its top, measured up the vertical, for those landing on it.
-      stamp(slab, x, z, yaw, plane, slab.thickness / normal.y);
+      const rise = slab.thickness / normal.y;
+      stamp(slab, x, z, yaw, plane, rise);
       count++;
+      const id = ++serial;
+      resting.set(id, { slab, x, z, yaw, plane, rise });
       return {
+        id,
         centre,
         along,
         up: normal,
@@ -274,9 +293,21 @@ export function createSkipPile(bounds: PileBounds, { cell = 0.025 } = {}) {
     get count() {
       return count;
     },
+    /**
+     * Take one slab out again (despawned): the pile is what is left, each
+     * where it lay. What rested on it stays put (it is not settled again).
+     */
+    remove(id: number) {
+      if (!resting.delete(id)) return;
+      reset();
+      count = resting.size;
+      for (const r of resting.values())
+        stamp(r.slab, r.x, r.z, r.yaw, r.plane, r.rise);
+    },
     /** Empty the skip. */
     reset() {
       reset();
+      resting.clear();
       count = 0;
     },
   };

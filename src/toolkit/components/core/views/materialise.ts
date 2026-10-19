@@ -56,6 +56,11 @@ const BLOBS = 8;
  * Its noise is scaled to the thing, about eight blobs across it, so a
  * small card boils as a big cabinet does; call `update` each frame until
  * it returns false.
+ *
+ * `out` runs it backwards, to despawn a thing: it boils away, holes
+ * opening in islands that spread and join, each edge burning, until
+ * nothing is left; then it is hidden (and its materials put back), for
+ * its owner to take away.
  */
 export function createMaterialise(
   root: Object3D,
@@ -63,13 +68,16 @@ export function createMaterialise(
     seconds = 1.6,
     reduced = false,
     glow = '#ffb347',
+    out = false,
   }: {
     seconds?: number;
     reduced?: boolean;
     glow?: string;
+    /** Boil away instead of in. */
+    out?: boolean;
   } = {},
 ) {
-  const progress = { value: 0 };
+  const progress = { value: out ? 1 : 0 };
   const time = { value: 0 };
   const uniforms = {
     matProgress: progress,
@@ -170,6 +178,8 @@ export function createMaterialise(
   const finish = () => {
     if (!running) return;
     running = false;
+    // Boiled away: nothing of it left to see.
+    if (out) root.visible = false;
     for (const { mesh, material, castShadow } of meshes) {
       mesh.material = material;
       mesh.castShadow = castShadow;
@@ -183,14 +193,15 @@ export function createMaterialise(
       if (!running) return false;
       elapsed += delta;
       time.value += delta;
-      progress.value = materialiseAt(elapsed, duration);
+      const at = materialiseAt(elapsed, duration);
+      progress.value = out ? 1 - at : at;
       if (elapsed >= duration) finish();
       return running;
     },
     get running() {
       return running;
     },
-    /** Make it whole at once. */
+    /** Make it whole at once (or, going `out`, gone). */
     finish,
   };
 }

@@ -50,6 +50,25 @@ describe('settling things into a skip', () => {
     expect(rest.up.y).toBeCloseTo(1);
   });
 
+  it('forgets a board taken out, so the next lands where it was', () => {
+    const pile = createSkipPile(SKIP);
+    const under = pile.settle(BOARD, { x: 0, z: 0, yaw: 0 });
+    const over = pile.settle(BOARD, { x: 0, z: 0, yaw: 0 });
+    pile.remove(under.id);
+    pile.remove(over.id);
+    expect(pile.count).toBe(0);
+    expect(pile.top()).toBeCloseTo(SKIP.floor);
+    const again = pile.settle(BOARD, { x: 0, z: 0, yaw: 0 });
+    expect(again.centre.y).toBeCloseTo(SKIP.floor + BOARD.thickness / 2);
+    // Taking out one of two leaves the other's height in the pile.
+    const other = pile.settle(BOARD, { x: 0.5, z: 0, yaw: 0 });
+    pile.remove(again.id);
+    expect(pile.count).toBe(1);
+    expect(pile.heightAt(0.5, 0)).toBeGreaterThan(SKIP.floor + 0.01);
+    expect(pile.heightAt(0, 0)).toBeCloseTo(SKIP.floor);
+    expect(other.id).not.toBe(again.id);
+  });
+
   it('lays a board dropped on another flat on top of it', () => {
     const pile = createSkipPile(SKIP);
     pile.settle(BOARD, { x: 0, z: 0, yaw: 0 });

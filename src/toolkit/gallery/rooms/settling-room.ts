@@ -2,10 +2,12 @@ import {
   AmbientLight,
   Box3,
   BoxGeometry,
+  CylinderGeometry,
   Group,
   HemisphereLight,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
   Quaternion,
@@ -16,6 +18,7 @@ import {
   Vector3,
 } from 'three';
 import type { Object3D } from 'three';
+import { signal } from '@preact/signals-core';
 import { click, partAudio } from '../../components/core/audio/part-audio';
 import { devPortals, devWalls } from '../logic/dev-room-links';
 import { EXPANSION_CARD_KINDS } from '../../components/industrial-control/logic/machine-components';
@@ -29,9 +32,19 @@ import { materialiseAt } from '../../components/core/logic/materialise';
 import { createMaterialise } from '../../components/core/views/materialise';
 import { mergeStatic } from '../../components/core/views/merge-static';
 import type { Footprint } from '../../controls/logic/walk-collision';
-import { createSectionBoard } from '../../components/core/views/signage';
+import {
+  createCaption,
+  createSectionBoard,
+} from '../../components/core/views/signage';
+import {
+  createPartSet,
+  potentiometer,
+  pushButton,
+} from '../../components/core/parts/parts';
+import { createCanvasTexture } from '../../components/core/views/screens';
 import {
   createPanelKit,
+  createSevenSegment,
   disposeKit,
   kitPaint,
 } from '../../components/core/views/eighties-controls';
@@ -65,6 +78,19 @@ const MATERIALISE = 0.7;
 const HEAPED = 0.3;
 /** Seconds a heaped skip is left to be looked at before it is emptied. */
 const ADMIRE = 4;
+/** DESPAWN: each thing in the skip goes after a random 3 to 15 seconds. */
+const DESPAWN_FROM = 3;
+const DESPAWN_TO = 15;
+/** Seconds a despawned thing takes to boil away. */
+const BOIL_AWAY = 1.6;
+/** The control desk: where it stands, on the floor plan. */
+const DESK = { x: 1.4, z: 1.8 };
+/**
+ * AVERAGE DELAY's detents, seconds: a logarithmic scale, 1, 2, 5 to each
+ * decade. Throws come at random, so many a second or one now and then,
+ * averaging this.
+ */
+const DELAYS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20];
 /** What is thrown in: the boards from dev14. */
 const KINDS: readonly MachineComponentKind[] = [
   ...EXPANSION_CARD_KINDS,
@@ -203,9 +229,16 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     seconds: number;
     landed: boolean;
     merged: boolean;
+    /** Its place in the pile, to take it out again. */
+    rest: number;
+    /** Seconds until it despawns, once DESPAWN has given it a time. */
+    despawnIn: number | null;
+    /** Boiling away, once its time has come. */
+    vanishing: ReturnType<typeof createMaterialise> | null;
   }[] = [];
-  let paused = false;
-  let every = EVERY;
+  /** Seconds to the next throw; a development override of the mean. */
+  let nextIn = EVERY;
+  let meanOverride: number | null = null;
   let since = 0;
   let heapedFor = 0;
 
@@ -289,6 +322,9 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
       seconds: 0.6 + 0.2 * distance,
       landed: false,
       merged: false,
+      rest: rest.id,
+      despawnIn: null,
+      vanishing: null,
     });
   };
 
@@ -296,6 +332,7 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
   const empty = () => {
     for (const t of thrown) {
       t.effect.finish();
+      t.vanishing?.finish();
       room.remove(t.object);
       t.device.dispose();
       disposeKit(t.kit, t.object as Group);
@@ -303,6 +340,153 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     thrown.length = 0;
     pile.reset();
     heapedFor = 0;
+  };
+
+  /**
+   * DESPAWN: everything now in the skip is given a time, a random 3 to 15
+   * seconds; when its time is up it boils away (`createMaterialise`, run
+   * out) and is taken out of the pile. What arrives later stays.
+   */
+  const despawn = () => {
+    for (const t of thrown)
+      if (t.landed && t.despawnIn === null && !t.vanishing)
+        t.despawnIn =
+          DESPAWN_FROM + (DESPAWN_TO - DESPAWN_FROM) * Math.random();
+  };
+  const vanish = (delta: number) => {
+    for (const t of [...thrown]) {
+      if (t.despawnIn !== null) {
+        t.despawnIn -= delta;
+        if (t.despawnIn <= 0) {
+          t.despawnIn = null;
+          // Whole first, and never merged now: it boils away as it is.
+          t.effect.finish();
+          t.merged = true;
+          t.vanishing = createMaterialise(t.object, {
+            out: true,
+            seconds: BOIL_AWAY,
+            reduced: reducedMotion(),
+          });
+        }
+      }
+      if (t.vanishing && !t.vanishing.update(delta)) {
+        // Gone: out of the room, and out of the pile.
+        pile.remove(t.rest);
+        room.remove(t.object);
+        t.device.dispose();
+        disposeKit(t.kit, t.object as Group);
+        thrown.splice(thrown.indexOf(t), 1);
+      }
+    }
+    despawning.value = thrown.some(
+      (t) => t.despawnIn !== null || t.vanishing !== null,
+    );
+  };
+
+  // ---- The control desk: a sloping steel panel on a post by the skip ----
+  // START and STOP the emitter; a counter of what is in the skip; DESPAWN;
+  // and AVERAGE DELAY, the mean time between throws, on a log scale.
+  const parts = createPartSet();
+  const desk = new Group();
+  desk.name = 'Skip emitter control desk';
+  desk.position.set(DESK.x, 0, DESK.z);
+  room.add(desk);
+  const steel = kitPaint(kit, '#9aa1a3', 0.45);
+  const grey = kitPaint(kit, '#8e9592', 0.6);
+  const base = new Mesh(new BoxGeometry(0.34, 0.012, 0.34), steel);
+  base.position.y = 0.006;
+  desk.add(base);
+  const height = 0.95;
+  const pole = new Mesh(new CylinderGeometry(0.035, 0.035, height, 24), steel);
+  pole.position.y = height / 2;
+  desk.add(pole);
+  // The panel, tilted back towards whoever stands at it.
+  const panel = new Group();
+  panel.position.set(0, height + 0.08, 0.02);
+  panel.rotation.x = -0.6;
+  desk.add(panel);
+  const box = new Mesh(new BoxGeometry(0.46, 0.26, 0.07), grey);
+  box.position.z = -0.035;
+  panel.add(box);
+  const title = createCaption(kit, 'SKIP EMITTER');
+  title.scale.setScalar(0.45);
+  title.position.set(0, 0.112, 0.002);
+  panel.add(title);
+  // The counter: what is in the skip now.
+  const counter = createSevenSegment(kit, 4, { digitHeight: 0.022 });
+  counter.group.position.set(-0.12, 0.06, 0);
+  panel.add(counter.group);
+  const counted = createCaption(kit, 'IN SKIP');
+  counted.scale.setScalar(0.28);
+  counted.position.set(-0.12, 0.028, 0.002);
+  panel.add(counted);
+  const running = signal(true);
+  const despawning = signal(false);
+  const start = pushButton(kit, {
+    colour: 'green',
+    head: 'illuminated',
+    legend: 'START',
+    name: 'START push button',
+    lamp: running,
+    action: () => (running.value = true),
+  });
+  const stop = pushButton(kit, {
+    colour: 'red',
+    legend: 'STOP',
+    name: 'STOP push button',
+    action: () => (running.value = false),
+  });
+  const despawnButton = pushButton(kit, {
+    colour: 'amber',
+    head: 'illuminated',
+    legend: 'DESPAWN',
+    name: 'DESPAWN push button',
+    lamp: despawning,
+    action: () => despawn(),
+  });
+  [start, stop, despawnButton].forEach((button, i) => {
+    button.object.position.set(-0.17 + i * 0.075, -0.06, 0);
+    panel.add(button.object);
+    parts.add(button);
+  });
+  const delay = potentiometer(kit, {
+    legend: 'AVERAGE DELAY',
+    steps: DELAYS.length - 1,
+    initial: DELAYS.indexOf(1) / (DELAYS.length - 1),
+    name: 'AVERAGE DELAY knob',
+  });
+  delay.object.position.set(0.14, 0.03, 0);
+  panel.add(delay.object);
+  parts.add(delay);
+  /** The mean seconds between throws, from the knob's detent. */
+  const meanDelay = () => DELAYS[delay.position.value] ?? 1;
+  const readout = createCanvasTexture(128, 40);
+  kit.textures.push(readout.texture);
+  const face = new MeshBasicMaterial({ map: readout.texture });
+  kit.materials.push(face);
+  const screen = new Mesh(new PlaneGeometry(0.07, 0.022), face);
+  screen.position.set(0.14, -0.065, 0.001);
+  screen.raycast = () => {};
+  panel.add(screen);
+  let shownDelay = NaN;
+  let shownCount = NaN;
+  const showPanel = () => {
+    if (pile.count !== shownCount) {
+      shownCount = pile.count;
+      counter.show(String(Math.min(9999, shownCount)));
+    }
+    const mean = meanDelay();
+    if (mean === shownDelay) return;
+    shownDelay = mean;
+    const c = readout.context;
+    c.fillStyle = '#0d120e';
+    c.fillRect(0, 0, 128, 40);
+    c.fillStyle = '#7dff9a';
+    c.font = 'bold 26px monospace';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(`${mean < 1 ? mean.toFixed(1) : mean} s`, 64, 21);
+    readout.texture.needsUpdate = true;
   };
 
   /** Fly, settle and tidy up everything on its way in. */
@@ -338,11 +522,13 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects([portals.group], true)[0];
+    const hit = raycaster.intersectObjects([portals.group, desk], true)[0];
     if (!hit || hit.distance > 4 * m) return null;
     for (let o: Object3D | null = hit.object; o; o = o.parent) {
       const travel = portals.uses.get(o as Mesh);
       if (travel) return () => travel();
+      const work = parts.uses.get(o);
+      if (work) return work;
     }
     return null;
   };
@@ -375,6 +561,12 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
         minZ: (-skip.footprint.z / 2 - 0.05) * m,
         maxZ: (skip.footprint.z / 2 + 0.05) * m,
       },
+      {
+        minX: (DESK.x - 0.2) * m,
+        maxX: (DESK.x + 0.2) * m,
+        minZ: (DESK.z - 0.2) * m,
+        maxZ: (DESK.z + 0.25) * m,
+      },
     ],
     use: (x, y) => usableAt(x, y)?.(),
     aimed: () => Boolean(usableAt(0, 0)),
@@ -400,15 +592,17 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
       walk.place(x * m, z * m, yaw, pitch);
     },
     /** Stop or start the emitter. */
-    pause: () => (paused = true),
-    resume: () => (paused = false),
+    pause: () => (running.value = false),
+    resume: () => (running.value = true),
     /** Throw something in every `seconds`. */
-    every: (seconds: number) => (every = Math.max(0.05, seconds)),
+    every: (seconds: number) => (meanOverride = Math.max(0.05, seconds)),
     /** Throw `n` things in at once. */
     throw(n = 1) {
       for (let i = 0; i < n; i++) emit();
     },
     empty,
+    /** Press DESPAWN. */
+    despawn,
     /** How many are in, and how high the pile stands over the skip's floor. */
     state: () => ({
       count: pile.count,
@@ -433,14 +627,22 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
       // Heaped: left a while to be looked at, then emptied.
       heapedFor += delta;
       if (heapedFor > ADMIRE) empty();
-    } else if (!paused) {
+    } else if (running.value) {
       since += delta;
-      if (since >= every) {
+      if (since >= nextIn) {
         since = 0;
         emit();
+        // At random, averaging the knob's delay (a Poisson stream).
+        nextIn = Math.max(
+          0.05,
+          -Math.log(1 - Math.random()) * (meanOverride ?? meanDelay()),
+        );
       }
     }
+    showPanel();
     fly(delta);
+    vanish(delta);
+    parts.update(delta);
     portals.update(delta, walk.walker.x, walk.walker.z);
     partAudio.listen(camera, m);
     renderer.render(scene, camera);
@@ -451,6 +653,7 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     walk.dispose();
     portals.dispose();
     empty();
+    parts.dispose();
     lamps.dispose();
     graffiti.dispose();
     disposeKit(kit, scene as unknown as Group);
