@@ -207,7 +207,9 @@ export function createFirePanel(kit: PanelKit) {
     (D - 0.01) / 2,
   );
   t.box(group, t.paint('#ecece7', 0.45), W, H, 0.012, 0, 0, D - 0.006);
-  const front = D + 0.0005;
+  // The facia stands a little proud of the case, and is drawn in front of
+  // it, so the two never fight for the same depth seen from afar.
+  const front = D + 0.0015;
   for (const x of [-W / 2 + 0.018, W / 2 - 0.018])
     t.cyl(
       group,
@@ -388,6 +390,11 @@ export function createFirePanel(kit: PanelKit) {
     Math.round(fw * FACIA_PX),
   );
   facia.mesh.position.set(0, top - fh / 2, front);
+  for (const material of [facia.mesh.material].flat()) {
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = -1;
+    material.polygonOffsetUnits = -2;
+  }
   group.add(facia.mesh);
   // The zones' labels, handwritten in their windows above the facia.
   const labels = t.printed(
