@@ -1,4 +1,5 @@
 import { level0Diagnostics } from '../game/bbc-machine-diagnostics';
+import type { UnitHealth } from '../toolkit/components/industrial-control/logic/bbc-micro';
 import { computed, effect, signal } from '@preact/signals-core';
 import type { Readable } from '../toolkit/components/core/logic/world/components';
 import type { Object3D, Quaternion } from 'three';
@@ -365,6 +366,21 @@ export function createLevel0Machine(
     mcc,
     diagnostics: {
       steady: computed(() => plant.steady.value && mcc.steady.value),
+      powered: mains,
+      // Each unit as its annunciator window truly stands (not as scanned):
+      // green, failed, or otherwise (off, starting, a warning).
+      units: computed<Record<string, UnitHealth>>(() =>
+        Object.fromEntries(
+          plant.windowStates.value.map((state) => [
+            state.window,
+            state.worst === 'failure' || state.worst === 'critical'
+              ? 'failed'
+              : state.on && !state.starting && !state.worst
+                ? 'green'
+                : 'other',
+          ]),
+        ),
+      ),
       ...level0Diagnostics(
         plant,
         mcc.diagnosticEndpoint,

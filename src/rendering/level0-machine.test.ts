@@ -814,6 +814,35 @@ it('announces readiness only after full operation, never at a settled partial st
   dispose();
 });
 
+it('warns BEWARE once when a unit fails after the steady state, however many follow', () => {
+  const { machine, run, dispose } = sandbox();
+  const bbc = createBbcComputer(machine.diagnostics);
+  bbc.power.flip();
+  const both = (seconds: number) => {
+    run(seconds);
+    bbc.step(seconds);
+  };
+  createLevel0Scenarios(machine).fullOn();
+  both(100);
+  expect(bbc.fanfare.value).toBe(1);
+  expect(bbc.beware.value).toBe(0);
+  // A fuse blows: its unit fails, and others fall with it.
+  machine.inflict(`fuse:${UNITS.lube}`);
+  both(2);
+  expect(machine.diagnostics.units!.value.LUBE).toBe('failed');
+  expect(bbc.beware.value).toBe(1);
+  // Another, straight after: within 30 s, it stays quiet.
+  machine.inflict(`fuse:${UNITS.cooling}`);
+  both(2);
+  expect(machine.diagnostics.units!.value.COOLING).toBe('failed');
+  expect(bbc.beware.value).toBe(1);
+  // Failures that only stand do not sound it again.
+  both(40);
+  expect(bbc.beware.value).toBe(1);
+  bbc.dispose();
+  dispose();
+});
+
 it('lets a front click reach every VFD keypad key and its speed knob', () => {
   const { machine, dispose } = sandbox();
   machine.mcc.group.updateMatrixWorld(true);

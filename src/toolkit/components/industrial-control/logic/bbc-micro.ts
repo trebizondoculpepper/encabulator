@@ -10,7 +10,19 @@ export interface BbcDiagnosticLink {
   lines: Readable<readonly ScreenLine[]>;
   /** The observed machine green tier, independent of the text presentation. */
   steady?: Readable<boolean>;
+  /** Whether the machine has mains: off, its steady state is forgotten. */
+  powered?: Readable<boolean>;
+  /**
+   * Each unit's state, by name: green (on and well), failed (a failure or
+   * critical fault standing), or anything else (off, starting, a warning).
+   */
+  units?: Readable<Readonly<Record<string, UnitHealth>>>;
 }
+
+export type UnitHealth = 'green' | 'failed' | 'other';
+
+/** The least time between two BEWARE cues, seconds. */
+export const BEWARE_INTERVAL_SECONDS = 30;
 export const BBC_HANDSHAKE_SECONDS = 0.35;
 export const BBC_READ_SECONDS = 1.5;
 
@@ -31,6 +43,34 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
     }
     if (green) unsteadySeconds = 0;
     wasSteady = green;
+  });
+  // BEWARE: once the machine has reached its steady state (remembered
+  // until its mains goes off, since the first failure ends it), a unit
+  // going from green to failed sounds it, while the computer is on. It is
+  // the change that sounds it, not a failure standing, and not more often
+  // than once every 30 s, so a cascade of failures sounds it once.
+  const beware = signal(0);
+  let clock = 0;
+  let reachedSteady = link?.steady?.value ?? false;
+  let lastBeware = -Infinity;
+  let wasUnits = link?.units?.value ?? {};
+  const stopBeware = effect(() => {
+    const units = link?.units?.value ?? {};
+    if (link?.steady?.value) reachedSteady = true;
+    if (link?.powered && !link.powered.value) reachedSteady = false;
+    const failed = Object.entries(units).some(
+      ([name, health]) => health === 'failed' && wasUnits[name] === 'green',
+    );
+    wasUnits = units;
+    if (
+      failed &&
+      reachedSteady &&
+      power.state.value &&
+      clock - lastBeware >= BEWARE_INTERVAL_SECONDS
+    ) {
+      lastBeware = clock;
+      beware.value = beware.peek() + 1;
+    }
   });
   const sessionElapsed = signal(0);
   const session = computed(() =>
@@ -126,12 +166,16 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
     diagnosticsAvailable,
     reading,
     fanfare,
+    /** Counts each BEWARE: a unit failing after the steady state. */
+    beware,
     snapshot: () => ({
       powered: power.state.value,
       elapsed: elapsed.value,
       sessionElapsed: sessionElapsed.value,
       fanfareArmed,
       unsteadySeconds,
+      reachedSteady,
+      sinceBeware: clock - lastBeware,
     }),
     /** A geometry swap must not reboot the computer or replay its disk activity. */
     restore(snapshot: {
@@ -140,9 +184,13 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
       sessionElapsed: number;
       fanfareArmed?: boolean;
       unsteadySeconds?: number;
+      reachedSteady?: boolean;
+      sinceBeware?: number;
     }) {
       fanfareArmed = snapshot.fanfareArmed ?? !wasSteady;
       unsteadySeconds = snapshot.unsteadySeconds ?? 0;
+      reachedSteady = snapshot.reachedSteady ?? reachedSteady;
+      lastBeware = clock - (snapshot.sinceBeware ?? Infinity);
       batch(() => {
         power.set(snapshot.powered);
         elapsed.value = snapshot.elapsed;
@@ -151,6 +199,7 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
     },
     step(delta: number) {
       const dt = Math.max(0, delta);
+      clock += dt;
       if (link?.steady?.value) unsteadySeconds = 0;
       else {
         unsteadySeconds = Math.min(1, unsteadySeconds + dt);
@@ -167,6 +216,7 @@ export function createBbcComputer(link?: BbcDiagnosticLink) {
     },
     dispose() {
       stopSteady();
+      stopBeware();
       invalidate();
       stop();
       power.dispose();

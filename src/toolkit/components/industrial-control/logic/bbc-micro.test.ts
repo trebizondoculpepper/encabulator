@@ -2,7 +2,12 @@ import { signal } from '@preact/signals-core';
 import type { ScreenLine } from './bbc-micro';
 import { BBC_HANDSHAKE_SECONDS, BBC_READ_SECONDS } from './bbc-micro';
 import { describe, expect, it } from 'vite-plus/test';
-import { BBC_LOAD_SECONDS, createBbcComputer } from './bbc-micro';
+import {
+  BBC_LOAD_SECONDS,
+  BEWARE_INTERVAL_SECONDS,
+  createBbcComputer,
+} from './bbc-micro';
+import type { UnitHealth } from './bbc-micro';
 
 describe('BBC Micro startup', () => {
   it('starts off, beeps through ROM startup before loading, then shows a standalone diagnostic page', () => {
@@ -162,5 +167,97 @@ describe('BBC steady-state fanfare', () => {
     expect(replacement.fanfare.value).toBe(0);
     original.dispose();
     replacement.dispose();
+  });
+});
+
+describe('BBC BEWARE', () => {
+  /** A machine of three units, all green and steady, the computer on. */
+  const machine = ({ on = true } = {}) => {
+    const steady = signal(false);
+    const powered = signal(true);
+    const units = signal<Record<string, UnitHealth>>({
+      LUBE: 'green',
+      FAN: 'green',
+      VFD: 'green',
+    });
+    const bbc = createBbcComputer({
+      online: signal(true),
+      lines: signal([]),
+      steady,
+      powered,
+      units,
+    });
+    if (on) bbc.power.flip();
+    /** Set some units, as the machine would. */
+    const set = (changes: Record<string, UnitHealth>) =>
+      (units.value = { ...units.value, ...changes });
+    return { bbc, steady, powered, units, set };
+  };
+
+  it('sounds when a unit goes from green to failed after the steady state', () => {
+    const { bbc, steady, set } = machine();
+    steady.value = true;
+    expect(bbc.beware.value).toBe(0);
+    // The failure ends the steady state as it happens; it still sounds.
+    steady.value = false;
+    set({ LUBE: 'failed' });
+    expect(bbc.beware.value).toBe(1);
+    bbc.dispose();
+  });
+
+  it('is silent before the steady state is reached, and once the mains goes off', () => {
+    const { bbc, steady, powered, set } = machine();
+    set({ LUBE: 'failed' });
+    expect(bbc.beware.value).toBe(0);
+    set({ LUBE: 'green' });
+    steady.value = true;
+    steady.value = false;
+    powered.value = false;
+    powered.value = true;
+    set({ FAN: 'failed' });
+    expect(bbc.beware.value).toBe(0);
+    bbc.dispose();
+  });
+
+  it('sounds only while the computer is on, and queues nothing for later', () => {
+    const { bbc, steady, set } = machine({ on: false });
+    steady.value = true;
+    set({ LUBE: 'failed' });
+    bbc.power.flip();
+    bbc.step(BEWARE_INTERVAL_SECONDS);
+    expect(bbc.beware.value).toBe(0);
+    set({ FAN: 'failed' });
+    expect(bbc.beware.value).toBe(1);
+    bbc.dispose();
+  });
+
+  it('sounds for the change, not the standing failure, and once in 30 s', () => {
+    const { bbc, steady, set } = machine();
+    steady.value = true;
+    // Two units failing together sound it once.
+    set({ LUBE: 'failed', FAN: 'failed' });
+    expect(bbc.beware.value).toBe(1);
+    // Standing failures, and units going anywhere else, do not sound it.
+    bbc.step(BEWARE_INTERVAL_SECONDS);
+    set({ VFD: 'other' });
+    expect(bbc.beware.value).toBe(1);
+    // A failure from anything but green does not either.
+    set({ VFD: 'failed' });
+    expect(bbc.beware.value).toBe(1);
+    // 30 s on, a unit recovering and failing again sounds it...
+    set({ LUBE: 'green' });
+    set({ LUBE: 'failed' });
+    expect(bbc.beware.value).toBe(2);
+    // ...but not again within 30 s...
+    bbc.step(BEWARE_INTERVAL_SECONDS - 1);
+    set({ LUBE: 'green' });
+    set({ LUBE: 'failed' });
+    expect(bbc.beware.value).toBe(2);
+    // ...and sounds again once 30 s have passed.
+    bbc.step(1);
+    set({ FAN: 'green' });
+    set({ FAN: 'failed' });
+    expect(bbc.beware.value).toBe(3);
+    bbc.dispose();
   });
 });

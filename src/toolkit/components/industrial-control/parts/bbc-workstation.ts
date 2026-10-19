@@ -18,6 +18,11 @@ const FANFARE = recording(
   0.35,
 );
 
+const BEWARE = recording(
+  new URL('../../sound/audio/assets/bbc-beware.mp3', import.meta.url),
+  0.35,
+);
+
 /** Reusable workstation, including its own power control, boot and positional cue. */
 export function bbcWorkstation(
   kit: PanelKit,
@@ -117,6 +122,21 @@ export function bbcWorkstation(
       }
     }
   });
+  // BEWARE, when a unit fails after the steady state (`model.beware`).
+  let stopBeware = () => {};
+  let lastBeware = model.beware.value;
+  const bewareSound = effect(() => {
+    const serial = model.beware.value;
+    const on = model.power.state.value;
+    if (!on) stopBeware();
+    if (serial !== lastBeware) {
+      lastBeware = serial;
+      if (on && audible) {
+        stopBeware();
+        stopBeware = partAudio.play(BEWARE, speaker);
+      }
+    }
+  });
   let clock = 0;
   const update = (delta: number) => {
     clock += delta;
@@ -136,6 +156,8 @@ export function bbcWorkstation(
   a.disposers.push(
     steadySound,
     () => stopFanfare(),
+    bewareSound,
+    () => stopBeware(),
     sound,
     () => stopRead(),
     stopEvent,
@@ -161,6 +183,7 @@ export function bbcWorkstation(
         stopSound();
         stopRead();
         stopFanfare();
+        stopBeware();
       }
     },
   };
