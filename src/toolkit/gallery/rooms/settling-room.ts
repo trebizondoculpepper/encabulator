@@ -80,9 +80,18 @@ const MATERIALISE = 0.7;
 const HEAPED = 0.3;
 /** Seconds a heaped skip is left to be looked at before it is emptied. */
 const ADMIRE = 4;
-/** DESPAWN: each thing in the skip goes after a random 3 to 15 seconds. */
-const DESPAWN_FROM = 3;
-const DESPAWN_TO = 15;
+/**
+ * DESPAWN: each thing in the skip goes after a countdown drawn from a
+ * normal distribution, 7 s on average with a standard deviation of 3 s,
+ * never under half a second.
+ */
+const DESPAWN_MEAN = 7;
+const DESPAWN_SPREAD = 3;
+const DESPAWN_SOONEST = 0.5;
+/** A standard normal draw (Box–Muller). */
+const normal = () =>
+  Math.sqrt(-2 * Math.log(1 - Math.random())) *
+  Math.cos(2 * Math.PI * Math.random());
 /** Seconds a despawned thing takes to boil away. */
 const BOIL_AWAY = 1.6;
 /** The control desk: where it stands, on the floor plan. */
@@ -345,15 +354,17 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
   };
 
   /**
-   * DESPAWN: everything now in the skip is given a time, a random 3 to 15
-   * seconds; when its time is up it boils away (`createMaterialise`, run
+   * DESPAWN: everything now in the skip is given a time, about 7 s, give
+   * or take 3 (normally distributed); when its time is up it boils away (`createMaterialise`, run
    * out) and is taken out of the pile. What arrives later stays.
    */
   const despawn = () => {
     for (const t of thrown)
       if (t.landed && t.despawnIn === null && !t.vanishing)
-        t.despawnIn =
-          DESPAWN_FROM + (DESPAWN_TO - DESPAWN_FROM) * Math.random();
+        t.despawnIn = Math.max(
+          DESPAWN_SOONEST,
+          DESPAWN_MEAN + DESPAWN_SPREAD * normal(),
+        );
   };
   const vanish = (delta: number) => {
     for (const t of [...thrown]) {
@@ -459,11 +470,18 @@ export function startSettlingRoom(canvas: HTMLCanvasElement) {
     lamp: despawning,
     action: () => despawn(),
   });
-  [start, stop, despawnButton].forEach((button, i) => {
-    button.object.position.set(-0.17 + i * 0.075, -0.06, 0);
+  // START and STOP together; DESPAWN apart, well clear of the mushroom's
+  // head, so a click meant for it never lands on the stop. DESPAWN works
+  // whether or not the stop is in: the stop stops only the throwing.
+  for (const [button, x] of [
+    [start, -0.18],
+    [stop, -0.1],
+    [despawnButton, 0.025],
+  ] as const) {
+    button.object.position.set(x, -0.06, 0);
     panel.add(button.object);
     parts.add(button);
-  });
+  }
   const delay = potentiometer(kit, {
     legend: 'AVERAGE DELAY',
     steps: DELAYS.length - 1,
