@@ -236,27 +236,42 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
       }),
     };
   });
-  // DISTRIBUTION, holding out after the water, fails in its turn: it
-  // crackles and flashes over as the annunciator sputters, then its
-  // breaker trips and everything it feeds goes dark.
-  const distribution = mcc.unitFaces.get(UNITS.distribution)!;
-  const distributionSpark = createShortSpark(kit, 14);
-  distributionSpark.group.scale.setScalar(2.5);
-  distributionSpark.group.position.set(
-    distribution.centre,
-    (distribution.face.bottom + distribution.face.top) / 2,
-    mcc.doorFront + 0.04,
-  );
-  distribution.section.add(distributionSpark.group);
-  let distributionFlashes = 0;
+  // The last stand after the water: the annunciator (on DISTRIBUTION's
+  // door) crackles as it sputters out; then INCOMING or DISTRIBUTION gives
+  // way in a burst of big sparks and a bang, and everything goes dark.
+  const lastSparks = Object.fromEntries(
+    (['INCOMING', 'DISTRIBUTION'] as const).map((which) => {
+      const unit = mcc.unitFaces.get(
+        which === 'INCOMING' ? UNITS.incoming : UNITS.distribution,
+      )!;
+      const spark = createShortSpark(kit, 20);
+      spark.group.position.set(
+        unit.centre,
+        (unit.face.bottom + unit.face.top) / 2,
+        mcc.doorFront + 0.05,
+      );
+      unit.section.add(spark.group);
+      return [which, { spark, flashes: 0 }];
+    }),
+  ) as Record<
+    'INCOMING' | 'DISTRIBUTION',
+    { spark: ReturnType<typeof createShortSpark>; flashes: number }
+  >;
   let fate = plant.distributionFate.peek();
   const stopDistribution = effect(() => {
     const now = plant.distributionFate.value;
-    if (now === 'sputtering' && fate === 'holding') {
-      distributionFlashes = 6;
-      partAudio.play(CRACKLE, distributionSpark.group);
+    const which = plant.lastToFail.peek();
+    const last = lastSparks[which];
+    if (now === 'sputtering' && fate === 'holding')
+      partAudio.play(CRACKLE, lastSparks.DISTRIBUTION.spark.group);
+    if (now === 'dead' && fate !== 'dead') {
+      last.flashes = 14;
+      last.spark.group.scale.setScalar(5);
+      last.spark.fire();
+      partAudio.play(SEIZE, last.spark.group);
     }
     if (now === 'dead') {
+      // DISTRIBUTION, fed from the incoming side, goes either way.
       const breaker = mcc.circuits.get(UNITS.distribution)?.breaker?.breaker;
       if (breaker?.position.peek() === 'on') breaker.trip();
     }
@@ -317,11 +332,14 @@ export function createLevel0Failures(kit: PanelKit, machine: Level0Machine) {
         flashes--;
       }
       for (const spark of shorting) spark.update(delta, reducedMotion());
-      if (distributionFlashes > 0 && Math.random() < delta * 4) {
-        distributionSpark.fire();
-        distributionFlashes--;
+      for (const last of Object.values(lastSparks)) {
+        // A rapid volley, the biggest sparks of all.
+        if (last.flashes > 0 && Math.random() < delta * 10) {
+          last.spark.fire();
+          last.flashes--;
+        }
+        last.spark.update(delta, reducedMotion());
       }
-      distributionSpark.update(delta, reducedMotion());
       // The fire's smoke, thicker as it grows, and the soot it leaves.
       // Plainly smoking from the start, pouring as it takes hold.
       const size = plant.fireSize.value;

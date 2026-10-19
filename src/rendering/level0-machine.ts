@@ -83,6 +83,14 @@ export function createLevel0Machine(
   const mcc = createRetroEncabulatorMcc(kit, {
     incomingOn: false,
     diagnosticsAvailable,
+    // After the water, INCOMING may be the last to give way: its meters die.
+    bucketFeed: {
+      [UNITS.incoming]: computed(
+        () =>
+          plant.distributionFate.value !== 'dead' ||
+          plant.lastToFail.value !== 'INCOMING',
+      ),
+    },
     dress: createLevel0Dresser(plant, ref, wiring),
     interlock,
     breakerLatch: {

@@ -822,6 +822,11 @@ export function createRetroEncabulatorMcc(
       const feed = gate
         ? computed(() => baseFeed.value && gate.value)
         : baseFeed;
+      // Units on the incoming side take the supply itself, through their
+      // gate if they have one (a room may fail them on their own).
+      const supplied = gate
+        ? computed(() => supply.value && gate.value)
+        : supply;
       let toneReady: Readable<boolean> = feed;
       let doorOpen: Readable<boolean> = signal(false);
       const plcReady = signal(false);
@@ -873,9 +878,9 @@ export function createRetroEncabulatorMcc(
         incoming ||
           bucketId === 'section1.bucket2' ||
           spec.face === 'annunciator'
-          ? supply
+          ? supplied
           : feed,
-        incoming ? supply : lamps,
+        incoming ? supplied : lamps,
         plcReady,
         faults.active,
         options.interlock?.[bucketId],

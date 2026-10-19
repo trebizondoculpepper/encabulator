@@ -88,8 +88,7 @@ export const PLANT = {
    * `fireHeat` × size °C above the room, less with distance (metres).
    */
   fireHeat: 130,
-  distributionHolds: 20,
-  sputterSeconds: 2.5,
+  lastStandSeconds: 12,
   leakSeconds: 60,
   dryWearSeconds: 90,
   wearGrinding: 0.3,
@@ -481,12 +480,19 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     /** Seconds the fire has raged at its fiercest: long enough, burnt out. */
     burnedFor: g.state('machine.burnedFor', 0),
     /**
-     * Seconds since the water shorted the bus. DISTRIBUTION, better
-     * shielded than the rest (for drama), holds out for
-     * `distributionHolds`, then fails, and the annunciator it feeds
-     * sputters out over `sputterSeconds`.
+     * Seconds since the water shorted the bus. INCOMING, DISTRIBUTION and
+     * the annunciator, better shielded than the rest (for drama), hold out
+     * for `lastStandSeconds`; then the annunciator sputters out, over
+     * `sputtering` seconds (1 to 3, drawn when the bus shorts), and one
+     * of INCOMING and DISTRIBUTION (`lastToFail`) fails in a burst of
+     * sparks, taking everything with it.
      */
     shortedFor: g.state('machine.shortedFor', 0),
+    sputtering: g.state('machine.sputtering', 2),
+    lastToFail: g.state<'INCOMING' | 'DISTRIBUTION'>(
+      'machine.lastToFail',
+      'DISTRIBUTION',
+    ),
     hydraulic: g.state('hydraulic.pressure', 0, { note: 'psi' }),
     flow: g.state('hydro.flow', 0, { note: 'share of rated flow' }),
     fan: g.state('fan.pressure', 0, { note: 'inWC' }),
@@ -1459,9 +1465,20 @@ export function createLevel0Plant(g: Graph = createGraph()) {
       if (next >= PLANT.fireFierce) s.burnedFor.set(s.burnedFor.peek() + dt);
     },
   );
-  g.process('drowned distribution', [s.drowned], [s.shortedFor], (dt) => {
-    if (s.drowned.peek()) s.shortedFor.set(s.shortedFor.peek() + dt);
-  });
+  g.process(
+    'last stand',
+    [s.drowned, s.shortedFor],
+    [s.shortedFor, s.sputtering, s.lastToFail],
+    (dt, random) => {
+      if (!s.drowned.peek()) return;
+      if (s.shortedFor.peek() === 0) {
+        // How long the annunciator sputters, and which gives way at last.
+        s.sputtering.set(1 + 2 * random());
+        s.lastToFail.set(random() < 0.5 ? 'INCOMING' : 'DISTRIBUTION');
+      }
+      s.shortedFor.set(s.shortedFor.peek() + dt);
+    },
+  );
   g.process('water ingress', [raining, e.mains], [s.water, s.drowned], (dt) => {
     const wet = s.water.peek();
     s.water.set(
@@ -1482,20 +1499,30 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     where: 'the shutdown and its sparks',
   });
   /**
-   * DISTRIBUTION after the water: 'holding' (still working), 'sputtering'
-   * (failing: the annunciator it feeds flickers wildly) or 'dead' (its
-   * supply gone: the annunciator dark).
+   * The last stand after the water: 'holding' (INCOMING, DISTRIBUTION and
+   * the annunciator still working), 'sputtering' (the annunciator failing,
+   * flickering wildly) or 'dead' (`lastToFail` gone in a burst of sparks,
+   * and everything with it).
    */
   const distributionFate = g.output(
     'distribution.fate',
-    [s.shortedFor],
-    (t): 'holding' | 'sputtering' | 'dead' =>
-      t < PLANT.distributionHolds
+    [s.shortedFor, s.sputtering],
+    (t, sputter): 'holding' | 'sputtering' | 'dead' =>
+      t < PLANT.lastStandSeconds
         ? 'holding'
-        : t < PLANT.distributionHolds + PLANT.sputterSeconds
+        : t < PLANT.lastStandSeconds + sputter
           ? 'sputtering'
           : 'dead',
-    { where: 'DISTRIBUTION and the annunciator it feeds' },
+    { where: 'INCOMING, DISTRIBUTION and the annunciator' },
+  );
+  /** Which gives way at the end: INCOMING or DISTRIBUTION. */
+  const lastToFail = g.output(
+    'distribution.lastToFail',
+    [s.lastToFail],
+    (w) => w,
+    {
+      where: 'the last burst of sparks',
+    },
   );
   /** How big the fire is, 0 to 1: its smoke and soot. */
   const fireSize = g.output('machine.fireShown', [s.fireSize], (f) => f, {
@@ -2048,6 +2075,7 @@ export function createLevel0Plant(g: Graph = createGraph()) {
     sprinklerFailure,
     ignite,
     distributionFate,
+    lastToFail,
     fireSize,
     ruined,
     strain,

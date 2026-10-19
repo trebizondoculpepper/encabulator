@@ -405,15 +405,28 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(machine.mcc.mainBreaker.position.value).toBe('tripped');
     expect(machine.plant.electrical.mains.value).toBe(false);
     expect(faulted()).toBeGreaterThan(before);
-    // DISTRIBUTION, better shielded, holds out about 20 s, sputters, dies.
+    // INCOMING, DISTRIBUTION and the annunciator, better shielded, hold
+    // out a little longer; the annunciator sputters out over 1 to 3 s;
+    // then INCOMING or DISTRIBUTION gives way, and everything goes dark.
     const distribution = machine.mcc.circuits.get('section1.bucket3')!;
+    const incoming = machine.mcc.circuits.get('section1.bucket1')!;
     expect(distribution.powered.value).toBe(true);
     expect(machine.plant.distributionFate.value).toBe('holding');
-    step(12);
+    let held = 10;
+    while (machine.plant.distributionFate.value === 'holding') {
+      step(0.5);
+      held += 0.5;
+    }
+    expect(held).toBeGreaterThan(10);
+    expect(held).toBeLessThan(25);
     expect(machine.plant.distributionFate.value).toBe('sputtering');
-    step(3);
+    expect(distribution.powered.value).toBe(true);
+    step(3.5);
     expect(machine.plant.distributionFate.value).toBe('dead');
     expect(distribution.powered.value).toBe(false);
+    expect(incoming.powered.value).toBe(
+      machine.plant.lastToFail.value !== 'INCOMING',
+    );
     // RESET: dried out, repaired, the heads replaced.
     useOf(panel, 'RESET states switch')();
     step(1);
@@ -421,6 +434,7 @@ describe('the Hyperplasc Scenario Simulator', () => {
     expect(machine.plant.fire.discharging.value).toBe(false);
     expect(machine.plant.distributionFate.value).toBe('holding');
     expect(distribution.powered.value).toBe(true);
+    expect(incoming.powered.value).toBe(true);
     failures.dispose();
     dispose();
   });
