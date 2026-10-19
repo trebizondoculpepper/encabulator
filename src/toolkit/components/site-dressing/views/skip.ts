@@ -11,6 +11,7 @@ import {
 } from 'three';
 import type { Material, Object3D } from 'three';
 import type { BinShape } from '../logic/bin-toss';
+import type { PileBounds } from '../logic/skip-pile';
 import { lampLit } from '../logic/skip-dressing';
 import type { GraffitiTag, SkipLamp } from '../logic/skip-dressing';
 import { GRAFFITI_ASPECT, graffitiTexture } from './graffiti';
@@ -51,6 +52,15 @@ const LUG_RADIUS = 0.035;
 /** Where the stiffeners stand along each side, and how wide they are. */
 const STIFFENERS = [-0.3, 0.3];
 const STIFFENER = 0.07;
+
+/** The skip's inside, plate to plate, for settling things into it (`createSkipPile`). */
+export const SKIP_INSIDE: PileBounds = {
+  floorHalfX: FLOOR_LONG / 2 - PLATE,
+  topHalfX: LONG / 2 - PLATE,
+  halfZ: WIDE / 2 - PLATE,
+  floor: LIFT + PLATE,
+  rim: HIGH,
+};
 
 /** The inside of the skip, for `binRest`. */
 export const SKIP_SHAPE: BinShape = {

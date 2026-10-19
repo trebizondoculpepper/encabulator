@@ -78,6 +78,9 @@ const openRoom = async () => {
   else if (room === 'dev20')
     start = (await import('./toolkit/gallery/rooms/repair-room'))
       .startRepairRoom;
+  else if (room === 'dev21')
+    start = (await import('./toolkit/gallery/rooms/settling-room'))
+      .startSettlingRoom;
   else if (room === 'dev18')
     start = (await import('./toolkit/gallery/rooms/architectural-room'))
       .startArchitecturalGalleryRoom;
