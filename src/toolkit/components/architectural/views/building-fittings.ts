@@ -48,6 +48,161 @@ export function createRockerPlate(kit: PanelKit, gangs: number) {
   return { group, rockers };
 }
 
+/**
+ * A metalclad grid switch plate, after MK's Metalclad Plus Grid Plus
+ * (K3494ALM: four modules in an 86 × 146 mm zinc-grey steel plate on a
+ * 38 mm metalclad box): a row of 25 × 59 mm grid modules, each a white
+ * rocker or a secret-key switch, each labelled under it, with a title
+ * strip across the top. A placeholder; the research is
+ * `doc/research/warehouse-lighting-control.md`.
+ */
+export function createGridSwitchPlate(
+  kit: PanelKit,
+  modules: { legend: string; key?: boolean }[],
+  title = '',
+) {
+  const t = tools(kit);
+  const group = new Group();
+  const zinc = t.paint('#a9aeaa', 0.45, 0.6);
+  const width = modules.length > 2 ? 0.146 : 0.086;
+  t.box(group, zinc, width - 0.006, 0.08, 0.038, 0, 0, 0.019);
+  t.box(group, zinc, width, 0.086, 0.002, 0, 0, 0.039);
+  // The pressed rim and dark grid yoke are visible around the modules.
+  t.box(
+    group,
+    t.paint('#737a77', 0.55, 0.35),
+    width - 0.01,
+    0.066,
+    0.001,
+    0,
+    0,
+    0.0405,
+  );
+  for (const x of [-0.06015, 0.06015])
+    if (width > 0.1) {
+      t.cyl(
+        group,
+        t.paint('#d5d6d0', 0.3, 0.75),
+        0.003,
+        0.002,
+        x,
+        0,
+        0.041,
+        'z',
+        10,
+      );
+      t.box(group, t.paint('#666a68'), 0.003, 0.0005, 0.0005, x, 0, 0.0425);
+    }
+  const white = t.paint(PLATE_WHITE, 0.35);
+  const switches = modules.map((module, i) => {
+    const x = (i - (modules.length - 1) / 2) * 0.026;
+    t.box(group, white, 0.022, 0.05, 0.003, x, 0.004, 0.041);
+    t.label(
+      group,
+      module.legend,
+      x,
+      -0.034,
+      0.0405,
+      0.0034,
+      '#111111',
+      '#f4f3ee',
+    );
+    const pivot = new Group();
+    pivot.position.set(x, 0.004, 0.043);
+    pivot.userData.live = true;
+    group.add(pivot);
+    if (module.key) {
+      // The barrel stays put; only the key in it turns.
+      t.cyl(
+        group,
+        t.paint('#c9c4ae', 0.3, 0.8),
+        0.006,
+        0.003,
+        x,
+        0.004,
+        0.044,
+        'z',
+      );
+      const bow = t.box(
+        pivot,
+        t.paint('#c5c7c8', 0.25, 0.9),
+        0.0025,
+        0.016,
+        0.016,
+        0,
+        0,
+        0.01,
+      );
+      return {
+        mesh: bow,
+        set(on: boolean) {
+          pivot.rotation.z = on ? -Math.PI / 2 : 0;
+        },
+      };
+    }
+    const mesh = t.box(pivot, t.paint('#ecebe4', 0.3), 0.018, 0.04, 0.006);
+    mesh.position.z = 0.002;
+    return {
+      mesh,
+      set(on: boolean) {
+        pivot.rotation.x = on ? -0.14 : 0.14;
+      },
+    };
+  });
+  if (title) t.label(group, title, 0, 0.037, 0.0405, 0.0034);
+  return { group, switches };
+}
+
+/**
+ * A high-bay presence detector, after CP Electronics' EBDHS-PRM in its
+ * surface box: a white box 76 mm across and 65 mm deep, an 88 mm flange
+ * under it and a faceted white dome 49 mm deep below that, with a small
+ * red LED (licence: a walk-test LED that blinks when it sees someone). It
+ * hangs from y = 0, facing down. A placeholder.
+ */
+export function createPresenceDetector(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  const white = t.paint(PLATE_WHITE, 0.45);
+  t.box(group, white, 0.076, 0.065, 0.076, 0, -0.0325, 0);
+  t.cyl(group, white, 0.044, 0.004, 0, -0.067, 0, 'y', 24);
+  const dome = new Mesh(
+    new SphereGeometry(0.035, 16, 7, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
+    t.paint('#f1f0ea', 0.3),
+  );
+  dome.scale.y = 49 / 35;
+  dome.rotation.y = Math.PI / 16;
+  dome.position.y = -0.069;
+  group.add(dome);
+  const led = t.led(group, '#ff2a1a', 0.002, 0.03, -0.0695, 0, 'y');
+  return { group, set: led.set };
+}
+
+/**
+ * A round outdoor bulkhead light, a placeholder after a common 280 mm IP65
+ * LED bulkhead: a grey base and an opal polycarbonate diffuser behind a
+ * cast guard, cool white when lit. Its back at z = 0, facing +z.
+ */
+export function createBulkheadLight(kit: PanelKit) {
+  const t = tools(kit);
+  const group = new Group();
+  t.cyl(group, t.paint('#4d5356', 0.5), 0.14, 0.04, 0, 0, 0.02, 'z', 28);
+  const diffuser = kitGlow(kit, '#eef3ff');
+  t.cyl(group, diffuser, 0.115, 0.05, 0, 0, 0.065, 'z', 28);
+  const guard = t.paint('#3a3f41', 0.5);
+  for (const angle of [0, Math.PI / 2])
+    t.box(group, guard, 0.24, 0.015, 0.012, 0, 0, 0.094).rotation.z = angle;
+  const off = new Color('#9ea4a8');
+  const on = new Color('#eef3ff');
+  diffuser.color.copy(on);
+  return {
+    group,
+    set(lit: boolean) {
+      diffuser.color.copy(lit ? on : off);
+    },
+  };
+}
+
 /** A rotary dimmer on a plate: `set` its level, 0 to 10. */
 export function createDimmerPlate(kit: PanelKit) {
   const t = tools(kit);
@@ -338,12 +493,13 @@ export function createDistributionBoard(kit: PanelKit, circuits: string[]) {
   const handle = (x: number, y: number, red = false) => {
     const pivot = new Group();
     pivot.position.set(x, y, 0.075);
+    pivot.userData.live = true;
     inside.add(pivot);
     t.box(
       pivot,
       t.paint('#e8e6db', 0.6),
       red ? 0.07 : 0.018,
-      0.072,
+      red ? 0.072 : 0.083,
       0.022,
       0,
       0,
@@ -359,28 +515,50 @@ export function createDistributionBoard(kit: PanelKit, circuits: string[]) {
       0,
       0.033,
     );
+    let window: ReturnType<typeof t.paint> | undefined;
+    if (!red) {
+      // Contact-position window and the recessed test key of an RCBO.
+      window = t.paint('#34664a');
+      const flag = t.box(pivot, window, 0.009, 0.006, 0.001, 0, 0.029, 0.023);
+      flag.userData.live = true;
+    }
     return {
       lever,
       set(on: boolean) {
         lever.position.y = on ? 0.014 : -0.014;
+        window?.color.set(on ? '#b93a31' : '#34664a');
       },
     };
   };
   const main = handle(-0.145, -0.13, true);
   t.label(inside, 'MAIN 125 A', -0.145, -0.19, 0.105, 0.004);
   const breakers = circuits.map((name, i) => {
-    const x = -0.12 + (i % 6) * 0.044;
-    const y = 0.12 - Math.floor(i / 6) * 0.13;
+    const x = -0.078 + (i % 12) * 0.0175;
+    const y = 0.12 - Math.floor(i / 12) * 0.13;
     const breaker = handle(x, y);
-    t.label(inside, name, x, y - 0.055, 0.105, 0.0024);
+    t.label(inside, name, x, y - 0.054, 0.105, 0.002);
     t.label(
       inside,
       ['B6', 'B32', 'B16', 'B6'][i % 4],
       x,
-      y + 0.025,
-      0.122,
-      0.002,
+      y + 0.019,
+      0.099,
+      0.0018,
     );
+    if (i === 0) {
+      t.cyl(
+        inside,
+        t.paint('#ededdf'),
+        0.003,
+        0.002,
+        x,
+        y - 0.029,
+        0.101,
+        'z',
+        12,
+      );
+      t.label(inside, 'T', x, y - 0.036, 0.102, 0.002);
+    }
     return breaker;
   });
   for (const y of [-0.02, 0.205])

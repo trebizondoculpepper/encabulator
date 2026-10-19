@@ -28,6 +28,7 @@ export const FIRE_KINDS: readonly ArchitecturalKind[] = [
   'water',
   'co2',
   'emergency',
+  'bulkhead',
   'exit',
   'pipe',
 ];
@@ -36,7 +37,11 @@ export const FIRE_KINDS: readonly ArchitecturalKind[] = [
  * Lighting belongs with the building fittings too: the emergency light and
  * exit sign are shown in dev18 as well as dev8.
  */
-export const SHARED_KINDS: readonly ArchitecturalKind[] = ['emergency', 'exit'];
+export const SHARED_KINDS: readonly ArchitecturalKind[] = [
+  'emergency',
+  'bulkhead',
+  'exit',
+];
 
 /**
  * A place for a specimen: on a wall (its centre line at x, z), facing
@@ -49,6 +54,8 @@ export interface SpecimenPlace {
   facing: number;
   y: number;
   tall?: boolean;
+  /** Its board's width, metres, if not the usual 2.6. */
+  width?: number;
 }
 
 /** Each specimen's board, metres, and how far it stands off the wall line. */
@@ -141,15 +148,16 @@ export function showSpecimens(
     );
     board.add(part.object);
     const top = standing ? height - place.y : BOARD.h / 2;
+    const width = place.width ?? BOARD.w;
     if (!standing)
-      board.add(new Mesh(new BoxGeometry(BOARD.w, BOARD.h, 0.035), backing));
+      board.add(new Mesh(new BoxGeometry(width, BOARD.h, 0.035), backing));
     fittingCaption(
       kit,
       board,
       kind,
       0,
       standing ? top + 0.2 : -BOARD.h / 2 - 0.1,
-      BOARD.w,
+      width,
     );
     const number = createMicroLabel(kit, String(i + 1), {
       height: 0.1,
@@ -157,7 +165,7 @@ export function showSpecimens(
       plate: '#141414',
     });
     number.position.set(
-      -BOARD.w / 2 + 0.1,
+      -width / 2 + 0.1,
       standing ? top + 0.2 : BOARD.h / 2 - 0.08,
       0.025,
     );

@@ -110,8 +110,12 @@ const openRoom = async () => {
   else if (room === 'dev8')
     start = (await import('./toolkit/gallery/rooms/fittings-room'))
       .startFittingsRoom;
-  else if (room === 'dev7')
-    start = (await import('./rendering/corridor-room')).startCorridorRoom;
+  else if (room === 'dev_courtyard')
+    start = (await import('./rendering/dev-courtyard-room'))
+      .startDevCourtyardRoom;
+  else if (room === 'dev_corridor')
+    start = (await import('./rendering/dev-corridor-room'))
+      .startDevCorridorRoom;
   else if (room === 'dev3')
     start = (await import('./toolkit/gallery/rooms/racks-room')).startRacksRoom;
   else if (room === 'dev2')

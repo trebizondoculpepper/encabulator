@@ -6,7 +6,9 @@ import {
   Mesh,
   PerspectiveCamera,
   PlaneGeometry,
-  PointLight,
+  CanvasTexture,
+  MeshBasicMaterial,
+  SRGBColorSpace,
   Raycaster,
   Scene,
   Vector2,
@@ -19,6 +21,7 @@ import type { ArchitecturalKind } from '../../components/architectural/logic/arc
 import { createArchitecturalServices } from '../../components/architectural/logic/warehouse-services';
 import {
   HVAC_MODES,
+  ZONES,
   createBuildingServices,
 } from '../../components/architectural/logic/building-services';
 import { METRE } from '../../components/core/logic/units';
@@ -64,6 +67,24 @@ import {
 } from './catalogue-specimens';
 import type { SpecimenPlace } from './catalogue-specimens';
 import { createFirstPerson } from '../../controls/input/first-person';
+import {
+  BS5266,
+  checkEmergencyLighting,
+  illuminance,
+} from '../../components/general-safety/logic/emergency-lighting';
+import { SUPPLY_CONDITIONS } from '../../components/architectural/logic/supply-quality';
+import type { SupplyCondition } from '../../components/architectural/logic/supply-quality';
+import {
+  GALLERY_CEILING,
+  GALLERY_EMERGENCY,
+  GALLERY_EMPHASIS,
+  GALLERY_DETECTORS,
+  GALLERY_FLOOR,
+  GALLERY_LUMINAIRES,
+  GALLERY_SWITCH_BANKS,
+} from '../logic/fittings-gallery-lighting';
+import { pushButton, selector } from '../../components/core/parts/parts';
+import { detects } from '../../components/architectural/logic/presence-detector';
 import { createPartSet } from '../../components/core/parts/parts';
 import type { Part } from '../../components/core/parts/parts';
 import { ps1Uniforms } from '../../components/core/parts/ps1-material';
@@ -72,8 +93,11 @@ import {
   useEnvironment,
 } from '../../components/core/parts/render-style';
 
-const FLOOR = { minX: -12, maxX: 12, minZ: -9, maxZ: 9 };
-const CEILING = 7;
+const FLOOR = GALLERY_FLOOR;
+const CEILING = GALLERY_CEILING;
+/** A luminaire's and an emergency light's intensity as drawn, candela. */
+const LUMINAIRE_CANDELA = 10;
+const EMERGENCY_CANDELA = 10;
 /** The full-size doors, along the north wall, and where. */
 const DOORS: { kind: ArchitecturalKind; x: number }[] = [
   { kind: 'escapedoor', x: -7.5 },
@@ -82,12 +106,13 @@ const DOORS: { kind: ArchitecturalKind; x: number }[] = [
 ];
 const WALL = 0.15;
 /**
- * The catalogue specimens' places: two rows along the south wall, left to
- * right as seen, and a tall fitting either side of the doors.
+ * The catalogue specimens' places: two rows at eye level along the south
+ * wall, left to right as seen, then a row above them, and a tall fitting
+ * either side of the doors.
  */
 const PLACES: SpecimenPlace[] = [
   { x: -10.5, z: FLOOR.minZ, facing: 0, y: 1.5, tall: true },
-  ...[2.3, 1.15].flatMap((y) =>
+  ...[2.3, 1.15, 3.45].flatMap((y) =>
     [9, 6, 3, 0, -3, -6, -9].map((x) => ({
       x,
       z: FLOOR.maxZ,
@@ -130,8 +155,12 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   const freeEnvironment = useEnvironment(renderer, scene, 0.4);
   renderer.setClearColor('#0b0c0d');
   const camera = new PerspectiveCamera(62, 1, 0.05, 80 * m);
-  scene.add(new AmbientLight('#e8e6e0', 0.75));
-  scene.add(new HemisphereLight('#f2f1ec', '#3a3a36', 0.8));
+  // The room has no windows: what light there is is its own, and the
+  // light bounced about the room is in proportion to it.
+  const environment = scene.environmentIntensity;
+  const ambient = new AmbientLight('#e8e6e0', 0.75);
+  const sky = new HemisphereLight('#f2f1ec', '#3a3a36', 0.8);
+  scene.add(ambient, sky);
   const kit = createPanelKit();
   const room = new Group();
   room.scale.setScalar(m);
@@ -147,12 +176,6 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.y = CEILING;
   room.add(ceiling);
-  for (const x of [-8, 0, 8])
-    for (const z of [-4.5, 4.5]) {
-      const lamp = new PointLight('#fff6ea', 14, 14 * m);
-      lamp.position.set(x * m, (CEILING - 0.25) * m, z * m);
-      scene.add(lamp);
-    }
   const bounds: Footprint = {
     minX: FLOOR.minX * m,
     maxX: FLOOR.maxX * m,
@@ -182,7 +205,11 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   room.add(sign);
 
   // ---- The catalogue's fittings --------------------------------------------
-  const services = createArchitecturalServices();
+  // One building-services model for the catalogue's fittings and the
+  // office's working ones, so they share one supply and one lighting
+  // circuit.
+  const model = createBuildingServices();
+  const services = createArchitecturalServices(model);
   const parts = createPartSet();
   // The doors, full size, standing in the north wall.
   const north = new Group();
@@ -197,7 +224,7 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
       north,
       kind,
       x,
-      kind === 'loadingdoor' ? 5.6 : 2.5,
+      kind === 'loadingdoor' ? 5.6 : 3.1,
       kind === 'loadingdoor' ? 4 : 1.8,
     );
   }
@@ -208,7 +235,6 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   // building-services model: lighting, the accessible WC and an intercom
   // on the east wall; power and climate on the west. (The door released
   // in a fire stays in dev8, with the fire system.)
-  const model = createBuildingServices();
   const L = model.lighting;
   const P = model.power;
   const C = model.climate;
@@ -370,6 +396,118 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
   );
   onWall(createCaption(kit, 'WINDOW VENT AND BLINDS'), 'west', -3.6, 0.8);
 
+  // ---- The room's lighting --------------------------------------------------
+  // Lit as a large space is: three zones, a column of battens each (1 west,
+  // 2 middle, 3 east), each a circuit of its own on the board, switched
+  // two-way from a bank by each exit and by a presence detector over it;
+  // emergency downlights and a bulkhead over each way out, fed from their
+  // zone's circuit; an exit sign over the escape door. Every fitting is the
+  // catalogue's own part (`architecturalPart`), as the warehouse installs
+  // it. The layout is a plan (`fittings-gallery-lighting.ts`), checked
+  // against BS 5266-1 by its test.
+  const zoneOf = (x: number) => (x < -4 ? 1 : x > 4 ? 3 : 2);
+  const install = (
+    kind: ArchitecturalKind,
+    x: number,
+    y: number,
+    z: number,
+    options: Parameters<typeof architecturalPart>[3] = {},
+  ) => {
+    const part = parts.add(architecturalPart(kit, kind, services, options));
+    part.object.position.set(x, y, z);
+    room.add(part.object);
+    return part;
+  };
+  const rodPaint = kitPaint(kit, '#9aa1a0', 0.4);
+  const lamps = GALLERY_LUMINAIRES.map(({ x, y, z }) => {
+    const part = install('luminaire', x, y, z, {
+      zone: zoneOf(x),
+      light: { candela: LUMINAIRE_CANDELA, range: 18, metre: m },
+    }) as ReturnType<typeof architecturalPart> & {
+      output: () => number;
+      age: (tube: number, age: number) => void;
+    };
+    for (const end of [-0.6, 0.6]) {
+      const rod = new Mesh(new BoxGeometry(0.01, CEILING - y, 0.01), rodPaint);
+      rod.position.set(x + end, (CEILING + y) / 2, z);
+      room.add(rod);
+    }
+    return part;
+  });
+  for (const f of GALLERY_EMERGENCY) {
+    if (f.kind === 'downlight') {
+      install('emergency', f.x, CEILING, f.z, {
+        zone: zoneOf(f.x),
+        beam: { candela: EMERGENCY_CANDELA, angle: 1.2, range: 14, metre: m },
+      });
+      continue;
+    }
+    const north = f.wall === 'north';
+    const part = install(
+      'bulkhead',
+      f.x,
+      f.height,
+      north ? FLOOR.minZ + WALL : FLOOR.maxZ - WALL,
+      {
+        zone: zoneOf(f.x),
+        beam: { candela: EMERGENCY_CANDELA, angle: 1.1, range: 9, metre: m },
+      },
+    );
+    part.object.rotation.y = north ? 0 : Math.PI;
+  }
+  install('exit', -7.5, 2.4, FLOOR.minZ + WALL + 0.01);
+  // A switch bank beside each exit door, on its latch side.
+  GALLERY_SWITCH_BANKS.forEach(({ x }, index) => {
+    install('gridswitch', x, 1.2, FLOOR.minZ + WALL, { index });
+    const caption = createCaption(kit, 'ZONE 1 WEST · 2 MIDDLE · 3 EAST');
+    caption.position.set(x, 1.04, FLOOR.minZ + WALL + 0.004);
+    room.add(caption);
+  });
+  for (const d of GALLERY_DETECTORS)
+    install('presence', d.x, CEILING, d.z, { zone: zoneOf(d.x) });
+  // In this room the detectors are set to a minute, to see them work.
+  L.detectorTimeout.set(60);
+  // The supply, as a machine on it would pull it about, and a fault on
+  // each zone's circuit: test controls on a plate by the board.
+  const testPlate = new Mesh(
+    new BoxGeometry(0.5, 0.26, 0.02),
+    kitPaint(kit, '#c9ccc8', 0.5),
+  );
+  onWall(testPlate, 'west', 9.1, 1.45);
+  fit(
+    selector(kit, {
+      name: 'supply test selector',
+      legend: 'SUPPLY',
+      positions: 3,
+      bound: P.supplyCondition,
+    }),
+    'west',
+    9.27,
+    1.47,
+  );
+  onWall(createCaption(kit, 'NORMAL · BROWNOUT · SEVERE'), 'west', 9.27, 1.36);
+  for (const n of ZONES)
+    fit(
+      pushButton(kit, {
+        name: `zone ${n} fault push button`,
+        legend: `ZONE ${n} FAULT`,
+        colour: 'red',
+        head: 'flush',
+        action: () => P.tripZone(n),
+      }),
+      'west',
+      9.17 - n * 0.075,
+      1.47,
+    );
+  onWall(createCaption(kit, 'SUPPLY TEST'), 'west', 9.1, 1.62);
+
+  // A development overlay: the emergency lighting's lux on the floor, red
+  // under 0.5 (BS 5266's open area), amber under 1 (an escape route),
+  // green above.
+  const luxMap = createLuxMap();
+  luxMap.visible = false;
+  room.add(luxMap);
+
   // ---- Walking --------------------------------------------------------------
   const portals = createPortals('dev18', devPortals('dev18', bounds, m), 0, m);
   scene.add(portals.group);
@@ -433,32 +571,78 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
     },
     model,
     fittings: () => numbered.map((k, i) => `${i + 1}. ${k}`),
+    /**
+     * Fit batten `n` (1 to 6, west to east, north first) with a tube of
+     * another age (0 new to 1 dead; from 0.92 a dud that never catches).
+     */
+    age(n: number, age: number, tube = 0) {
+      lamps[n - 1]?.age(tube, age);
+    },
+    /** Each luminaire's light, 0 to 1. */
+    outputs: () => lamps.map((l) => Number(l.output().toFixed(2))),
+    /** The emergency lighting on the floor at (x, z), lux, on battery. */
+    lux: (x: number, z: number) => illuminance(GALLERY_EMERGENCY, x, z),
+    /** The emergency lighting against BS 5266-1. */
+    check: () =>
+      checkEmergencyLighting(GALLERY_EMERGENCY, FLOOR, GALLERY_EMPHASIS),
+    /** Show the emergency lighting's lux on the floor, or hide it. */
+    luxMap(on = true) {
+      luxMap.visible = on;
+    },
+    /**
+     * Run `seconds` of frames at once (where the browser is not drawing,
+     * as in a hidden tab) and give the last as a PNG data URL.
+     */
+    shot(seconds = 0, width = 1280, height = 720) {
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      let time = last || 1000;
+      for (let t = 0; t <= seconds; t += 1 / 30) frame((time += 1000 / 30));
+      return canvas.toDataURL('image/png');
+    },
+    /** Set the supply: normal, brownout or severe. */
+    supply(condition: SupplyCondition) {
+      P.supplyCondition.set(Math.max(0, SUPPLY_CONDITIONS.indexOf(condition)));
+    },
   };
 
   // ---- Each frame -------------------------------------------------------------
   let last = 0;
   let seen = { x: NaN, z: NaN, yaw: NaN };
-  renderer.setAnimationLoop((time) => {
-    if (canvas.parentElement?.hidden) {
-      last = 0;
-      return;
-    }
-    const delta = last ? Math.min(0.1, (time - last) / 1000) : 0;
+  const frame = (time: number) => {
+    // Never backwards: `shot` runs frames on a clock of its own.
+    const delta = last ? Math.min(0.1, Math.max(0, (time - last) / 1000)) : 0;
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
-    services.model.tick(delta);
     // The occupancy sensor sees anyone who moves or turns.
     const { x, z, yaw } = walk.walker;
     if (x !== seen.x || z !== seen.z || yaw !== seen.yaw) {
       L.motion();
       seen = { x, z, yaw };
+      // The presence detectors see anyone who moves under them.
+      for (const d of GALLERY_DETECTORS)
+        if (detects(d, x / m, z / m)) L.seen(zoneOf(d.x));
     }
     model.tick(delta);
     parts.update(delta);
+    // The light bounced about the room follows the room's own.
+    const lit = lamps.reduce((sum, l) => sum + l.output(), 0) / lamps.length;
+    const battery = L.emergencyLit.value ? 1 : 0;
+    ambient.intensity = 0.02 + 0.73 * lit + 0.1 * battery;
+    sky.intensity = 0.02 + 0.78 * lit + 0.08 * battery;
+    scene.environmentIntensity = environment * (0.08 + 0.92 * lit);
     portals.update(delta, walk.walker.x, walk.walker.z);
     partAudio.listen(camera, m);
     renderer.render(scene, camera);
+  };
+  renderer.setAnimationLoop((time) => {
+    if (canvas.parentElement?.hidden) {
+      last = 0;
+      return;
+    }
+    frame(time);
   });
   const dispose = () => {
     renderer.setAnimationLoop(null);
@@ -484,4 +668,48 @@ export function startArchitecturalGalleryRoom(canvas: HTMLCanvasElement) {
       if (pose) walk.place(pose.x, pose.z, pose.yaw, pose.pitch);
     },
   });
+}
+
+/** The emergency lighting's lux on the floor, painted, for development. */
+function createLuxMap() {
+  const W = FLOOR.maxX - FLOOR.minX;
+  const D = FLOOR.maxZ - FLOOR.minZ;
+  const per = 8;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * per;
+  canvas.height = D * per;
+  const c = canvas.getContext('2d')!;
+  for (let i = 0; i < canvas.width; i++)
+    for (let k = 0; k < canvas.height; k++) {
+      const x = FLOOR.minX + (i + 0.5) / per;
+      const z = FLOOR.minZ + (k + 0.5) / per;
+      const lux = illuminance(GALLERY_EMERGENCY, x, z);
+      const shade = Math.min(1, 0.35 + lux / 4);
+      const [r, g, b] =
+        lux < BS5266.openArea
+          ? [220, 40, 30]
+          : lux < BS5266.escapeRoute
+            ? [235, 160, 30]
+            : [50, 190, 80];
+      c.fillStyle = `rgb(${r * shade},${g * shade},${b * shade})`;
+      c.fillRect(i, k, 1, 1);
+    }
+  c.fillStyle = '#ffffff';
+  c.font = `${per * 0.5}px sans-serif`;
+  for (let x = FLOOR.minX + 1; x < FLOOR.maxX; x += 2)
+    for (let z = FLOOR.minZ + 1; z < FLOOR.maxZ; z += 2)
+      c.fillText(
+        illuminance(GALLERY_EMERGENCY, x, z).toFixed(1),
+        (x - FLOOR.minX) * per - per * 0.4,
+        (z - FLOOR.minZ) * per + per * 0.2,
+      );
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  const map = new Mesh(
+    new PlaneGeometry(W, D),
+    new MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.85 }),
+  );
+  map.rotation.x = -Math.PI / 2;
+  map.position.y = 0.01;
+  return map;
 }

@@ -39,7 +39,11 @@ import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
 import { createDetailCuller } from './detail-culling';
-import { createLevel0Scene, cullLevel0Detail } from './level0-scene';
+import {
+  LEVEL0_ENVIRONMENT,
+  createLevel0Scene,
+  cullLevel0Detail,
+} from './level0-scene';
 import { createLevel0Strangeness } from './level0-strangeness';
 import { simulatorFootprint } from './scenario-simulator';
 
@@ -58,6 +62,9 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     symptoms,
     room,
     lighting,
+    presence,
+    building,
+    supply,
     machineSides,
     workstation,
     stopDiagnosticLink,
@@ -68,7 +75,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     detail,
   } = createLevel0Scene(kit, m);
   const renderer = createRenderer(canvas);
-  const freeEnvironment = useEnvironment(renderer, scene, 0.3);
+  const freeEnvironment = useEnvironment(renderer, scene, LEVEL0_ENVIRONMENT);
   renderer.setClearColor('#cbd3d6');
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
@@ -297,6 +304,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     last = time;
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
+    presence(delta, walk.walker.x / m, walk.walker.z / m);
     room.parts.update(delta);
     lighting.update();
     workstation.parts.update(delta);
@@ -367,6 +375,27 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     view: (x: number, z: number, yaw = 0, pitch = 0) =>
       walk.place(x * m, z * m, yaw, pitch),
     conjureSkip,
+    /** The building's services: its lighting zones, supply and emergency lighting. */
+    building: building.model,
+    /** The view now, as a PNG data URL `width` × `height` (development). */
+    shot(width = 1280, height = 720) {
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+      const url = canvas.toDataURL('image/png');
+      resize();
+      return url;
+    },
+    /** The building's supply under the machine's load (development). */
+    supply: () => ({
+      volts: building.model.power.supplyVolts.value,
+      amps: machine.plant.loadAmps.value,
+      overFor: supply.over,
+      brownout: supply.brownout,
+    }),
+    /** Each batten's light, 0 to 1. */
+    lights: () => room.lights.map((l) => Number(l.output().toFixed(2))),
     /** The scenario simulator's actions (development only). */
     scenarios,
     simulator,

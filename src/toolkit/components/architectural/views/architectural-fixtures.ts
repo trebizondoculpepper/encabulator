@@ -8,7 +8,8 @@ import {
   LineCurve3,
   Vector3,
 } from 'three';
-import type { Material, Object3D } from 'three';
+import { Color } from 'three';
+import type { Material, MeshBasicMaterial, Object3D } from 'three';
 import type { PanelKit } from '../../core/views/eighties-controls';
 import {
   createMicroLabel,
@@ -16,6 +17,9 @@ import {
   kitPaint,
 } from '../../core/views/eighties-controls';
 import type { ArchitecturalKind } from '../logic/architectural-fittings';
+
+/** A lit luminaire lens's colour at full brightness. */
+const LENS = new Color();
 
 /** Catalogue-sized passive building fittings, shared by installed rooms and galleries. */
 export function createArchitecturalFixture(
@@ -60,7 +64,7 @@ export function createArchitecturalFixture(
     group.add(mark);
   };
   let lens: Mesh | undefined;
-  let lensOn: Material | undefined;
+  let lensOn: MeshBasicMaterial | undefined;
   let lensOff: Material | undefined;
   if (kind === 'cableprotector') {
     group.add(
@@ -91,6 +95,7 @@ export function createArchitecturalFixture(
   } else if (kind === 'luminaire') {
     box(group, pale, 1.6, 0.09, 0.09);
     lensOn = kitGlow(kit, '#edf1e5');
+    LENS.copy(lensOn.color);
     lensOff = kitPaint(kit, '#b7bdb2');
     lens = box(group, lensOn, 1.55, 0.025, 0.08, 0, -0.05, 0);
     // Lit by changing its paint: not merged with the still parts.
@@ -171,7 +176,7 @@ export function createArchitecturalFixture(
     return {
       group,
       actuator: wheel,
-      set(on: boolean) {
+      set(on: boolean | number) {
         wheel.rotation.z = on ? Math.PI / 2 : 0;
       },
     };
@@ -179,8 +184,12 @@ export function createArchitecturalFixture(
   return {
     group,
     actuator: undefined,
-    set(on: boolean) {
-      if (lens) lens.material = on ? lensOn! : lensOff!;
+    /** Lit or not, or how brightly, 0 to 1 (a luminaire's lens). */
+    set(on: boolean | number) {
+      if (!lens) return;
+      const level = typeof on === 'number' ? on : on ? 1 : 0;
+      lens.material = level > 0 ? lensOn! : lensOff!;
+      if (level > 0) lensOn!.color.copy(LENS).multiplyScalar(0.2 + 0.8 * level);
     },
   };
 }

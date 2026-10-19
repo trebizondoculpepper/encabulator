@@ -111,44 +111,61 @@ describe('architectural fittings', () => {
     room.parts.dispose();
     disposeKit(kit, room.group);
   }, 60_000);
-  it('connects both warehouse switches to the lamps while preserving daylight and emergency supply', () => {
+  it('switches the warehouse by zone, two-way from a bank at each exit, preserving daylight and emergency supply', () => {
     const kit = createPanelKit();
     const services = createArchitecturalServices();
     const room = createWarehouseTrainingRoom(kit, false, {
       lighting: services,
     });
     const scene = new Scene();
+    const L = services.model.lighting;
     const lighting = addWarehouseLighting(scene, room.lights, 1, {
       daylight: 0.5,
-      circuit: services.model.lighting.roomLight,
+      zones: L.zoneLight,
     });
     const lamps = scene.children.filter(
       (o): o is PointLight => o instanceof PointLight,
     );
     const daylight = scene.children.find((o) => o instanceof DirectionalLight)!;
     expect(lamps).toHaveLength(12);
-    expect(lamps.every((o) => o.visible)).toBe(true);
-    expect(daylight.intensity).toBeCloseTo(0.65);
-    const switches = room.fittings.filter(
-      (o) => o.userData.architectural?.kind === 'switch',
-    );
-    expect(switches).toHaveLength(2);
-    for (const [index, control] of switches.entries()) {
-      const use = [...room.parts.uses].find(([object]) =>
-        control.getObjectById(object.id),
-      );
-      expect(use).toBeDefined();
-      use![1]();
-      room.parts.update(0);
+    // The battens come to life, each in its own time; never hidden.
+    const settle = () => {
+      for (let t = 0; t < 15; t += 0.1) room.parts.update(0.1);
       lighting.update();
-      expect(lamps.every((o) => o.visible === (index === 1))).toBe(true);
-      expect(services.model.lighting.emergencyLit.value).toBe(false);
+    };
+    const on = (o: PointLight) => o.visible && o.intensity > 0;
+    settle();
+    expect(lamps.every(on)).toBe(true);
+    expect(daylight.intensity).toBeCloseTo(0.65);
+    // Three zones of four, a detector over each.
+    expect(room.lights.map((l) => l.zone).sort((a, b) => a - b)).toEqual([
+      1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3,
+    ]);
+    expect(room.detectors.map((d) => d.zone)).toEqual([1, 2, 3]);
+    const banks = room.fittings.filter(
+      (o) => o.userData.architectural?.kind === 'gridswitch',
+    );
+    expect(banks).toHaveLength(2);
+    // Zone 1's rocker on each bank, in turn: off from one end, on from the other.
+    const zone1 = lamps.filter((_, i) => room.lights[i].zone === 1);
+    const others = lamps.filter((_, i) => room.lights[i].zone !== 1);
+    for (const [index, bank] of banks.entries()) {
+      const rockers = [...room.parts.uses].filter(([object]) =>
+        bank.getObjectById(object.id),
+      );
+      expect(rockers.length).toBeGreaterThanOrEqual(3);
+      rockers[0][1]();
+      settle();
+      expect(zone1.every((o) => on(o) === (index === 1))).toBe(true);
+      expect(others.every(on)).toBe(true);
+      expect(lamps.every((o) => o.visible)).toBe(true);
+      expect(L.emergencyLit.value).toBe(false);
       expect(daylight.intensity).toBeCloseTo(0.65);
     }
-    services.model.power.lightingBreaker.set(false);
-    lighting.update();
-    expect(lamps.every((o) => !o.visible)).toBe(true);
-    expect(services.model.lighting.emergencyLit.value).toBe(true);
+    services.model.power.tripLighting();
+    settle();
+    expect(lamps.some(on)).toBe(false);
+    expect(L.emergencyLit.value).toBe(true);
     room.parts.dispose();
     disposeKit(kit, room.group);
   });

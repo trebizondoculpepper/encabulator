@@ -99,6 +99,12 @@ const GROUPS: readonly {
       },
       { legend: 'GLITCH', cap: 'yellow', led: 'red', act: 'glitch' },
       { legend: 'KAPUT', cap: 'red', led: 'amber', act: 'kaput' },
+      {
+        legend: 'LIGHTING\nFAULT',
+        cap: 'yellow',
+        led: 'amber',
+        act: 'lightingFault',
+      },
     ],
   },
   {
@@ -114,6 +120,7 @@ const GROUPS: readonly {
       },
       { legend: 'HICCUP', cap: 'yellow', led: 'amber', act: 'hiccup' },
       { legend: 'SPRINKLER', cap: 'blue', led: 'blue', act: 'rain' },
+      { legend: 'BROWNOUT', cap: 'yellow', led: 'amber', act: 'brownout' },
     ],
   },
 ];

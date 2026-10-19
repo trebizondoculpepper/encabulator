@@ -1,4 +1,4 @@
-import { Scene } from 'three';
+import { Scene, Vector3 } from 'three';
 import type { Mesh } from 'three';
 import { computed, effect, signal } from '@preact/signals-core';
 import type { createDetailCuller } from './detail-culling';
@@ -27,6 +27,8 @@ import { createLevel0Scenarios } from './level0-scenarios';
 import { createScenarioSimulator } from './scenario-simulator';
 import { addMachineWorkstation } from './machine-workstation';
 import { addWarehouseLighting } from './warehouse-lighting';
+import { createBuildingSupply } from '../game/building-supply';
+import { detects } from '../toolkit/components/architectural/logic/presence-detector';
 
 /**
  * How small merged detail may look before it is not drawn: its radius over
@@ -36,6 +38,16 @@ import { addWarehouseLighting } from './warehouse-lighting';
  * what a door is recognised by from where the player starts: meters,
  * gauges, bezels (compared against `?merge=off`, the owner's eye the judge).
  */
+/** How much daylight comes through Level 0's skylights: a dark day. */
+export const LEVEL0_DAYLIGHT = 0.2;
+/** Level 0's environment light with every light lit (`useEnvironment`). */
+export const LEVEL0_ENVIRONMENT = 0.3;
+/** A fire this big (0 to 1) has taken hold of the machine's wiring. */
+const CATASTROPHIC_FIRE = 0.3;
+/** How long the simulator's BROWNOUT symptom lasts, seconds. */
+export const LEVEL0_BROWNOUT_SECONDS = 45;
+/** Seconds a lighting zone stays on after its detector last saw anyone. */
+export const LEVEL0_DETECTOR_TIMEOUT = 120;
 export const LEVEL0_DETAIL = 0.003;
 /**
  * The same for a control's own meshes (`userData.control`): a door is
@@ -65,6 +77,8 @@ export function cullLevel0Detail(
 export function createLevel0Scene(kit: PanelKit, m: number) {
   const scene = new Scene();
   const building = createArchitecturalServices();
+  // The building's supply, which the machine's load pulls about.
+  const supply = createBuildingSupply();
   const diagnosticsAvailable = signal(false);
   const machine = createLevel0Machine(kit, { diagnosticsAvailable });
   // The building's fire alarm: the plant's fire system, heard from a
@@ -101,10 +115,20 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
   room.parts.add(voice);
   room.group.scale.setScalar(m);
   scene.add(room.group);
+  // A dark day: little comes in through the skylights, and the room is lit
+  // mostly by its own fluorescent battens, which come to life, flicker and
+  // fail with the building's supply, and by its emergency lighting.
   const lighting = addWarehouseLighting(scene, room.lights, m, {
-    daylight: 0.5,
-    circuit: building.model.lighting.roomLight,
+    daylight: LEVEL0_DAYLIGHT,
+    brightness: 1.2,
+    bounce: 0.35,
+    environment: LEVEL0_ENVIRONMENT,
+    zones: building.model.lighting.zoneLight,
+    emergency: building.model.lighting.zoneEmergencyVolts,
   });
+  // The presence detectors hold a zone on for two minutes after they last
+  // see the player, so the lights noticeably follow them about.
+  building.model.lighting.detectorTimeout.set(LEVEL0_DETECTOR_TIMEOUT);
   const { mcc } = machine;
   mcc.group.scale.setScalar(m);
   mcc.group.position.set(LEVEL0_MACHINE.x * m, 0, LEVEL0_MACHINE.z * m);
@@ -135,8 +159,22 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
   // bearings grinding, the seizure, the fire's smoke and soot, the water.
   const failures = createLevel0Failures(kit, machine);
   // The Hyperplasc Scenario Simulator: a rack of testing scenarios.
-  const scenarios = createLevel0Scenarios(machine, Math.random, symptoms, () =>
-    failures.clean(),
+  const scenarios = createLevel0Scenarios(
+    machine,
+    Math.random,
+    symptoms,
+    () => {
+      failures.clean();
+      // RESET puts the building's lighting right too.
+      supply.clear();
+      const power = building.model.power;
+      power.lightingBreaker.set(true);
+      for (const zone of power.zoneBreakers) zone.set(true);
+    },
+    {
+      fault: () => building.model.power.tripLighting(),
+      brownout: () => supply.brownoutFor(LEVEL0_BROWNOUT_SECONDS),
+    },
   );
   const simulator = createScenarioSimulator(kit, scenarios);
   simulator.group.scale.setScalar(m);
@@ -154,12 +192,51 @@ export function createLevel0Scene(kit: PanelKit, m: number) {
     ...workstation.batches,
     ...simulator.batches,
   ];
+  // The presence detectors over the lighting zones, where they hang, so
+  // each can be told whether it sees the player.
+  room.group.updateMatrixWorld(true);
+  const detectors = room.detectors.map(({ part, zone }) => {
+    const at = part.object.getWorldPosition(new Vector3());
+    return {
+      zone,
+      detector: { x: at.x / m, z: at.z / m, height: at.y / m },
+    };
+  });
+  let wasBroken = false;
+  let wasBurning = false;
+  /**
+   * Advance the building's services `delta` seconds, the player at (x, z),
+   * metres: the detectors over them see them.
+   */
+  const presence = (delta: number, x: number, z: number) => {
+    for (const { zone, detector } of detectors)
+      if (detects(detector, x, z)) building.model.lighting.seen(zone);
+    // The machine and the building share a supply: its load pulls the
+    // building's lights about (`building-supply.ts`).
+    // Its catastrophes (a breakdown, a fire taking hold) surge the lights
+    // and trip them; as it nears a breakdown, they turn strange.
+    const plant = machine.plant;
+    const broken = plant.brokenDown.value;
+    const burning = plant.fireSize.value > CATASTROPHIC_FIRE;
+    if ((broken && !wasBroken) || (burning && !wasBurning))
+      supply.catastrophe();
+    wasBroken = broken;
+    wasBurning = burning;
+    building.model.power.supplyFeed.set(
+      supply.step(delta, plant.loadAmps.value, broken ? 0 : plant.strain.value),
+    );
+    if (supply.trip()) building.model.power.tripLighting();
+    building.model.tick(delta);
+  };
   return {
     scene,
     machine,
     symptoms,
     room,
     lighting,
+    presence,
+    building,
+    supply,
     machineSides,
     workstation,
     stopDiagnosticLink,

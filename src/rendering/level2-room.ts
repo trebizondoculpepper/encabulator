@@ -1,3 +1,4 @@
+import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { createMachineSideCulling } from '../scene/machine-side-culling';
 import { narrativeDiagnostics } from '../game/bbc-machine-diagnostics';
 import { addMachineWorkstation } from './machine-workstation';
@@ -94,10 +95,13 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   const kit = createPanelKit();
-  const room = createWarehouseTrainingRoom(kit);
+  // One lighting model for the building's fittings, so its switch banks
+  // work its zones (its supply steady, its detectors never timing out).
+  const services = createArchitecturalServices();
+  const room = createWarehouseTrainingRoom(kit, false, { lighting: services });
   room.group.scale.setScalar(m);
   scene.add(room.group);
-  addWarehouseLighting(scene, room.lights, m);
+  const lighting = addWarehouseLighting(scene, room.lights, m);
   const bounds: Footprint = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -579,6 +583,7 @@ export function startLevel2Room(canvas: HTMLCanvasElement) {
     clock += delta;
     walk.update(delta);
     room.parts.update(delta);
+    lighting.update();
     workstation.parts.update(delta);
     tossing.update(delta);
     skipLamps?.update(time / 1000);

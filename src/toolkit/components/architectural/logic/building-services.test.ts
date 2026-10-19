@@ -3,6 +3,7 @@ import {
   DOOR_RELEASE_SECONDS,
   FAN_RUN_ON_SECONDS,
   INVESTIGATION_SECONDS,
+  SEVERE_TRIP_SECONDS,
   VACANCY_SECONDS,
   createBuildingServices,
 } from './building-services';
@@ -40,12 +41,98 @@ describe('dev8 building services', () => {
   it('light the emergency lights when the lighting circuit fails or is tested', () => {
     const b = createBuildingServices();
     expect(b.lighting.emergencyLit.value).toBe(false);
+    // The test key interrupts the emergency fittings' supply alone.
     b.lighting.emergencyTest.set(true);
     expect(b.lighting.emergencyLit.value).toBe(true);
-    expect(b.lighting.roomLight.value).toBe(0);
+    expect(b.lighting.roomLight.value).toBe(1);
     expect(b.lighting.exitSign.value).toBeGreaterThan(0);
     b.lighting.emergencyTest.set(false);
-    b.power.lightingBreaker.set(false);
+    expect(b.lighting.emergencyLit.value).toBe(false);
+    // A fault trips the lighting breaker: the room goes dark.
+    b.power.tripLighting();
+    expect(b.power.lightingBreaker.value).toBe(false);
+    expect(b.lighting.roomLight.value).toBe(0);
+    expect(b.lighting.lightingVolts.value).toBe(0);
+    expect(b.lighting.emergencyLit.value).toBe(true);
+  });
+
+  it('pass a brownout to the luminaires and the emergency lights, without tripping', () => {
+    const b = createBuildingServices();
+    b.power.supplyCondition.set(1);
+    let lowest = 1;
+    for (let i = 0; i < 6000; i++) {
+      b.tick(0.01);
+      lowest = Math.min(lowest, b.lighting.lightingVolts.value);
+      expect(b.lighting.emergencyVolts.value).toBe(
+        b.lighting.lightingVolts.value,
+      );
+    }
+    expect(lowest).toBeLessThan(0.7);
+    expect(b.power.lightingBreaker.value).toBe(true);
+    b.power.supplyCondition.set(0);
+    run(b, 1);
+    expect(b.lighting.lightingVolts.value).toBeCloseTo(1, 1);
+  });
+
+  it('switch a large space by zone, two-way from a bank at each exit', () => {
+    const b = createBuildingServices();
+    const lit = () => b.lighting.zoneLight.map((z) => z.value);
+    expect(lit()).toEqual([1, 1, 1]);
+    b.lighting.zoneSwitches[1].a.set(false);
+    expect(lit()).toEqual([1, 0, 1]);
+    // From the other bank, it comes back on.
+    b.lighting.zoneSwitches[1].b.set(true);
+    expect(lit()).toEqual([1, 1, 1]);
+  });
+
+  it('wire each zone as a circuit of its own, with its own emergency lights', () => {
+    const b = createBuildingServices();
+    b.power.tripZone(2);
+    expect(b.lighting.zoneLight.map((z) => z.value)).toEqual([1, 0, 1]);
+    expect(b.lighting.zoneVolts[1].value).toBe(0);
+    expect(b.lighting.zoneEmergencyVolts[1].value).toBe(0);
+    expect(b.lighting.zoneEmergencyVolts[0].value).toBeGreaterThan(0.9);
+    b.power.zoneBreakers[1].set(true);
+    // The test key cuts every zone's emergency fittings, and no lights.
+    b.lighting.emergencyTest.set(true);
+    expect(b.lighting.zoneEmergencyVolts.map((v) => v.value)).toEqual([
+      0, 0, 0,
+    ]);
+    expect(b.lighting.zoneLight.map((z) => z.value)).toEqual([1, 1, 1]);
+    // A lighting fault trips them all.
+    b.lighting.emergencyTest.set(false);
+    b.power.tripLighting();
+    expect(b.lighting.zoneLight.map((z) => z.value)).toEqual([0, 0, 0]);
+  });
+
+  it('turn a zone off when its detector has seen nobody for its time-out', () => {
+    const b = createBuildingServices();
+    b.lighting.detectorTimeout.set(30);
+    run(b, 20);
+    b.lighting.seen(1);
+    run(b, 15);
+    expect(b.lighting.zoneLight.map((z) => z.value)).toEqual([1, 0, 0]);
+    b.lighting.seen(3);
+    expect(b.lighting.zoneLight[2].value).toBe(1);
+  });
+
+  it('take its supply from a machine on the same supply when fed', () => {
+    const b = createBuildingServices();
+    b.power.supplyFeed.set(0.72);
+    run(b, 0.2);
+    expect(b.lighting.zoneVolts[0].value).toBeCloseTo(0.72);
+    b.power.supplyFeed.set(null);
+    run(b, 0.2);
+    expect(b.lighting.zoneVolts[0].value).toBeCloseTo(1, 1);
+  });
+
+  it('trip the lighting breaker in a severe disturbance', () => {
+    const b = createBuildingServices();
+    b.power.supplyCondition.set(2);
+    run(b, SEVERE_TRIP_SECONDS - 1);
+    expect(b.power.lightingBreaker.value).toBe(true);
+    run(b, 2);
+    expect(b.power.lightingBreaker.value).toBe(false);
     expect(b.lighting.emergencyLit.value).toBe(true);
   });
 

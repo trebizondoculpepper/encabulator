@@ -29,7 +29,7 @@ describe('portals', () => {
     portals.update(0.1, stop.x, west.z);
     expect(dispatchEvent).toHaveBeenCalledOnce();
     expect(dispatchEvent.mock.calls[0][0].detail).toEqual({
-      to: 'dev0',
+      to: 'dev_corridor',
       from: 'dev1',
     });
     portals.update(0.1, stop.x, west.z);
@@ -42,13 +42,13 @@ describe('portals', () => {
     vi.stubGlobal('window', { dispatchEvent });
     const links = devPortals('dev1', bounds, 1);
     const portals = createPortals('dev1', links, 0, 1);
-    const [westPatch, eastPatch] = [...portals.uses.entries()];
-    expect(westPatch[0].name).toBe('Portal to dev0');
-    eastPatch[1]();
-    westPatch[1]();
+    const [patch] = [...portals.uses.entries()];
+    expect(patch[0].name).toBe('Portal to dev_corridor');
+    patch[1]();
+    patch[1]();
     expect(dispatchEvent).toHaveBeenCalledOnce();
     expect(dispatchEvent.mock.calls[0][0].detail).toEqual({
-      to: 'dev2',
+      to: 'dev_corridor',
       from: 'dev1',
     });
     portals.dispose();
@@ -63,13 +63,13 @@ describe('portals', () => {
     expect(dispatchEvent).not.toHaveBeenCalled();
   });
 
-  it('stand an arrival clear of the portal back, facing into the room', () => {
+  it('stand an arrival clear of the way out, facing into the room', () => {
     const links = devPortals('dev1', bounds, 1);
     const portals = createPortals('dev1', links, 0, 1);
-    const pose = portals.arrival('dev2')!;
-    expect(pose.x).toBeCloseTo(5 - 0.15 - 1.2);
-    expect(pose.z).toBeCloseTo(links[1].z);
-    expect(Math.sin(pose.yaw)).toBeCloseTo(-1);
+    const pose = portals.arrival('dev_corridor')!;
+    expect(pose.x).toBeCloseTo(-5 + 0.15 + 1.2);
+    expect(pose.z).toBeCloseTo(links[0].z);
+    expect(Math.sin(pose.yaw)).toBeCloseTo(1);
     expect(portals.arrival('dev3')).toBeNull();
   });
 });

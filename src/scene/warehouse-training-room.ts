@@ -16,6 +16,7 @@ import type { Material, Object3D } from 'three';
 import {
   WAREHOUSE_SKYLIGHTS,
   WAREHOUSE_TRUSSES,
+  WAREHOUSE_EMERGENCY,
   WAREHOUSE_UTILITIES,
 } from '../game/warehouse-room-plan';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
@@ -71,9 +72,12 @@ export function createWarehouseTrainingRoom(
   ) => {
     const services = [
       'switch',
+      'gridswitch',
+      'presence',
       'luminaire',
       'distribution',
       'emergency',
+      'bulkhead',
       'exit',
     ].includes(kind)
       ? lighting
@@ -329,8 +333,13 @@ export function createWarehouseTrainingRoom(
   put('loadingdoor', west, 0, 0, 0);
   put('escapedoor', west, -13.9, 0, 0.04, { legend: 'ENTRANCE' });
   put('escapedoor', east, 13.9, 0, 0.04, { legend: 'FIRE EXIT' });
+  // A bulkhead over each personnel door (`WAREHOUSE_EMERGENCY`).
+  put('bulkhead', west, -13.9, 2.75, 0.06);
+  put('bulkhead', east, 13.9, 2.75, 0.06);
   for (const { x, label: text } of WAREHOUSE_UTILITIES)
     put('utilitydoor', north, x, 0, 0.04, { legend: text });
+  // The first aid room's own light, on a plain one-gang switch outside it.
+  put('switch', north, -0.45, 1.1, 0.08);
   label(north, 'NEUMANN DYNAMIK', 5, 0.14, 0, 3.7, 0.08, '#3b474a');
   label(
     north,
@@ -343,15 +352,42 @@ export function createWarehouseTrainingRoom(
     '#4d5a5a',
   );
 
-  // Suspended linear luminaires, replaced inside their industrial housings.
-  const lights: { x: number; y: number; z: number }[] = [];
+  // Suspended linear luminaires, replaced inside their industrial housings,
+  // in three lighting zones of four, a row each (x = −10, 0, 10), each a
+  // circuit of its own with a presence detector over it
+  // (`doc/research/warehouse-lighting-control.md`).
+  const zoneOf = (x: number) => (x < -5 ? 1 : x > 5 ? 3 : 2);
+  const lights: {
+    x: number;
+    y: number;
+    z: number;
+    zone: 1 | 2 | 3;
+    /** Its fitting's light, 0 to 1. */
+    output: () => number;
+  }[] = [];
   for (const z of [-10, -2, 6, 12])
     for (const x of [-10, 0, 10]) {
       for (const dx of [-0.6, 0.6])
         box(group, p.zinc, 0.008, 0.55, 0.008, x + dx, 6.38, z);
-      put('luminaire', group, x, 6.05, z);
-      lights.push({ x, y: 5.9, z });
+      const part = put('luminaire', group, x, 6.05, z, { zone: zoneOf(x) });
+      lights.push({
+        x,
+        y: 5.9,
+        z,
+        zone: zoneOf(x),
+        output: (part as { output?: () => number }).output ?? (() => 1),
+      });
     }
+  // The emergency downlights on the roof steel, by Thorn's spacing guide
+  // (`WAREHOUSE_EMERGENCY`, checked against BS 5266-1 by its test), each
+  // fed from the zone it is in.
+  for (const f of WAREHOUSE_EMERGENCY)
+    if (f.kind === 'downlight' && f.height > 5)
+      put('emergency', group, f.x, f.height, f.z, { zone: zoneOf(f.x) });
+  const detectors = [-10, 0, 10].map((x) => ({
+    part: put('presence', group, x, 6.6, 2, { zone: zoneOf(x) }),
+    zone: zoneOf(x),
+  }));
   // Cable ladder, rigid conduit and radiant heaters live high on the side walls.
   for (const side of [-1, 1]) {
     for (let z = -12; z <= 12; z += 3)
@@ -379,11 +415,22 @@ export function createWarehouseTrainingRoom(
     put('emergency', station, 0, 3.2, 0.3);
     put('water', station, -side, 0, 0);
     put('co2', station, -side * 1.4, 0, 0);
-    put('switch', station, -side * 0.5, 1.1, 0, {
-      index: lighting && side > 0 ? 1 : 0,
+    // A bank of zone switches at each exit, two-way, as a large space is
+    // switched; the emergency lighting test key on the entrance's.
+    put('gridswitch', station, -side * 0.55, 1.15, 0, {
+      index: side > 0 ? 1 : 0,
     });
     if (lighting)
-      label(station, 'WAREHOUSE LIGHTS', 0.24, 0.012, -side * 0.5, 1.02, 0.004);
+      label(
+        station,
+        'ZONE 1 · 2 · 3, ROW BY ROW',
+        0.3,
+        0.012,
+        -side * 0.55,
+        1.07,
+        0.004,
+      );
+
     label(
       station,
       'FIRE ACTION\nRaise the alarm\nLeave by the nearest exit\nReport to the assembly point',
@@ -556,6 +603,14 @@ export function createWarehouseTrainingRoom(
       minZ: -s.maxX,
       maxZ: -s.minX,
     })),
-    lights: lights.map((l) => ({ x: l.z, y: l.y, z: -l.x })),
+    lights: lights.map((l) => ({
+      x: l.z,
+      y: l.y,
+      z: -l.x,
+      zone: l.zone,
+      output: l.output,
+    })),
+    /** Each zone's presence detector, to be told where the player is. */
+    detectors,
   };
 }

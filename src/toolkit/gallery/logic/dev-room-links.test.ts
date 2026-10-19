@@ -11,24 +11,26 @@ import { slide } from '../../controls/logic/walk-collision';
 
 const bounds = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 };
 describe('the rooms', () => {
-  it('link each room in the chain to its neighbours, both ways', () => {
-    for (const [i, id] of CHAIN.entries()) {
+  it('lead every room in the chain back to dev_corridor, its hub', () => {
+    for (const id of CHAIN) {
       const to = devPortals(id, bounds, 1).map((p) => p.to);
-      const neighbours = [CHAIN[i - 1], CHAIN[i + 1]].filter((r) => r);
-      expect(to.sort()).toEqual([...neighbours].sort());
-      for (const next of neighbours)
-        expect(devPortals(next, bounds, 1).map((p) => p.to)).toContain(id);
+      expect(to).toEqual(id === 'dev_corridor' ? [] : ['dev_corridor']);
     }
   });
 
-  it('give the ends of the chain a single door of their own', () => {
+  it('give the training room and the Rhombus their own doors back', () => {
     expect(CHAIN[0]).toBe('training');
     expect(CHAIN.at(-1)).toBe('rhombus');
     expect(devPortals('training', bounds, 1)).toEqual([
-      { to: 'dev0', side: 'north', x: bounds.minX + 2.1, z: bounds.minZ },
+      {
+        to: 'dev_corridor',
+        side: 'north',
+        x: bounds.minX + 2.1,
+        z: bounds.minZ,
+      },
     ]);
     expect(devPortals('rhombus', bounds, 1)).toEqual([
-      { to: 'dev21', side: 'east', x: bounds.maxX, z: 0 },
+      { to: 'dev_corridor', side: 'east', x: bounds.maxX, z: 0 },
     ]);
   });
 

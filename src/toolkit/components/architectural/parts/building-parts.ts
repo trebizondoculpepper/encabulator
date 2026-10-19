@@ -1,5 +1,14 @@
 import { signal } from '@preact/signals-core';
-import { click, recording } from '../../core/audio/part-audio';
+import { PointLight } from 'three';
+import { createLedDriver } from '../logic/led-driver';
+import { createFluorescentTube } from '../logic/fluorescent-gear';
+import { createSpringDoor } from '../logic/spring-door';
+import { createSpringDoorView } from '../views/spring-door';
+import type { GearEvent } from '../logic/fluorescent-gear';
+import { machineTone } from '../../sound/audio/machine-tones';
+import { createArchitecturalFixture } from '../views/architectural-fixtures';
+import { click, partAudio, recording } from '../../core/audio/part-audio';
+import type { SoundRecipe } from '../../core/audio/part-audio';
 import { EXTRACT_FAN } from '../../core/audio/part-loops';
 import type { Binding, Readable } from '../../core/logic/world/components';
 import {
@@ -11,8 +20,10 @@ import {
   createExtractorFan,
   createFloorBox,
   createFusedSpur,
+  createGridSwitchPlate,
   createIntercom,
   createOccupancySensor,
+  createPresenceDetector,
   createPullSwitch,
   createRadiator,
   createRockerPlate,
@@ -90,6 +101,118 @@ export function lightSwitch(
   return a.part();
 }
 
+/**
+ * A bank of grid switches in a metalclad plate: a rocker per lighting
+ * zone, and perhaps the emergency lighting test key, each throwing its
+ * binding.
+ */
+export function gridSwitchPlate(
+  kit: PanelKit,
+  props: {
+    name?: string;
+    title?: string;
+    modules: { legend: string; bound: Binding<boolean>; key?: boolean }[];
+  },
+): Part {
+  const a = beginPart(kit, props.name ?? 'grid switch plate');
+  const view = createGridSwitchPlate(kit, props.modules, props.title);
+  a.object.add(view.group);
+  const e = emitter();
+  const k = emitter();
+  a.voice(e, { on: ROCKER, off: ROCKER });
+  a.voice(k, { on: KEY_TURN, off: KEY_TURN });
+  view.switches.forEach((control, i) => {
+    const { bound, key } = props.modules[i];
+    a.uses.set(control.mesh, () => {
+      bound.set(!bound.value);
+      (key ? k : e).emit(bound.value ? 'on' : 'off');
+    });
+  });
+  show(a, () =>
+    view.switches.forEach((c, i) => c.set(props.modules[i].bound.value)),
+  );
+  return a.part();
+}
+
+/**
+ * A high-bay presence detector over a lighting zone. Its walk-test LED
+ * blinks while it sees someone (`unseen`, seconds since it last did, is
+ * under a second).
+ */
+export function presenceDetector(
+  kit: PanelKit,
+  props: { unseen: Readable<number> },
+): Part {
+  const a = beginPart(kit, 'presence detector');
+  const view = createPresenceDetector(kit);
+  a.object.add(view.group);
+  let time = 0;
+  a.updates.push((delta) => {
+    time += delta;
+    view.set(props.unseen.value < 1 && time % 0.5 < 0.25);
+  });
+  return a.part();
+}
+
+/** A spring door's soft thud as it settles shut. */
+const DOOR_SETTLES = click({
+  band: 380,
+  q: 0.8,
+  decay: 0.08,
+  level: 0.12,
+  thump: [70, 0.08],
+});
+
+/**
+ * A double-action spring door (`spring-door.ts`): a use pushes it open
+ * away from the side it is pushed from (`away`, +1 into its back, −1 out of
+ * its face), and it eases shut on its spring a while after it is let go,
+ * settling with a soft thud; `hold` while someone stands in its doorway;
+ * `snapShut` closes it at once and silently.
+ */
+export function springDoor(
+  kit: PanelKit,
+  props: { name?: string; away?: () => 1 | -1 } = {},
+): Part & {
+  door: ReturnType<typeof createSpringDoor>;
+  hold(held: boolean): void;
+} {
+  const a = beginPart(kit, props.name ?? 'spring door');
+  const view = createSpringDoorView(kit);
+  a.object.add(view.group);
+  const door = createSpringDoor();
+  const e = emitter();
+  a.voice(e, { off: DOOR_SETTLES });
+  let held = false;
+  a.uses.set(view.leaf, () => door.push(props.away?.() ?? 1));
+  let shown = 0;
+  a.updates.push((delta) => {
+    const before = door.angle;
+    const angle = door.step(delta, held);
+    if (before !== 0 && angle === 0) e.emit('off');
+    if (angle !== shown) view.set((shown = angle));
+  });
+  return {
+    ...a.part(),
+    door: {
+      ...door,
+      get angle() {
+        return door.angle;
+      },
+      get open() {
+        return door.open;
+      },
+      snapShut() {
+        door.snapShut();
+        view.set((shown = 0));
+      },
+    },
+    hold(on: boolean) {
+      held = on;
+    },
+  };
+}
+
 /** A rotary dimmer: a click on its left half dims, its right brightens. */
 export function dimmer(
   kit: PanelKit,
@@ -139,6 +262,132 @@ export function occupancySensor(
   a.object.add(view.group);
   show(a, () => view.set(props.occupied.value));
   return a.part();
+}
+
+/** How a luminaire lights the room, when it does. */
+export interface LuminaireLight {
+  /** Its intensity at full output, candela, in the room's own scale. */
+  candela: number;
+  /** How far its light reaches, metres. */
+  range: number;
+  /** Scene units to the metre. */
+  metre: number;
+}
+
+/** Control gear: a fluorescent's switch-start gear, or an LED driver. */
+export type LuminaireGear = 'switch-start' | 'led';
+
+/** The starter's click as it opens, kicking the tube to strike. */
+const STARTER = click({ band: 2600, q: 3, decay: 0.012, level: 0.05 });
+/** A failed strike's flash: a small, glassy tink. */
+const TINK: SoundRecipe = {
+  tones: [
+    { at: 0, hz: 3150, seconds: 0.05, level: 0.012, type: 'sine' },
+    { at: 0, hz: 4720, seconds: 0.03, level: 0.006, type: 'sine' },
+  ],
+};
+/** The tube striking: a soft ping. */
+const PING: SoundRecipe = {
+  tone: { hz: 2350, seconds: 0.16, level: 0.012, type: 'triangle' },
+};
+/** The ballast's hum while the tube is lit: a quiet, low 100 Hz buzz. */
+const BALLAST = machineTone('transformer', signal(2), 0.02, {
+  up: 0.15,
+  down: 0.1,
+  floor: 1,
+});
+
+/**
+ * How old a fitting's tube is, from its seed: most are in their middle
+ * years, some old and slow to start, and about one in twenty-five a dud.
+ */
+export function tubeAge(seed: number) {
+  const r = (((Math.sin(seed * 37.719 + 4.1) * 15731.743) % 1) + 1) % 1;
+  return r < 0.04 ? 0.97 : r < 0.3 ? 0.55 + r : 0.05 + 0.4 * r;
+}
+
+/**
+ * A luminaire on a lighting circuit. On switch-start gear (the default),
+ * a twin fluorescent batten whose two tubes come to life each in its own
+ * time (`fluorescent-gear.ts`): the starter glowing and clicking, failed
+ * strikes flashing, then the strike and the run-up to full light, with the
+ * ballast's hum while lit; below about 80 % of nominal a tube goes out and
+ * starts all over again. On an LED driver (`led-driver.ts`), steady near
+ * nominal, dimming and flickering with a sagging supply, dropping out and
+ * restarting in a deep dip. `level` is what its switching asks of it (0 to
+ * 1). With `light` it lights the room as well as showing lit; `ages` sets
+ * its tubes' ages (0 new to 1 dead), else they follow from `seed`.
+ */
+export function luminaire(
+  kit: PanelKit,
+  props: {
+    level: Readable<number>;
+    volts: Readable<number>;
+    seed?: number;
+    light?: LuminaireLight;
+    gear?: LuminaireGear;
+    ages?: [number, number];
+  },
+): Part & { output: () => number; age: (tube: number, age: number) => void } {
+  const a = beginPart(kit, 'luminaire');
+  const view = createArchitecturalFixture(kit, 'luminaire');
+  a.object.add(view.group);
+  const seed = props.seed ?? 0;
+  const gear = props.gear ?? 'switch-start';
+  const driver = createLedDriver(seed);
+  const ages = props.ages ?? [tubeAge(seed * 2), tubeAge(seed * 2 + 1)];
+  let tubes = ages.map((age, i) => createFluorescentTube(seed * 2 + i, age));
+  const light = props.light
+    ? new PointLight('#f4f2e8', 0, props.light.range * props.light.metre, 2)
+    : null;
+  if (light) {
+    light.position.y = -0.12;
+    a.object.add(light);
+  }
+  const humming = signal(false);
+  if (gear === 'switch-start') a.holdWhile(humming, BALLAST);
+  const sound: Partial<Record<GearEvent, SoundRecipe>> = {
+    click: STARTER,
+    flash: TINK,
+    strike: PING,
+  };
+  let output = -1;
+  a.updates.push((delta) => {
+    const level = props.level.value;
+    const volts = level > 0 ? props.volts.value : 0;
+    let lit: number;
+    if (gear === 'led') lit = driver.step(delta, volts) * level;
+    else {
+      let sum = 0;
+      for (const tube of tubes) {
+        const step = tube.step(delta, volts);
+        sum += step.light;
+        for (const event of step.events) {
+          const recipe = sound[event];
+          if (recipe) partAudio.play(recipe, a.object);
+        }
+      }
+      lit = (sum / tubes.length) * level;
+      humming.value = tubes.some(
+        (t) => t.phase === 'lit' || t.phase === 'runup',
+      );
+    }
+    if (lit === output) return;
+    output = lit;
+    view.set(lit);
+    if (light && props.light)
+      light.intensity =
+        props.light.candela * props.light.metre * props.light.metre * lit;
+  });
+  return {
+    ...a.part(),
+    output: () => Math.max(0, output),
+    /** Fit tube `tube` (0 or 1) with one of another age: a dud, say. */
+    age(tube: number, age: number) {
+      ages[tube] = age;
+      tubes = ages.map((each, i) => createFluorescentTube(seed * 2 + i, each));
+    },
+  };
 }
 
 // ---- Power -------------------------------------------------------------------

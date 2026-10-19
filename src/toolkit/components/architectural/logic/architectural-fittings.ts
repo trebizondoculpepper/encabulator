@@ -25,13 +25,31 @@ export const ARCHITECTURAL_FITTINGS = {
   },
   emergency: {
     title: 'Emergency downlight',
-    reference: 'Recessed self-contained emergency downlight format',
-    source: 'https://www.thornlighting.com/',
+    reference: 'Thorn Voyager Star recessed E3/8T, Ø85 mm, high-ceiling lens',
+    source:
+      'https://resources.zumtobel.com/PDB/Ressource/Manual/TLG_VSTR_MRCR.pdf',
   },
   exit: {
-    title: 'Maintained exit sign',
-    reference: 'UK maintained running-man exit sign format',
-    source: 'https://www.thornlighting.com/',
+    title: 'Maintained exit box sign',
+    reference: 'EXIT3MLISO LED box sign, 390 × 192 × 60 mm, ISO 7010',
+    source:
+      'https://cdn.yesss.co.uk/documents/354318_03_EXIT3MLED_Datasheet_1c8d1d9c40fd39b5cb29f481700cc501.pdf',
+  },
+  bulkhead: {
+    title: 'Emergency bulkhead',
+    reference: 'LEDVANCE EM BULKHEAD E 1.3W 3H, 355 × 115 × 63 mm',
+    source: 'https://docs.rs-online.com/6d4d/A700000015974009.pdf',
+  },
+  gridswitch: {
+    title: 'Lighting zone switch bank',
+    reference: 'MK Metalclad Plus Grid Plus K3494ALM, 86 × 146 mm',
+    source:
+      'https://www.mkelectric.com/en-gb/Products/Pages/ProductDetail.aspx?ProductID=K3494ALM',
+  },
+  presence: {
+    title: 'High-bay presence detector',
+    reference: 'CP Electronics EBDHS-PRM, Ø88 mm, 10 A relay',
+    source: 'https://www.cpelectronics.co.uk/',
   },
   callpoint: {
     title: 'Resettable fire call point',

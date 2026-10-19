@@ -2,6 +2,7 @@ import { signal } from '@preact/signals-core';
 import type { ReadonlySignal, Signal } from '@preact/signals-core';
 import type { FireAlarmSystem } from '../../fire/logic/fire-alarm-system';
 import { createBuildingServices } from './building-services';
+import type { BuildingServices } from './building-services';
 
 /** Physical pendant-head locations; room-wide service wiring is deliberately deferred. */
 export const WAREHOUSE_HEADS = Array.from({ length: 10 }, (_, z) =>
@@ -10,8 +11,15 @@ export const WAREHOUSE_HEADS = Array.from({ length: 10 }, (_, z) =>
     z: -13.5 + z * 3,
   })),
 ).flat();
-export function createArchitecturalServices() {
-  const model = createBuildingServices();
+/**
+ * The services a building's installed fittings bind to: its building
+ * services model (a fresh one, or a room's own, so that its catalogue
+ * fittings and its working ones share one supply), its call points and a
+ * test drain.
+ */
+export function createArchitecturalServices(
+  model: BuildingServices = createBuildingServices(),
+) {
   const callPoints = [signal(false), signal(false)];
   let serial = 0;
   return {

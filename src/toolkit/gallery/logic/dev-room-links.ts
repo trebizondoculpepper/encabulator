@@ -18,7 +18,7 @@ export type DevRoomId =
   | 'dev3'
   | 'dev4'
   | 'dev6'
-  | 'dev7'
+  | 'dev_corridor'
   | 'dev8'
   | 'dev9'
   | 'dev10'
@@ -39,7 +39,8 @@ export type RoomId =
   | 'rhombus'
   | 'training'
   | 'level0'
-  | 'level2';
+  | 'level2'
+  | 'dev_courtyard';
 export type PortalSide = 'north' | 'south' | 'east' | 'west';
 export interface Portal {
   to: RoomId;
@@ -57,7 +58,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev3',
   'dev4',
   'dev6',
-  'dev7',
+  'dev_corridor',
   'dev8',
   'dev9',
   'dev10',
@@ -78,11 +79,20 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
 export const CHAIN: readonly RoomId[] = ['training', ...DEV_ROOMS, 'rhombus'];
 
 /** Every room with a URL of its own. */
-export const ROOMS: readonly RoomId[] = [...CHAIN, 'hall', 'level0', 'level2'];
+export const ROOMS: readonly RoomId[] = [
+  ...CHAIN,
+  'hall',
+  'level0',
+  'level2',
+  // Reached through dev_corridor's courtyard doors, not by a portal.
+  'dev_courtyard',
+];
 
 /** Historic URLs remain usable without changing the address bar. */
 export function resolveRoomId(id: string | null): RoomId | undefined {
   if (id === 'dev5') return 'rhombus';
+  // dev_corridor took over dev7, the underground corridor.
+  if (id === 'dev7') return 'dev_corridor';
   if (id === 'retro-computing') return 'dev19';
   return ROOMS.includes(id as RoomId) ? (id as RoomId) : undefined;
 }
@@ -94,7 +104,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev3: 'DEV3 · RACKS',
   dev4: 'DEV4 · BRANDS AND LOGOS',
   dev6: 'DEV6 · RETRO ENCABULATOR',
-  dev7: 'DEV7 · UNDERGROUND CORRIDOR',
+  dev_corridor: 'DEV CORRIDOR',
   dev8: 'DEV8 · FIRE SAFETY',
   dev9: 'DEV9 · THE WANDERING BUTTON',
   dev10: 'DEV10 · WAKING UP FROM THE DREAM',
@@ -110,6 +120,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev20: 'DEV20 · REPAIR WORKSHOP',
   dev21: 'DEV21 · SETTLING OBJECTS INTO SKIPS',
   hall: 'THE HALL',
+  dev_courtyard: 'COURTYARD',
   rhombus: 'RHOMBUS',
   training: 'TRAINING ROOM',
   level0: 'LEVEL 0 · MACHINE SANDBOX',
@@ -123,7 +134,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev3: '#3f7fe0',
   dev4: '#c8a227',
   dev6: '#9a9685',
-  dev7: '#2d9ca0',
+  dev_corridor: '#2d9ca0',
   dev8: '#b8433a',
   dev9: '#c7542f',
   dev10: '#6f9a3a',
@@ -139,6 +150,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev20: '#798b91',
   dev21: '#c4a24a',
   hall: '#c9c23a',
+  dev_courtyard: '#7fa36a',
   rhombus: '#d8d4c8',
   training: '#e3d6b0',
   level0: '#809c91',
@@ -150,44 +162,37 @@ export const PORTAL_HEIGHT = 2.2;
 export const WALL_THICKNESS = 0.3;
 
 /**
- * A room's portals, in scene units (`metre` per metre): to the room
- * before it in the chain on its west wall and the room after it on its
- * east wall, both near its south end. The chain's two ends have a single
- * way out of their own: the training room's door in its north wall, and
- * the Rhombus mini-game's EXIT door in its east wall. The Hall has none.
+ * A room's way out, in scene units (`metre` per metre): since the dev
+ * rooms were wired to dev_corridor's doors (`doc/prompts/009`), every room
+ * has a single way out, back to the corridor, which leads round the loop
+ * to every other: on its west wall near its south end (dev17 and dev18 on
+ * their north wall, by the warehouse's escape); the training room's door
+ * in its north wall; the Rhombus mini-game's EXIT door in its east wall.
+ * The corridor and the courtyard have doors of their own instead, and the
+ * Hall none.
  */
 export function devPortals(
   id: RoomId,
   bounds: Footprint,
   metre: number,
 ): Portal[] {
-  const at = CHAIN.indexOf(id);
-  if (at < 0) return [];
-  const before = CHAIN[at - 1];
-  const after = CHAIN[at + 1];
+  if (!CHAIN.includes(id) || id === 'dev_corridor') return [];
+  const to: RoomId = 'dev_corridor';
   if (id === 'training')
     return [
       {
-        to: after,
+        to,
         side: 'north',
         x: bounds.minX + ROOM_DOOR_FROM_WEST * metre,
         z: bounds.minZ,
       },
     ];
-  if (id === 'dev17' || id === 'dev18') {
-    const x = bounds.maxX - 1.1 * metre;
+  if (id === 'dev17' || id === 'dev18')
     return [
-      { to: before, side: 'south', x, z: bounds.maxZ },
-      { to: after, side: 'north', x, z: bounds.minZ },
+      { to, side: 'north', x: bounds.maxX - 1.1 * metre, z: bounds.minZ },
     ];
-  }
-  if (id === 'rhombus')
-    return [{ to: before, side: 'east', x: bounds.maxX, z: 0 }];
-  const z = bounds.maxZ - 1.1 * metre;
-  return [
-    { to: before, side: 'west', x: bounds.minX, z },
-    { to: after, side: 'east', x: bounds.maxX, z },
-  ];
+  if (id === 'rhombus') return [{ to, side: 'east', x: bounds.maxX, z: 0 }];
+  return [{ to, side: 'west', x: bounds.minX, z: bounds.maxZ - 1.1 * metre }];
 }
 
 export interface WallPiece extends Footprint {

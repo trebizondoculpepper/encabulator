@@ -1,3 +1,4 @@
+import { createArchitecturalServices } from '../toolkit/components/architectural/logic/warehouse-services';
 import { addWarehouseLighting } from './warehouse-lighting';
 import { partAudio } from '../toolkit/components/core/audio/part-audio';
 import {
@@ -36,10 +37,15 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement, gallery = false) {
   const freeEnvironment = useEnvironment(renderer, scene, 0.32);
   const camera = new PerspectiveCamera(65, 1, 0.05, 100 * m);
   const kit = createPanelKit();
-  const room = createWarehouseTrainingRoom(kit, gallery);
+  // One lighting model for the building's fittings, so its switch banks
+  // work its zones (its supply steady, its detectors never timing out).
+  const services = createArchitecturalServices();
+  const room = createWarehouseTrainingRoom(kit, gallery, {
+    lighting: services,
+  });
   room.group.scale.setScalar(m);
   scene.add(room.group);
-  addWarehouseLighting(scene, room.lights, m);
+  const lighting = addWarehouseLighting(scene, room.lights, m);
   const bounds = {
     minX: WAREHOUSE_BOUNDS.minX * m,
     maxX: WAREHOUSE_BOUNDS.maxX * m,
@@ -135,6 +141,7 @@ export function startWarehouseRoom(canvas: HTMLCanvasElement, gallery = false) {
     ps1Uniforms.time.value = time / 1000;
     walk.update(delta);
     room.parts.update(delta);
+    lighting.update();
     partAudio.listen(camera, m);
     portals.update(delta, walk.walker.x, walk.walker.z);
     renderer.render(scene, camera);

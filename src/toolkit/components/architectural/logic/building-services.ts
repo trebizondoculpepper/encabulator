@@ -1,5 +1,7 @@
 import { createGraph } from '../../core/logic/world/graph';
 import { createFireAlarmSystem } from '../../fire/logic/fire-alarm-system';
+import { SUPPLY_CONDITIONS, supplyVoltage } from './supply-quality';
+import { DETECTOR_TIMEOUT } from './presence-detector';
 
 /**
  * Dev8's world model: the building services of one room of a present-day
@@ -14,8 +16,12 @@ import { createFireAlarmSystem } from '../../fire/logic/fire-alarm-system';
  *   each end of the room; either one changes them), a dimmer, and an
  *   occupancy sensor that turns them off when nobody has moved for a
  *   while. Emergency lights are non-maintained: they light only when the
- *   lighting circuit loses power, which the test key switch simulates. The
- *   exit sign is maintained: always lit.
+ *   lighting circuit loses power or its voltage sags too far (each at its
+ *   own threshold), which the test key switch simulates for them alone. The exit sign is
+ *   maintained: always lit.
+ * - **Supply quality**: the incoming supply's voltage, steady or pulled
+ *   about by a machine (a brownout, a severe disturbance), which the
+ *   luminaires' drivers follow (`led-driver.ts`).
  * - **Fire**: a two-stage fire alarm with a voice alarm, as in a UK
  *   office (BS 5839-1 and -8), set off by the dev room's joke: a steel
  *   waste-paper bin under the smoke detector, lit by a button on a
@@ -104,6 +110,11 @@ export const OUTSIDE_TEMPERATURE = 9;
 /** Air-conditioning modes, in the order the MODE button steps them. */
 export const HVAC_MODES = ['auto', 'heat', 'cool', 'fan'] as const;
 
+/** A large space's lighting zones. */
+export const ZONES = [1, 2, 3] as const;
+/** Seconds of a severe disturbance before its fault trips the lighting. */
+export const SEVERE_TRIP_SECONDS = 10;
+
 export function createBuildingServices() {
   const g = createGraph();
 
@@ -116,13 +127,101 @@ export function createBuildingServices() {
     where: 'sockets breaker',
   });
   const hvacBreaker = g.input('board.hvac', true, { where: 'HVAC breaker' });
+  // A large space's lighting zones, each a circuit of its own on the
+  // board (`doc/research/warehouse-lighting-control.md`).
+  const zoneBreakers = ZONES.map((n) =>
+    g.input(`board.zone${n}`, true, { where: `LIGHTING ZONE ${n} breaker` }),
+  );
   const emergencyTest = g.input('emergency.test', false, {
     where: 'emergency lighting test key switch',
   });
+  // The lighting circuit. The emergency fittings are fed from its
+  // unswitched live through the test key switch, which interrupts their
+  // supply alone, as a failure of the circuit would: the room's own
+  // lights stay on.
   const lightingSupply = g.derive(
     'lighting.supply',
-    [main, lightingBreaker, emergencyTest],
-    (m, b, test) => m && b && !test,
+    [main, lightingBreaker],
+    (m, b) => m && b,
+  );
+  const emergencySupply = g.derive(
+    'emergency.supply',
+    [lightingSupply, emergencyTest],
+    (supply, test) => supply && !test,
+  );
+  /** A fault on the lighting: every lighting breaker trips. */
+  const tripLighting = g.action(
+    'board.lighting.trip',
+    [],
+    [lightingBreaker, ...zoneBreakers],
+    () => {
+      lightingBreaker.set(false);
+      for (const zone of zoneBreakers) zone.set(false);
+    },
+    'lighting fault',
+  );
+  /** A fault on one zone's circuit (1 to 3): its breaker trips. */
+  const tripZone = g.action(
+    'board.zone.trip',
+    [],
+    zoneBreakers,
+    (n: number) => zoneBreakers[n - 1]?.set(false),
+    'zone fault',
+  );
+
+  // ---- Supply quality ----------------------------------------------------
+  // The incoming supply's voltage, a fraction of nominal: steady, or
+  // pulled about by a machine on the same supply (`supply-quality.ts`).
+  // A severe disturbance's fault current soon trips the lighting breaker.
+  const supplyCondition = g.input('supply.condition', 0, {
+    where: 'SUPPLY test selector',
+  });
+  /**
+   * The supply's voltage as something outside sets it (a machine on the
+   * same supply: Level 0's), in place of the test selector's, or null.
+   */
+  const supplyFeed = g.input<number | null>('supply.feed', null, {
+    where: 'a machine on the same supply',
+  });
+  const supplyClock = g.state('supply.clock', 0);
+  const supplyVolts = g.state('supply.volts', 1);
+  const severeFor = g.state('supply.severeFor', 0);
+  g.process(
+    'supply',
+    [supplyCondition, supplyFeed, lightingBreaker, ...zoneBreakers],
+    [supplyClock, supplyVolts, severeFor, lightingBreaker, ...zoneBreakers],
+    (dt) => {
+      const t = supplyClock.peek() + dt;
+      supplyClock.set(t);
+      const condition = SUPPLY_CONDITIONS[supplyCondition.peek()] ?? 'normal';
+      supplyVolts.set(supplyFeed.peek() ?? supplyVoltage(condition, t));
+      const lit = [lightingBreaker, ...zoneBreakers].some((b) => b.peek());
+      const severe = condition === 'severe' && lit;
+      const lasted = severe ? severeFor.peek() + dt : 0;
+      if (lasted >= SEVERE_TRIP_SECONDS) {
+        lightingBreaker.set(false);
+        for (const zone of zoneBreakers) zone.set(false);
+        severeFor.set(0);
+      } else severeFor.set(lasted);
+    },
+  );
+  /** The voltage at the lighting circuit's fittings, 0 with it off. */
+  const lightingVolts = g.output(
+    'lighting.volts',
+    [lightingSupply, supplyVolts],
+    (supply, volts) => (supply ? volts : 0),
+    { where: 'luminaires' },
+  );
+  /**
+   * The voltage at the emergency fittings, 0 with their supply cut: each
+   * changes over to its battery at its own threshold
+   * (`../../general-safety/logic/emergency-changeover.ts`).
+   */
+  const emergencyVolts = g.output(
+    'emergency.volts',
+    [emergencySupply, supplyVolts],
+    (supply, volts) => (supply ? volts : 0),
+    { where: 'emergency lights' },
   );
   const socketSupply = g.derive(
     'sockets.supply',
@@ -161,19 +260,87 @@ export function createBuildingServices() {
       supply && a !== b && here ? Math.max(0.1, level / 10) : 0,
     { where: 'ceiling lights' },
   );
+  /** Their supply cut: every emergency light lit. */
+  // A large space's lighting is switched by zone (rows of fittings), from
+  // a bank of grid switches by each exit, two-way, as a corridor is, and
+  // by a presence detector over each zone, which holds it on for its
+  // time-out after it last saw anyone (`presence-detector.ts`). Each zone
+  // is a circuit of its own; its emergency fittings are fed from it,
+  // unswitched, through the test key.
+  const zoneSwitches = ZONES.map((n) => ({
+    a: g.input(`lights.zone${n}.a`, true, { where: `ZONE ${n}, first bank` }),
+    b: g.input(`lights.zone${n}.b`, false, {
+      where: `ZONE ${n}, second bank`,
+    }),
+  }));
+  const detectorTimeout = g.input('lights.detector.timeout', DETECTOR_TIMEOUT, {
+    where: 'presence detectors, set by handset',
+  });
+  const unseen = ZONES.map((n) => g.state(`lights.zone${n}.unseen`, 0));
+  g.process('presence', [], unseen, (dt) => {
+    for (const s of unseen) s.set(s.peek() + dt);
+  });
+  /** The detector over zone `n` (1 to 3) sees someone. */
+  const seen = g.action(
+    'lights.zone.seen',
+    [],
+    unseen,
+    (n: number) => unseen[n - 1]?.set(0),
+    'presence detectors',
+  );
+  const zoneOccupied = unseen.map((s, i) =>
+    g.output(
+      `lights.zone${i + 1}.occupied`,
+      [s, detectorTimeout],
+      (since, timeout) => since < timeout,
+      { where: `zone ${i + 1} presence detector LED` },
+    ),
+  );
+  const zoneSupply = zoneBreakers.map((breaker, i) =>
+    g.derive(`lights.zone${i + 1}.supply`, [main, breaker], (m, b) => m && b),
+  );
+  const zoneLight = ZONES.map((n, i) =>
+    g.output(
+      `lights.zone${n}.on`,
+      [zoneSupply[i], zoneSwitches[i].a, zoneSwitches[i].b, zoneOccupied[i]],
+      (supply, a, b, here) => (supply && a !== b && here ? 1 : 0),
+      { where: `zone ${n} luminaires` },
+    ),
+  );
+  /** The voltage at each zone's fittings, 0 with its circuit off. */
+  const zoneVolts = ZONES.map((n, i) =>
+    g.output(
+      `lights.zone${n}.volts`,
+      [zoneSupply[i], supplyVolts],
+      (supply, volts) => (supply ? volts : 0),
+      { where: `zone ${n} luminaires` },
+    ),
+  );
+  /** The voltage at each zone's emergency fittings. */
+  const zoneEmergencyVolts = ZONES.map((n, i) =>
+    g.output(
+      `emergency.zone${n}.volts`,
+      [zoneSupply[i], emergencyTest, supplyVolts],
+      (supply, test, volts) => (supply && !test ? volts : 0),
+      { where: `zone ${n} emergency lights` },
+    ),
+  );
   const emergencyLit = g.output(
     'lights.emergency',
-    [lightingSupply],
+    [emergencySupply],
     (supply) => !supply,
     { where: 'emergency lights' },
   );
-  const charging = g.output('lights.charging', [lightingSupply], (s) => s, {
-    where: 'emergency lights charging LEDs',
-  });
+  const charging = g.output(
+    'lights.charging',
+    [emergencySupply],
+    (supply) => supply,
+    { where: 'emergency lights charging LEDs' },
+  );
   const exitSign = g.output(
     'lights.exit',
-    [lightingSupply],
-    (supply) => (supply ? 1 : 0.75),
+    [emergencyLit],
+    (battery) => (battery ? 0.75 : 1),
     { where: 'exit sign' },
   );
   const wcCord = g.input('wc.cord', false, { where: 'WC pull-cord switch' });
@@ -428,7 +595,18 @@ export function createBuildingServices() {
     g,
     /** Advance `dt` seconds; `random` decides the investigation's finding. */
     tick: (dt: number, random?: () => number) => g.tick(dt, random),
-    power: { main, lightingBreaker, socketsBreaker, hvacBreaker },
+    power: {
+      main,
+      lightingBreaker,
+      socketsBreaker,
+      hvacBreaker,
+      tripLighting,
+      tripZone,
+      zoneBreakers,
+      supplyCondition,
+      supplyFeed,
+      supplyVolts,
+    },
     lighting: {
       switchDoor,
       switchFar,
@@ -437,6 +615,16 @@ export function createBuildingServices() {
       motion,
       occupied,
       roomLight,
+      zoneSwitches,
+      zoneOccupied,
+      zoneUnseen: unseen,
+      detectorTimeout,
+      seen,
+      zoneLight,
+      zoneVolts,
+      zoneEmergencyVolts,
+      lightingVolts,
+      emergencyVolts,
       emergencyLit,
       charging,
       exitSign,

@@ -548,11 +548,12 @@ export function startFittingsRoom(canvas: HTMLCanvasElement) {
     createArchitecturalServices(),
     FIRE_KINDS,
     [
-      ...[10.4, 7.8, 5.2, 2.6, 0, -2.6, -5.2, -7.8, -10.4].map((x) => ({
-        x,
+      ...Array.from({ length: 10 }, (_, i) => ({
+        x: 10.6 - i * (21.2 / 9),
         z: BOUNDS.maxZ,
         facing: Math.PI,
         y: 1.5,
+        width: 2.25,
       })),
       ...[4.6, 1.6, -4.6, -6.8].map((z) => ({
         x: BOUNDS.minX,

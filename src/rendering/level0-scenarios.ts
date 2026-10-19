@@ -23,10 +23,11 @@ export const SLOW_START_STEP_SECONDS = 2.5;
  *   (everything on and running at once), SLOW START (FULL ON a step at a
  *   time) and RESET (every fault and symptom cleared, switches kept).
  * - FAULTS, causes whose symptoms follow from the model: OIL SEAL,
- *   PRESSURE SWITCH, GLITCH (a fuse blows or an overload trips) and KAPUT
- *   (the rack's power card fails).
+ *   PRESSURE SWITCH, GLITCH (a fuse blows or an overload trips), KAPUT
+ *   (the rack's power card fails) and LIGHTING FAULT (the building's
+ *   lighting trips).
  * - SYMPTOMS, effects alone, without a cause, to try them out: OIL LEAK,
- *   SMOKING, DIMENSIONAL WARP, HICCUP and SPRINKLER.
+ *   SMOKING, DIMENSIONAL WARP, HICCUP, SPRINKLER and BROWNOUT.
  */
 export function createLevel0Scenarios(
   machine: Level0Machine,
@@ -35,6 +36,8 @@ export function createLevel0Scenarios(
   symptoms?: Level0Symptoms,
   /** What else RESET puts right: the room's soot and the like. */
   cleanUp: () => void = () => {},
+  /** The building's lighting, if the room has it. */
+  lighting?: { fault(): void; brownout(): void },
 ) {
   const { mcc, plant } = machine;
   const { control } = plant;
@@ -174,6 +177,10 @@ export function createLevel0Scenarios(
     },
     /** The rack's power card fails, sparking and smoking, the PLC halts. */
     kaput: () => machine.inflict('card:plc-power'),
+    /** FAULTS: a fault on the building's lighting trips it. */
+    lightingFault: () => lighting?.fault(),
+    /** SYMPTOMS: the building browns out for a while, whatever the load. */
+    brownout: () => lighting?.brownout(),
     /** Whether a slow start is still going. */
     get starting() {
       return queue.length > 0;
