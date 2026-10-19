@@ -23,23 +23,36 @@ import {
   staticMergeEnabled,
 } from '../toolkit/components/core/views/merge-static';
 
-/** Left of the isolator, forward of it, facing the machine's operator. */
+/**
+ * The BBC Micro diagnostic workstation, its desk and its protected data
+ * lead to the line-up's first cabinet. By default it stands left of the
+ * isolator, forward of it, facing the machine's operator; `placement`
+ * (metres, and a turn about the vertical, its front at yaw 0 facing +z)
+ * stands it somewhere else. (The lead keeps its route; it is to be laid
+ * again for a new place.)
+ */
 export function addMachineWorkstation(
   kit: PanelKit,
   machine: { x: number; z: number },
   metre: number,
   dataPort: Object3D,
   link?: BbcDiagnosticLink,
+  placement?: { x: number; z: number; yaw: number },
 ) {
   const group = new Group();
   group.name = 'Encabulator diagnostic workstation';
   group.scale.setScalar(metre);
-  group.position.set(
-    (machine.x + MCC_ISOLATOR_X - 1.85) * metre,
-    0,
-    (machine.z + 0.8) * metre,
-  );
-  group.rotation.y = 1.3;
+  if (placement) {
+    group.position.set(placement.x * metre, 0, placement.z * metre);
+    group.rotation.y = placement.yaw;
+  } else {
+    group.position.set(
+      (machine.x + MCC_ISOLATOR_X - 1.85) * metre,
+      0,
+      (machine.z + 0.8) * metre,
+    );
+    group.rotation.y = 1.3;
+  }
   const parts = createPartSet();
   let station = parts.add(bbcWorkstation(kit, false, link));
   const active = signal(station.model);

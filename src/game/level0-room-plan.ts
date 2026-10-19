@@ -48,3 +48,15 @@ export const LEVEL0_MACHINE_HEADS = WAREHOUSE_HEADS.map((_, i) => i).filter(
     );
   },
 );
+
+/**
+ * The BBC Micro diagnostic workstation, fixed five metres out in front of
+ * the line-up, a little left of centre (clear of the player's start), so
+ * that sat at it one sees most of the machine beyond the screen. `yaw`
+ * turns the desk's front (its screen and chair) away from the machine.
+ */
+export const LEVEL0_WORKSTATION = {
+  x: LEVEL0_MACHINE.x - 1.3,
+  z: LEVEL0_MACHINE.z + 5,
+  yaw: -0.25,
+};
