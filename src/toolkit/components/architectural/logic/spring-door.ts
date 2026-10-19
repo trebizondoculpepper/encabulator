@@ -30,6 +30,15 @@ export function createSpringDoor() {
       pushing = direction;
       dwell = DOOR_DWELL_SECONDS;
     },
+    /**
+     * Stand it at `value` (radians, either way) at once, as if just
+     * pushed there: a door handed over from the other side of a doorway.
+     */
+    swingTo(value: number) {
+      angle = Math.max(-DOOR_OPEN_ANGLE, Math.min(DOOR_OPEN_ANGLE, value));
+      pushing = 0;
+      dwell = DOOR_DWELL_SECONDS;
+    },
     /** Shut it at once, silently. */
     snapShut() {
       angle = 0;

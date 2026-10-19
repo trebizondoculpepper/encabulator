@@ -41,8 +41,6 @@ function journeys() {
 }
 
 const bounds = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 };
-/** The rooms with doors of their own, which a use goes through at once. */
-const PATCHES: readonly string[] = ['training', 'rhombus', 'dev17', 'dev18'];
 const WALKER_RADIUS = 0.25;
 
 /**
@@ -71,9 +69,9 @@ describe('the doors and ways out', () => {
           z: Math.cos(start.yaw) * 0.05,
         };
         let at = { x: start.x, z: start.z };
-        // A door of its own (most rooms: a spring door) is pushed open first.
+        // Its spring door is pushed open first.
         const [use] = [...portals.uses.values()];
-        if (!PATCHES.includes(id)) use();
+        use();
         for (let i = 0; i < 80 && went().length === 0; i++) {
           at = slide(walls, at.x, at.z, step.x, step.z, WALKER_RADIUS);
           portals.update(1 / 60, at.x, at.z);
@@ -88,11 +86,8 @@ describe('the doors and ways out', () => {
         const [use] = [...portals.uses.values()];
         expect(use).toBeDefined();
         use();
-        // The rooms whose doors are their own travel at a use; a spring
-        // door only opens, and is walked through.
-        expect(went()).toEqual(
-          PATCHES.includes(id) ? [{ to: portal.to, from: id }] : [],
-        );
+        // A spring door only opens; it is walked through.
+        expect(went()).toEqual([]);
         portals.dispose();
       });
 

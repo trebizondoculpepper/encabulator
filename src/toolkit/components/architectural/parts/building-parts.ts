@@ -206,6 +206,10 @@ export function springDoor(
         door.snapShut();
         view.set((shown = 0));
       },
+      swingTo(value: number) {
+        door.swingTo(value);
+        view.set((shown = door.angle));
+      },
     },
     hold(on: boolean) {
       held = on;

@@ -293,6 +293,8 @@ export const partAudio = {
    * scene units make a metre.
    */
   listen(camera: Camera, metreInScene: number) {
+    // A room drawn under another, seen through a doorway, does not hear.
+    if (camera.userData.following) return;
     awaitGesture();
     metre = metreInScene;
     if (!context) return;

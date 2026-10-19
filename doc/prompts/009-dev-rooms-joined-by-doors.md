@@ -1,6 +1,6 @@
 # 009: The dev rooms joined by physical doors off the loop
 
-**Status: approved and under way. Stage A (every room's way out leads to the corridor, the corridor's doors travel) is done; stage B (rooms walked into through open doors, one renderer) is done for the corridor and the courtyard; every dev room's way out is now a spring door like the corridor's, and seeing through into the other rooms is to follow. Follows prompt 008. See the report.**
+**Status: approved and under way. Stage A (every room's way out leads to the corridor, the corridor's doors travel) is done; stage B (rooms walked into through open doors, one renderer) is done for the corridor and the courtyard; every room's way out is now a spring door like the corridor's (no portals are left), and every dev room is seen through its open door and walked into without a break. Follows prompt 008. See the report.**
 
 The owner has decided that from now on the dev rooms are connected by physical doors, not portals: the looping corridor (dev_corridor, prompt 008) is the hub, each room is reached through a spring door off it, and the portal network is retired or parked. Walking the loop and opening a door should feel like an open world, while the game draws only the corridor and, at most, the one room whose door is open.
 

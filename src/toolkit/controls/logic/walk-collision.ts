@@ -47,3 +47,40 @@ export function slide(
   }
   return { x, z };
 }
+
+/**
+ * `solids` with `openings` cut out of them: each solid that an opening
+ * overlaps is split into the up to four pieces of it round the opening,
+ * so a doorway can be walked through a wall built solid.
+ */
+export function cutOpenings(
+  solids: readonly Footprint[],
+  openings: readonly Footprint[],
+): Footprint[] {
+  let pieces = [...solids];
+  for (const hole of openings) {
+    const next: Footprint[] = [];
+    for (const s of pieces) {
+      const apart =
+        hole.maxX <= s.minX ||
+        hole.minX >= s.maxX ||
+        hole.maxZ <= s.minZ ||
+        hole.minZ >= s.maxZ;
+      if (apart) {
+        next.push(s);
+        continue;
+      }
+      // Either side across x, then what is left above and below in z.
+      if (hole.minX > s.minX) next.push({ ...s, maxX: hole.minX });
+      if (hole.maxX < s.maxX) next.push({ ...s, minX: hole.maxX });
+      const minX = Math.max(s.minX, hole.minX);
+      const maxX = Math.min(s.maxX, hole.maxX);
+      if (hole.minZ > s.minZ)
+        next.push({ minX, maxX, minZ: s.minZ, maxZ: hole.minZ });
+      if (hole.maxZ < s.maxZ)
+        next.push({ minX, maxX, minZ: hole.maxZ, maxZ: s.maxZ });
+    }
+    pieces = next;
+  }
+  return pieces;
+}

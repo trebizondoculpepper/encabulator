@@ -3,7 +3,7 @@ import { createObjectHandling } from './object-handling';
 import type { DropPlacement } from './object-handling';
 import type { PortableObject, SupportSurface } from './object-handling';
 import { lockUnavailable } from '../logic/pointer-lock';
-import { slide } from '../logic/walk-collision';
+import { cutOpenings, slide } from '../logic/walk-collision';
 import type { Footprint } from '../logic/walk-collision';
 import { PAD, controlsHelp, deadZone } from '../logic/controls';
 import type { InputMode } from '../logic/controls';
@@ -152,6 +152,31 @@ export interface FirstPersonOptions {
   fov?: number;
 }
 
+/** Where the eye is and how it looks, to drive another room's camera. */
+export interface EyePose {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  pitch: number;
+  /** The camera's field of view now, degrees. */
+  fov: number;
+}
+
+/**
+ * Each room's controller by its canvas, so that the app can drive one
+ * room's camera from another's (seeing through a doorway into a room drawn
+ * underneath, `src/main.ts`) and cut a doorway through its walls while a
+ * door is open. It binds no input.
+ */
+const controllers = new WeakMap<
+  HTMLCanvasElement,
+  ReturnType<typeof createFirstPerson>
+>();
+export function firstPersonOn(canvas: HTMLCanvasElement) {
+  return controllers.get(canvas) ?? null;
+}
+
 export function createFirstPerson(options: FirstPersonOptions) {
   const { canvas, camera, metre, floorY } = options;
   const handling = options.objects
@@ -194,6 +219,13 @@ export function createFirstPerson(options: FirstPersonOptions) {
   let releasedAt = -Infinity;
   // While held, the room has the camera: no input walks or looks.
   let holding = false;
+  /**
+   * While followed, another room has the camera: this room is drawn under
+   * it, seen through a doorway, its eye where the other's would be.
+   */
+  let following: (() => EyePose | null) | null = null;
+  /** Doorways cut through the walls (`cutOpenings`), while doors are open. */
+  let openings: () => readonly Footprint[] = () => [];
 
   const crosshair = document.createElement('div');
   crosshair.setAttribute('aria-hidden', 'true');
@@ -247,7 +279,15 @@ export function createFirstPerson(options: FirstPersonOptions) {
   }
   canvas.parentElement?.append(movement);
 
-  const locked = () => document.pointerLockElement === canvas;
+  // The mouse is captured on the app, not this room's canvas, so it stays
+  // captured as one room hands over to another through a doorway; it is
+  // this room's while this room is the one shown and not following.
+  const lockTarget: Element =
+    (typeof canvas.closest === 'function' && canvas.closest('#app')) || canvas;
+  const current = () =>
+    !following &&
+    !(typeof canvas.closest === 'function' && canvas.closest('[hidden]'));
+  const locked = () => document.pointerLockElement === lockTarget && current();
 
   // Touch: twin thumbsticks and a crouch button, shown while the last
   // input was a finger.
@@ -322,7 +362,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
 
   const keydown = (event: KeyboardEvent) => {
-    if (canvas.parentElement?.hidden) return;
+    if (canvas.parentElement?.hidden || following) return;
     if (typing(event)) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (WALK_KEYS.has(event.code) || event.code === 'KeyX') {
@@ -410,10 +450,12 @@ export function createFirstPerson(options: FirstPersonOptions) {
       }
       if (fingers.size > 2) return;
     }
+    if (following) return;
     if (event.pointerType === 'mouse' && !lockRefused) {
       if (event.button !== 0) return;
       if (locked()) use(0, 0);
-      else void Promise.resolve(canvas.requestPointerLock()).catch(refuseLock);
+      else
+        void Promise.resolve(lockTarget.requestPointerLock()).catch(refuseLock);
       return;
     }
     canvas.setPointerCapture(event.pointerId);
@@ -491,6 +533,14 @@ export function createFirstPerson(options: FirstPersonOptions) {
     walker.zoom = wheelZoom(walker.zoom, event.deltaY, event.deltaMode);
   };
 
+  // A click while captured lands on the app, not the canvas.
+  const lockedDown = (event: Event) => {
+    if (event.target === canvas) return;
+    const pointer = event as PointerEvent;
+    if (pointer.button === 0 && locked()) use(0, 0);
+  };
+  if (lockTarget !== canvas)
+    lockTarget.addEventListener('pointerdown', lockedDown);
   document.addEventListener('keydown', keydown);
   document.addEventListener('keyup', keyup);
   window.addEventListener('blur', forget);
@@ -517,7 +567,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     inspect: false,
   };
   const readGamepad = () => {
-    if (canvas.parentElement?.hidden) return idle;
+    if (canvas.parentElement?.hidden || following) return idle;
     const pad =
       typeof navigator !== 'undefined' && navigator.getGamepads
         ? [...navigator.getGamepads()].find((p) => p?.mapping === 'standard')
@@ -560,9 +610,41 @@ export function createFirstPerson(options: FirstPersonOptions) {
   };
 
   const eyeY = floorY + EYE_HEIGHT_METRES * metre;
-  return {
+  const controller = {
     walker,
     locked,
+    /** Where the eye is now, and how it looks. */
+    pose(): EyePose {
+      return {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z,
+        yaw: walker.yaw,
+        pitch: walker.pitch,
+        fov: camera.fov,
+      };
+    },
+    /**
+     * Have another room drive this one's camera (`pose`, read each frame;
+     * null lets go): no input walks or looks here meanwhile, and the room
+     * is drawn as seen from there.
+     */
+    follow(pose: (() => EyePose | null) | null) {
+      following = pose;
+      camera.userData.following = Boolean(pose);
+      forget();
+      if (!pose) {
+        // Back to its own eye on the next frame.
+        camera.fov = 0;
+      }
+    },
+    get following() {
+      return Boolean(following);
+    },
+    /** Doorways cut through the walls while their doors are open. */
+    set openings(value: () => readonly Footprint[]) {
+      openings = value;
+    },
     /** Stand at (x, z) facing `yaw`, looking `pitch` up, with the eye at `y`. */
     place(x: number, z: number, yaw: number, pitch: number, y = eyeY) {
       walker.x = x;
@@ -590,6 +672,24 @@ export function createFirstPerson(options: FirstPersonOptions) {
     },
     /** Walk and look for `delta` seconds, then place the camera. */
     update(delta: number) {
+      if (following) {
+        // Another room's eye: no walking, no looking, no crosshair.
+        const eye = following();
+        crosshair.hidden = true;
+        if (!eye) return;
+        camera.position.set(eye.x, eye.y, eye.z);
+        camera.lookAt(
+          eye.x + Math.sin(eye.yaw) * Math.cos(eye.pitch),
+          eye.y + Math.sin(eye.pitch),
+          eye.z - Math.cos(eye.yaw) * Math.cos(eye.pitch),
+        );
+        if (camera.fov !== eye.fov) {
+          camera.fov = eye.fov;
+          camera.updateProjectionMatrix();
+        }
+        handling?.update(delta);
+        return;
+      }
       const pad = readGamepad();
       const held = (...codes: string[]) =>
         codes.some((code) => keys.has(code) || tapped.has(code));
@@ -646,8 +746,11 @@ export function createFirstPerson(options: FirstPersonOptions) {
       const right = (aside / length) * speed + still * nudge.right;
       nudge.forward = 0;
       nudge.right = 0;
+      const cuts = openings();
       const next = slide(
-        options.solids?.() ?? [],
+        cuts.length
+          ? cutOpenings(options.solids?.() ?? [], cuts)
+          : (options.solids?.() ?? []),
         walker.x,
         walker.z,
         Math.sin(walker.yaw) * forward + Math.cos(walker.yaw) * right,
@@ -714,6 +817,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
     },
     dispose() {
       handling?.dispose();
+      lockTarget.removeEventListener('pointerdown', lockedDown);
       document.removeEventListener('keydown', keydown);
       document.removeEventListener('keyup', keyup);
       window.removeEventListener('blur', forget);
@@ -731,6 +835,7 @@ export function createFirstPerson(options: FirstPersonOptions) {
       container?.removeEventListener('gesturestart', stopGesture);
       sticks?.dispose();
       if (locked()) document.exitPointerLock();
+      controllers.delete(canvas);
       crosshair.remove();
       movement.remove();
       crouchButton.remove();
@@ -739,4 +844,6 @@ export function createFirstPerson(options: FirstPersonOptions) {
       help.remove();
     },
   };
+  controllers.set(canvas, controller);
+  return controller;
 }

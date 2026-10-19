@@ -1,9 +1,13 @@
 import {
+  BackSide,
   BoxGeometry,
   CanvasTexture,
   DoubleSide,
   Group,
   Mesh,
+  MeshBasicMaterial,
+  NoBlending,
+  PlaneGeometry,
   RepeatWrapping,
   Shape,
   ShapeGeometry,
@@ -143,7 +147,19 @@ export function createDevCorridor(
     tray: kitPaint(kit, '#b8bfbd', 0.48),
     housing: kitPaint(kit, '#e3e3dc', 0.5),
     tube: kitGlow(kit, '#f5f7ee'),
+    /** The inside of a door's lobby box. */
+    lobby: kitPaint(kit, '#141617').clone(),
+    /** Nothing, not even the background: the room underneath shows. */
+    hole: new MeshBasicMaterial({
+      color: '#000000',
+      opacity: 0,
+      blending: NoBlending,
+      toneMapped: false,
+      depthWrite: false,
+    }),
   };
+  mat.lobby.side = BackSide;
+  kit.materials.push(mat.lobby, mat.hole);
   for (const m of [mat.teal, mat.magenta, mat.purple, mat.blue])
     m.side = DoubleSide;
   // Mortar joints painted on a small repeating canvas, not one mesh a block.
@@ -471,6 +487,11 @@ export function createDevCorridor(
     /** Where its leaf hangs, metres, for holding it while someone passes. */
     x: number;
     z: number;
+    /** Its turn, its face (+z) into the corridor. */
+    yaw: number;
+    /** An outer door's dark lobby, and the doorway seen through instead. */
+    lobby: Mesh | null;
+    hole: Mesh | null;
   }[] = [];
   let outerIndex = 0;
   for (const door of LOOP_DOORS) {
@@ -511,55 +532,41 @@ export function createDevCorridor(
     part.object.position.set(x, 0, z);
     part.object.rotation.y = yaw;
     zone.group.add(part.object);
-    // The dark lobby behind an outer door, for now: what is behind it is a
-    // room of its own, not drawn here. Behind an inner door is the
-    // courtyard, which the room draws there while it is open.
-    const lobby = new Group();
+    // The dark lobby behind an outer door, one inside-out box: what is
+    // behind it is a room of its own, not drawn here. Seen through (the
+    // room drawn underneath, by the app), the lobby goes and the doorway
+    // shows nothing at all (`hole`), so the room below shows through; the
+    // leaf is drawn after it, so it is seen swinging into that room.
+    // Behind an inner door is the courtyard, drawn there while it is open.
+    let lobby: Mesh | null = null;
+    let hole: Mesh | null = null;
     if (door.wall === 'outer') {
-      lobby.position.set(x, 0, z);
-      lobby.rotation.y = yaw;
-      zone.still.add(lobby);
-      box(
-        lobby,
-        mat.dark,
-        SPRING_OPENING.width + 0.2,
-        SPRING_OPENING.height + 0.1,
-        0.05,
-        0,
-        (SPRING_OPENING.height + 0.1) / 2,
-        -LOBBY,
-      );
-      for (const sx of [-1, 1])
-        box(
-          lobby,
-          mat.dark,
-          0.05,
+      lobby = new Mesh(
+        new BoxGeometry(
+          SPRING_OPENING.width + 0.2,
           SPRING_OPENING.height + 0.1,
           LOBBY,
-          sx * (SPRING_OPENING.width / 2 + 0.1),
-          (SPRING_OPENING.height + 0.1) / 2,
-          -LOBBY / 2,
-        );
-      box(
-        lobby,
-        mat.dark,
-        SPRING_OPENING.width + 0.2,
-        0.05,
-        LOBBY,
-        0,
-        SPRING_OPENING.height + 0.1,
-        -LOBBY / 2,
+        ),
+        mat.lobby,
       );
-      box(
-        lobby,
-        mat.dark,
-        SPRING_OPENING.width + 0.2,
-        0.05,
-        LOBBY,
-        0,
-        0,
-        -LOBBY / 2,
+      lobby.position.set(0, (SPRING_OPENING.height + 0.1) / 2, -LOBBY / 2);
+      lobby.raycast = () => {};
+      part.object.add(lobby);
+      hole = new Mesh(
+        new PlaneGeometry(SPRING_OPENING.width, SPRING_OPENING.height),
+        mat.hole,
       );
+      hole.position.set(0, SPRING_OPENING.height / 2, -0.03);
+      hole.renderOrder = 10;
+      hole.raycast = () => {};
+      hole.visible = false;
+      part.object.add(hole);
+      part.object.traverse((o) => {
+        if (!o.userData.live) return;
+        o.traverse((m) => {
+          if (m instanceof Mesh) m.renderOrder = 11;
+        });
+      });
     }
     // Its room's name over it, on its colour.
     const colour = room
@@ -575,7 +582,7 @@ export function createDevCorridor(
     });
     sign.position.set(0, SPRING_OPENING.height + 0.32, 0.1);
     part.object.add(sign);
-    doors.push({ door, room, part, x, z });
+    doors.push({ door, room, part, x, z, yaw, lobby, hole });
   }
 
   // ---- Fire points -------------------------------------------------------

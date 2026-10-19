@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { slide } from './walk-collision';
+import { cutOpenings, slide } from './walk-collision';
 
 const wall = { minX: -10, maxX: 10, minZ: 4, maxZ: 5 };
 
@@ -35,5 +35,21 @@ describe('slide', () => {
 
   it('lets a walker caught inside something step back out', () => {
     expect(slide([wall], 0, 4.5, 0, -3, 0.5).z).toBeCloseTo(1.5);
+  });
+});
+
+describe('openings cut through solids', () => {
+  it('lets a walker through a doorway in a wall, and not beside it', () => {
+    const wall = { minX: -5, maxX: 5, minZ: -0.15, maxZ: 0.15 };
+    const door = { minX: -0.5, maxX: 0.5, minZ: -1, maxZ: 1 };
+    const cut = cutOpenings([wall], [door]);
+    const through = slide(cut, 0, 1, 0, -2, 0.25);
+    expect(through.z).toBeCloseTo(-1);
+    const beside = slide(cut, 2, 1, 0, -2, 0.25);
+    expect(beside.z).toBeGreaterThan(0.15);
+    // Nothing is cut from a solid the opening misses.
+    expect(cutOpenings([wall], [{ ...door, minX: 6, maxX: 7 }])).toEqual([
+      wall,
+    ]);
   });
 });

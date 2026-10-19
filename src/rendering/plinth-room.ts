@@ -17,7 +17,12 @@ import {
 import type { Material, Texture } from 'three';
 import { MeshStandardNodeMaterial, PMREMGenerator } from 'three/webgpu';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { devPortals, devWalls } from '../toolkit/gallery/logic/dev-room-links';
+import {
+  cutDoorways,
+  devPortals,
+  devWalls,
+} from '../toolkit/gallery/logic/dev-room-links';
+import { SPRING_OPENING } from '../toolkit/components/architectural/views/spring-door';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { METRE } from '../toolkit/components/core/logic/units';
 import { PLINTHS, createPlinthTracker, spotlightLevels } from '../game/plinths';
@@ -102,7 +107,14 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
   ceilingMesh.position.y = HEIGHT * m;
   scene.add(floorMesh, ceilingMesh);
   const roomMeshes: Mesh[] = [floorMesh, ceilingMesh];
-  const walls = devWalls(bounds, m, HEIGHT * m);
+  // A real opening in the east wall for its spring door: drawn by WebGPU,
+  // the room has no stencil to draw a doorway into a solid wall.
+  const exits = devPortals('rhombus', bounds, m);
+  const walls = cutDoorways(
+    devWalls(bounds, m, HEIGHT * m),
+    exits,
+    SPRING_OPENING.width * m,
+  );
   for (const piece of walls) {
     const mesh = new Mesh(
       new BoxGeometry(
@@ -121,12 +133,7 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     scene.add(mesh);
     roomMeshes.push(mesh);
   }
-  const portals = createPortals(
-    'rhombus',
-    devPortals('rhombus', bounds, m),
-    0,
-    m,
-  );
+  const portals = createPortals('rhombus', exits, 0, m, { opening: true });
   scene.add(portals.group);
 
   // Two luminous tape edges lead from the gallery's south approach round
@@ -455,11 +462,14 @@ export function startPlinthRoom(canvas: HTMLCanvasElement) {
     floorY: 0,
     start: views[params.get('view') ?? ''] ??
       portals.arrival(params.get('from')) ?? { x: 0, z: 14 * m, yaw: 0 },
-    solids: () => [...walls, ...footprints],
+    solids: () => [...walls, ...footprints, ...portals.solids()],
     use: (x, y) => {
       raycaster.setFromCamera(pointer.set(x, y), camera);
-      const hit = raycaster.intersectObjects([...portals.uses.keys()], true)[0];
-      if (hit) portals.uses.get(hit.object as Mesh)?.();
+      const hit = raycaster.intersectObjects([portals.group], true)[0];
+      for (let o: Object3D | null = hit?.object ?? null; o; o = o.parent) {
+        const use = portals.uses.get(o);
+        if (use) return use();
+      }
     },
   });
 

@@ -33,7 +33,8 @@ export type DevRoomId =
   | 'dev19'
   | 'dev20'
   | 'dev21'
-  | 'dev22';
+  | 'dev22'
+  | 'dev23';
 export type RoomId =
   | DevRoomId
   | 'hall'
@@ -75,6 +76,7 @@ export const DEV_ROOMS: readonly DevRoomId[] = [
   'dev20',
   'dev21',
   'dev22',
+  'dev23',
 ];
 
 /** The rooms linked by portals, in order along the chain. */
@@ -122,6 +124,7 @@ export const DEV_ROOM_NAMES: Record<RoomId, string> = {
   dev20: 'DEV20 · REPAIR WORKSHOP',
   dev21: 'DEV21 · SETTLING OBJECTS INTO SKIPS',
   dev22: 'DEV22 · FIRES',
+  dev23: 'DEV23 · RECEPTION',
   hall: 'THE HALL',
   dev_courtyard: 'COURTYARD',
   rhombus: 'RHOMBUS',
@@ -153,6 +156,7 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   dev20: '#798b91',
   dev21: '#c4a24a',
   dev22: '#e0602a',
+  dev23: '#3e7f8c',
   hall: '#c9c23a',
   dev_courtyard: '#7fa36a',
   rhombus: '#d8d4c8',
@@ -160,18 +164,17 @@ export const DEV_ROOM_COLOURS: Record<RoomId, string> = {
   level0: '#809c91',
   level2: '#8c99a6',
 };
-export const PORTAL_WIDTH = 1.2;
-export const PORTAL_HEIGHT = 2.2;
 /** How thick a room's walls are, metres. */
 export const WALL_THICKNESS = 0.3;
 
 /**
  * A room's way out, in scene units (`metre` per metre): since the dev
  * rooms were wired to dev_corridor's doors (`doc/prompts/009`), every room
- * has a single way out, back to the corridor, which leads round the loop
- * to every other: on its west wall near its south end (dev17 and dev18 on
- * their north wall, by the warehouse's escape); the training room's door
- * in its north wall; the Rhombus mini-game's EXIT door in its east wall.
+ * has a single way out, a spring door back to the corridor, which leads
+ * round the loop to every other: on its west wall near its south end
+ * (dev17 and dev18 on their north wall, clear of the doors already there);
+ * the training room's in its north wall; the Rhombus mini-game's in its
+ * east wall.
  * The corridor and the courtyard have doors of their own instead, and the
  * Hall none.
  */
@@ -191,9 +194,13 @@ export function devPortals(
         z: bounds.minZ,
       },
     ];
-  if (id === 'dev17' || id === 'dev18')
+  // In the warehouse, in a clear bay of its north wall between columns.
+  if (id === 'dev17')
+    return [{ to, side: 'north', x: bounds.minX + 15 * metre, z: bounds.minZ }];
+  // In dev18, in the north wall's corner, clear of the doors shown there.
+  if (id === 'dev18')
     return [
-      { to, side: 'north', x: bounds.maxX - 1.1 * metre, z: bounds.minZ },
+      { to, side: 'north', x: bounds.maxX - 1.4 * metre, z: bounds.minZ },
     ];
   if (id === 'rhombus') return [{ to, side: 'east', x: bounds.maxX, z: 0 }];
   return [{ to, side: 'west', x: bounds.minX, z: bounds.maxZ - 1.1 * metre }];
@@ -244,7 +251,61 @@ export function devWalls(
   ];
 }
 
+/**
+ * `walls` (from `devWalls`) with a doorway cut through for each of
+ * `doors`, the width of a spring door's opening (`width`, scene units),
+ * full height: for a room that cuts real openings for its doors rather
+ * than drawing them into a solid wall.
+ */
+export function cutDoorways(
+  walls: readonly WallPiece[],
+  doors: readonly Portal[],
+  width: number,
+): WallPiece[] {
+  let pieces = [...walls];
+  for (const door of doors) {
+    const across = door.side === 'east' || door.side === 'west';
+    const next: WallPiece[] = [];
+    for (const piece of pieces) {
+      const hit = across
+        ? door.x >= piece.minX &&
+          door.x <= piece.maxX &&
+          door.z > piece.minZ &&
+          door.z < piece.maxZ
+        : door.z >= piece.minZ &&
+          door.z <= piece.maxZ &&
+          door.x > piece.minX &&
+          door.x < piece.maxX;
+      if (!hit) {
+        next.push(piece);
+        continue;
+      }
+      const at = across ? door.z : door.x;
+      const lo = across ? piece.minZ : piece.minX;
+      const hi = across ? piece.maxZ : piece.maxX;
+      for (const [a, b] of [
+        [lo, at - width / 2],
+        [at + width / 2, hi],
+      ])
+        if (b > a)
+          next.push(
+            across
+              ? { ...piece, minZ: a, maxZ: b }
+              : { ...piece, minX: a, maxX: b },
+          );
+    }
+    pieces = next;
+  }
+  return pieces;
+}
+
 /** Travel is handled by the app, without reloading the browser. */
-export function enterDevRoom(to: RoomId, from: RoomId) {
-  window.dispatchEvent(new CustomEvent('dev-room', { detail: { to, from } }));
+export function enterDevRoom(to: RoomId, from: RoomId, through = false) {
+  // `through`: walked through a doorway the room beyond was seen through,
+  // so the app hands over without a break (`src/main.ts`).
+  window.dispatchEvent(
+    new CustomEvent('dev-room', {
+      detail: through ? { to, from, through } : { to, from },
+    }),
+  );
 }

@@ -32,6 +32,7 @@ import {
   toWorld,
 } from '../game/courtyard-join';
 import type { Anchor } from '../game/courtyard-join';
+import { registerJoint } from '../toolkit/gallery/logic/door-joins';
 import { createDevCorridor } from '../scene/dev-corridor';
 import {
   devPortals,
@@ -282,18 +283,78 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
   };
 
   /**
-   * Walking through an open outer door goes to its dev room, drawn on its
-   * own; the inner doors are walked through into the courtyard.
+   * Walking through an open outer door goes to its dev room. Each is a
+   * joint (`registerJoint`): while the app draws the room beyond
+   * underneath, seen through the doorway (`see`), the door is walked
+   * through, over its threshold, and the room takes over without a break;
+   * otherwise it goes on reaching the doorway, the room drawn on its own.
+   * The inner doors are walked through into the courtyard.
    */
   let leaving = false;
+  const outerDoors = corridor.doors
+    .filter((d) => d.door.wall === 'outer' && d.room)
+    .map((d) => {
+      const found: Object3D[] = [];
+      d.part.object.traverse((o) => {
+        if (o.userData.live) found.push(o);
+      });
+      const leaf: Object3D | null = found[0] ?? null;
+      return { ...d, room: d.room!, leaf, seeing: false, was: -Infinity };
+    });
+  const withdrawJoints = outerDoors.map((d) => {
+    const way = doorway(d.door);
+    return registerJoint('dev_corridor', d.room, {
+      frame: { x: way.x * m, z: way.z * m, yaw: d.yaw },
+      open: () => d.part.door.open,
+      angle: () => d.part.door.angle,
+      swingTo: (angle) => d.part.door.swingTo(angle),
+      opening: () => {
+        // Through the outer wall and well beyond, the doorway's width.
+        const across = { x: Math.abs(way.out.z), z: Math.abs(way.out.x) };
+        const ends = [-0.4, 3].map((k) => ({
+          x: way.x + way.out.x * k,
+          z: way.z + way.out.z * k,
+        }));
+        return {
+          minX: (Math.min(ends[0].x, ends[1].x) - across.x * 0.5) * m,
+          maxX: (Math.max(ends[0].x, ends[1].x) + across.x * 0.5) * m,
+          minZ: (Math.min(ends[0].z, ends[1].z) - across.z * 0.5) * m,
+          maxZ: (Math.max(ends[0].z, ends[1].z) + across.z * 0.5) * m,
+        };
+      },
+      see: (on) => {
+        d.seeing = on;
+        if (d.lobby) d.lobby.visible = !on;
+        if (d.hole) d.hole.visible = on;
+      },
+      peek: (on) => {
+        if (d.leaf) d.leaf.visible = !on;
+        if (d.lobby) d.lobby.visible = !on && !d.seeing;
+      },
+    });
+  });
   const goThrough = (x: number, z: number) => {
-    if (leaving) return;
-    for (const d of corridor.doors) {
-      if (d.door.wall === 'inner' || !d.room) continue;
-      if (!d.part.door.open || !walkedThrough(d.door, x, z)) continue;
-      leaving = true;
-      enterDevRoom(d.room, 'dev_corridor');
-      return;
+    for (const d of outerDoors) {
+      const way = doorway(d.door);
+      // How far out through the doorway, metres, and how far to one side.
+      const out = (x - way.x) * way.out.x + (z - way.z) * way.out.z;
+      const aside = Math.abs((x - way.x) * way.out.z - (z - way.z) * way.out.x);
+      const was = d.was;
+      d.was = out;
+      const inDoorway = aside <= 0.5 && out >= -0.6 && out <= 0.6;
+      d.part.hold(inDoorway && d.part.door.open);
+      if (leaving || !d.part.door.open) continue;
+      if (d.seeing) {
+        if (aside <= 0.5 && was < 0 && out >= 0) {
+          leaving = true;
+          enterDevRoom(d.room, 'dev_corridor', true);
+          return;
+        }
+      } else if (walkedThrough(d.door, x, z)) {
+        leaving = true;
+        enterDevRoom(d.room, 'dev_corridor');
+        return;
+      }
     }
   };
 
@@ -483,6 +544,7 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
   };
 
   const dispose = () => {
+    for (const w of withdrawJoints) w();
     renderer.setAnimationLoop(null);
     observer.disconnect();
     walk.dispose();
@@ -518,6 +580,7 @@ export function startDevCorridorRoom(canvas: HTMLCanvasElement) {
       }
       // Back through a door: it is shut behind the player now.
       for (const d of allDoors) d.part.door.snapShut();
+      for (const d of outerDoors) d.was = -Infinity;
       const at = arrival(previous);
       if (at) walk.place(at.x, at.z, at.yaw, at.pitch);
     },

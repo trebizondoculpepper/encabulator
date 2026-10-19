@@ -34,6 +34,25 @@ export const realistic = true;
 /** The most pixels per CSS pixel drawn: sharp on a Retina screen, not wasteful. */
 const MAX_PIXEL_RATIO = 2;
 
+/**
+ * Each room's renderer by its canvas, and the frame loop it was given, so
+ * that development tools can run a room's frames themselves (where the
+ * browser does not, as in a hidden tab): `devShot` in `src/main.ts`.
+ */
+const renderers = new WeakMap<HTMLCanvasElement, RoomRenderer>();
+export interface RoomRenderer {
+  renderer: WebGLRenderer;
+  /** The room's frame, as given to `setAnimationLoop`. */
+  loop: ((time: number) => void) | null;
+  /** While paused the browser does not run the frame; `after` may. */
+  paused: boolean;
+  /** Run just after each of this room's frames: another room's, drawn under it. */
+  after: ((time: number) => void) | null;
+}
+export function rendererOn(canvas: HTMLCanvasElement) {
+  return renderers.get(canvas) ?? null;
+}
+
 /** A WebGL renderer for a room (the Hall has its own, hall-pipeline.ts). */
 export function createRenderer(canvas: HTMLCanvasElement) {
   // A stencil buffer, for doorways that look into a space the room does
@@ -55,6 +74,25 @@ export function createRenderer(canvas: HTMLCanvasElement) {
         : NeutralToneMapping;
   renderer.toneMappingExposure = exposure;
   renderer.shadowMap.type = PCFSoftShadowMap;
+  const entry: RoomRenderer = {
+    renderer,
+    loop: null,
+    paused: false,
+    after: null,
+  };
+  renderers.set(canvas, entry);
+  const setLoop = renderer.setAnimationLoop.bind(renderer);
+  renderer.setAnimationLoop = (callback) => {
+    entry.loop = callback as ((time: number) => void) | null;
+    setLoop(
+      callback
+        ? (time, frame) => {
+            if (!entry.paused) callback(time, frame);
+            entry.after?.(time);
+          }
+        : null,
+    );
+  };
   return renderer;
 }
 
