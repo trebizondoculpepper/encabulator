@@ -594,6 +594,9 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   arc.group.scale.setScalar(3 * m);
   scene.add(arc.group);
   const crack = click({ band: 3200, q: 0.7, decay: 0.09, level: 0.35 });
+  const crackle = click({ band: 4200, q: 0.9, decay: 0.05, level: 0.18 });
+  /** Seconds to each spark still to spit from the socket after a pop. */
+  let afterSparks: number[] = [];
   const dazzle = createDazzle(canvas, camera);
   const allowPickup = (object: Object3D) => {
     const liveRack = racks.findIndex(
@@ -614,6 +617,11 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       arc.fire();
       partAudio.play(crack, object);
       dazzle.flash(object, { reduced: reducedMotion() });
+      // Then none to three more, spat from the socket as it settles.
+      afterSparks = [];
+      let at = 0;
+      for (let n = Math.floor(Math.random() * 4); n > 0; n--)
+        afterSparks.push((at += 0.12 + Math.random() * 0.45));
       notice(station, 'PULLED LIVE');
     }
     return true;
@@ -710,6 +718,14 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
     parts.update(delta);
     fuse.update(delta);
     arc.update(delta, reducedMotion());
+    if (afterSparks.length) {
+      afterSparks = afterSparks.map((left) => left - delta);
+      if (afterSparks[0] <= 0) {
+        afterSparks.shift();
+        arc.fire();
+        partAudio.play(crackle, arc.group);
+      }
+    }
     dazzle.update(delta);
     for (let i = pending.length - 1; i >= 0; i--) {
       const insertion = pending[i];
