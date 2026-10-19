@@ -59,4 +59,3 @@ In the browser: `?room=dev23` did not start the room at the time of this run, be
 ## 2026-10-19: Neumann Dynamik's office
 
 The owner corrected the company: the reception is a Neumann Dynamik office, not Meridale's. `BRAND` in `src/toolkit/gallery/rooms/reception.ts` is now `neumann-dynamik`, so the logo behind the desk, its tagline, the brochures, the course register and the directional sign and the First floor offices plate take Neumann Dynamik's mark and colours (navy and steel grey). Its tagline, from `brands.ts`, is German ("Präzision in Bewegung"), as the brand's own.
-

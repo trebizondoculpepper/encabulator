@@ -25,6 +25,7 @@ import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
 import { createMicroLabel } from '../toolkit/components/core/views/eighties-controls';
 import { architecturalPart } from '../toolkit/components/architectural/parts/architectural-parts';
+import { createBrandBadge } from '../toolkit/components/core/views/brand-badge';
 import { createPartSet } from '../toolkit/components/core/parts/parts';
 import type { ArchitecturalKind } from '../toolkit/components/architectural/logic/architectural-fittings';
 import { ARCHITECTURAL_FITTINGS } from '../toolkit/components/architectural/logic/architectural-fittings';
@@ -494,7 +495,11 @@ export function createWarehouseTrainingRoom(
     put('utilitydoor', north, x, 0, 0.04, { legend: text });
   // The first aid room's own light, on a plain one-gang switch outside it.
   put('switch', north, -0.45, 1.1, 0.08);
-  label(north, 'NEUMANN DYNAMIK', 5, 0.14, 0, 3.7, 0.08, '#3b474a');
+  // The company's own building: its logo high on the north wall, as in
+  // the reception (dev23), over the site's name.
+  const logo = createBrandBadge(kit, 'neumann-dynamik', { height: 0.8 });
+  logo.position.set(0, 4.05, 0.08);
+  north.add(logo);
   label(
     north,
     'GUILDFORD  /  TRAINING WORKSHOP',
