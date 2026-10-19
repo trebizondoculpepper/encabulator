@@ -406,19 +406,33 @@ export function createDevCorridor(kit: PanelKit) {
     // A stripe along the inner wall at waist height, its whole length, in
     // the side's own colour, so the player knows which side they are on.
     const stripe = kitPaint(kit, LOOP_STRIPES[side]);
+    // It stops either side of the courtyard door, so it never crosses it.
+    const gaps = doorGaps(side, 'inner');
     for (const part of ['a', 'middle', 'b'] as const) {
-      const [t0, t1] = spans[part];
-      const mid = (t0 + t1) / 2;
-      box(
-        zones.get(`${side}.${part}`)!.still,
-        stripe,
-        s.along === 'x' ? t1 - t0 : 0.012,
-        0.12,
-        s.along === 'x' ? 0.012 : t1 - t0,
-        s.along === 'x' ? mid : innerFace,
-        0.95,
-        s.along === 'x' ? innerFace : mid,
-      );
+      const [p0, p1] = spans[part];
+      let pieces: [number, number][] = [[p0, p1]];
+      for (const [g0, g1] of gaps)
+        pieces = pieces.flatMap(([t0, t1]): [number, number][] =>
+          g1 <= t0 || g0 >= t1
+            ? [[t0, t1]]
+            : ([
+                [t0, Math.max(t0, g0)],
+                [Math.min(t1, g1), t1],
+              ].filter(([u0, u1]) => u1 - u0 > 0.01) as [number, number][]),
+        );
+      for (const [t0, t1] of pieces) {
+        const mid = (t0 + t1) / 2;
+        box(
+          zones.get(`${side}.${part}`)!.still,
+          stripe,
+          s.along === 'x' ? t1 - t0 : 0.012,
+          0.12,
+          s.along === 'x' ? 0.012 : t1 - t0,
+          s.along === 'x' ? mid : innerFace,
+          0.95,
+          s.along === 'x' ? innerFace : mid,
+        );
+      }
     }
   }
 
