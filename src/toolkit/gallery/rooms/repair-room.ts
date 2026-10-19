@@ -49,6 +49,9 @@ const FLOOR = { minX: -6, maxX: 6, minZ: -5, maxZ: 5 };
 const CEILING = 3.2;
 const SOCKET_AIM_REACH = 3.2;
 
+/** Where the scrap skip stands, on the floor plan, metres. */
+const SKIP_AT = { x: -3.25, z: 1.6 };
+
 /** Dev20: isolate, extract, discard, collect a spare, align, and insert. */
 export function startRepairRoom(canvas: HTMLCanvasElement) {
   const m = METRE;
@@ -325,11 +328,14 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
   const skip = tossing.add({
     name: 'scrap skip',
     ...createSkip(kit),
-    x: -3.25,
-    z: 1.6,
+    x: SKIP_AT.x,
+    z: SKIP_AT.z,
   });
+  // Where the tossing and the walls think it is: it was drawn at the
+  // room's middle, so nothing carried to it could be thrown in.
+  skip.group.position.set(SKIP_AT.x, 0, SKIP_AT.z);
   room.add(skip.group);
-  label('SCRAP · ACTION WITHIN 2 M', -3.25, 1.07, 2.35, 2.2);
+  label('SCRAP · ACTION WITHIN 2 M', SKIP_AT.x, 1.07, SKIP_AT.z + 0.75, 2.2);
   const light = new SpotLight('#fff3e2', 16 * m * m, 0, 0.42, 0.6, 2);
   light.position.set(0, (CEILING - 0.1) * m, 0);
   light.target.position.set(0, m, -2 * m);
@@ -365,10 +371,10 @@ export function startRepairRoom(canvas: HTMLCanvasElement) {
       maxZ: (benchZ + 0.55) * m,
     },
     {
-      minX: (-3.25 - 1) * m,
-      maxX: (-3.25 + 1) * m,
-      minZ: (1.6 - 0.7) * m,
-      maxZ: (1.6 + 0.7) * m,
+      minX: (SKIP_AT.x - 1) * m,
+      maxX: (SKIP_AT.x + 1) * m,
+      minZ: (SKIP_AT.z - 0.7) * m,
+      maxZ: (SKIP_AT.z + 0.7) * m,
     },
   ];
   const carrySolids = () => [
