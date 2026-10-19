@@ -1,4 +1,5 @@
-import { Group, Sprite, SpriteMaterial } from 'three';
+import { ParticleSprite } from './particles';
+import { Group, SpriteMaterial } from 'three';
 import { createCanvasTexture } from './screens';
 
 /**
@@ -23,10 +24,8 @@ export function createSmokeEmitter(puffCount = 14, colour = '222, 222, 216') {
       depthWrite: false,
       opacity: 0,
     });
-    const sprite = new Sprite(material);
+    const sprite = new ParticleSprite(material);
     sprite.userData.noCollision = true;
-    // Smoke is visual only, even while its emitter is hidden or transparent.
-    sprite.raycast = () => {};
     group.add(sprite);
     return sprite;
   });

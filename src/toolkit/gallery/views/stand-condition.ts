@@ -1,3 +1,4 @@
+import { ParticleSprite } from '../../components/core/views/particles';
 import {
   AdditiveBlending,
   CatmullRomCurve3,
@@ -7,7 +8,6 @@ import {
   Mesh,
   PlaneGeometry,
   SphereGeometry,
-  Sprite,
   SpriteMaterial,
   TubeGeometry,
   Vector3,
@@ -314,10 +314,9 @@ function glowSprite(kit: PanelKit, colour: string, size: number) {
     transparent: true,
   });
   kit.materials.push(material);
-  const sprite = new Sprite(material);
+  const sprite = new ParticleSprite(material);
   sprite.scale.setScalar(size);
   // A glow takes no clicks: they go through to the button.
-  sprite.raycast = () => {};
   return { sprite, material };
 }
 

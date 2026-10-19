@@ -21,10 +21,25 @@ export function createPcbBackplane(
       : width / height > 1.1
         ? 'backplane'
         : 'cabinet';
-  const board = new Mesh(
-    new BoxGeometry(width, height, 0.0024),
-    pcbMaterials(kit, variant, 'z'),
-  );
+  const geometry = new BoxGeometry(width, height, 0.0024);
+  const materials = pcbMaterials(kit, variant, 'z');
+  // Four identical FR4 edge groups and two identical solder-mask faces
+  // can each draw together, retaining the existing UVs and appearance.
+  const groups = geometry.groups.slice();
+  geometry.clearGroups();
+  for (const group of groups) {
+    const materialIndex = materials.indexOf(
+      materials[group.materialIndex ?? 0],
+    );
+    const previous = geometry.groups.at(-1);
+    if (
+      previous?.materialIndex === materialIndex &&
+      previous.start + previous.count === group.start
+    )
+      previous.count += group.count;
+    else geometry.addGroup(group.start, group.count, materialIndex);
+  }
+  const board = new Mesh(geometry, materials);
   board.name = 'Textured green PCB';
   board.position.z = -0.0012;
   group.add(board);

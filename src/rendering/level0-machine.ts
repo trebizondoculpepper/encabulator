@@ -332,17 +332,34 @@ export function createLevel0Machine(
   mcc.group.add(contact.object);
   const diagnosticBoards = circuit('section1.bucket3').diagnostics!;
   const fuseHolders = [...mcc.circuits.values()].flatMap((unit) =>
-    unit.devices.filter((device) => device.kind === 'fuse').map((holder) => ({holder, unit})),
+    unit.devices
+      .filter((device) => device.kind === 'fuse')
+      .map((holder) => ({ holder, unit })),
   );
   const live = (device: MachineDevice) => {
-    const fuse = fuseHolders.find(({holder}) => holder.slots?.[0].occupant.value === device);
+    const fuse = fuseHolders.find(
+      ({ holder }) => holder.slots?.[0].occupant.value === device,
+    );
     if (fuse) return fuse.unit.breaker?.active.value ?? false;
-    return circuit(device === capacitors ? UNITS.vfd : diagnosticBoards.cards.includes(device) ? 'section1.bucket3' : UNITS.automation).powered.value;
+    return circuit(
+      device === capacitors
+        ? UNITS.vfd
+        : diagnosticBoards.cards.includes(device)
+          ? 'section1.bucket3'
+          : UNITS.automation,
+    ).powered.value;
   };
   const spareBoards: MachineDevice[] = [];
-  const boards = () => [...assembly.cards!, ...spareBoards, capacitors, ...diagnosticBoards.cards, ...fuseHolders.flatMap(({holder}) => holder.cartridges ?? [])];
+  const boards = () => [
+    ...assembly.cards!,
+    ...spareBoards,
+    capacitors,
+    ...diagnosticBoards.cards,
+    ...fuseHolders.flatMap(({ holder }) => holder.cartridges ?? []),
+  ];
   const canReseat = (device: MachineDevice, targetSlot?: number) => {
-    if (!boards().includes(device)) return false;
+    if (![...assembly.cards!, ...spareBoards, capacitors].includes(device))
+      return false;
     if (device === capacitors)
       return targetSlot === undefined && !capacitorsInPlace();
     const index = targetSlot ?? CARD_KINDS.indexOf(device.kind as CardKind);
@@ -373,7 +390,7 @@ export function createLevel0Machine(
   const repairSockets: CabinetSocket[] = [
     ...assembly.cards!.map((card, index) => ({
       home: assembly.object,
-      position: card.object.position.clone(),
+      position: card.object.position.clone().setZ(0.024),
       width: card.kind === 'plc-cpu' ? 0.061 : 0.03,
       height: 0.29,
       accepts: (object: Object3D) => {
@@ -396,11 +413,16 @@ export function createLevel0Machine(
         object === capacitors.object && reseat(capacitors),
     },
   ];
-  for (const socket of repairSockets) socket.position.z += 0.16;
-  for (const {holder, unit} of fuseHolders) {
+  repairSockets[repairSockets.length - 1].position.z += 0.16;
+  for (const { holder, unit } of fuseHolders) {
     repairSockets.push({
-      home: holder.object, position: holder.object.position.clone().set(0, 0, 0.04), width: 0.045, height: 0.065,
-      accepts: (object) => object.userData.repairKind === 'fuse' && !holder.slots![0].occupant.value,
+      home: holder.object,
+      position: holder.object.position.clone().set(0, 0, 0.04),
+      width: 0.045,
+      height: 0.065,
+      accepts: (object) =>
+        object.userData.repairKind === 'fuse' &&
+        !holder.slots![0].occupant.value,
       place: (object) => {
         const device = boards().find((board) => board.object === object);
         if (!device || !holder.insert!(device, 0)) return false;
@@ -409,27 +431,36 @@ export function createLevel0Machine(
       },
     });
   }
-  diagnosticBoards.slots.forEach((slot, i) => repairSockets.push({
-    home: diagnosticBoards.object, position: diagnosticBoards.object.position.clone().set(slot.x, 0, 0.19), width: 0.05, height: 0.13,
-    accepts: (object) => {
-      const device = boards().find((board) => board.object === object);
-      return Boolean(device && diagnosticBoards.accepts(device, i));
-    },
-    place: (object) => {
-      const device = boards().find((board) => board.object === object);
-      if (!device || !diagnosticBoards.insert(device, i)) return false;
-      if (circuit('section1.bucket3').powered.value) contact.fire(object);
-      return true;
-    },
-  }));
-  const otherSeated = () => [
-    ...diagnosticBoards.slots.map((slot) => slot.occupant.value),
-    ...fuseHolders.map(({holder}) => holder.slots![0].occupant.value),
-  ].filter((device): device is MachineDevice => device !== null);
-
+  diagnosticBoards.slots.forEach((slot, i) =>
+    repairSockets.push({
+      home: diagnosticBoards.object,
+      position: diagnosticBoards.object.position.clone().set(slot.x, 0, 0.024),
+      width: 0.05,
+      height: 0.13,
+      accepts: (object) => {
+        const device = boards().find((board) => board.object === object);
+        return Boolean(device && diagnosticBoards.accepts(device, i));
+      },
+      place: (object) => {
+        const device = boards().find((board) => board.object === object);
+        if (!device || !diagnosticBoards.insert(device, i)) return false;
+        if (circuit('section1.bucket3').powered.value) contact.fire(object);
+        return true;
+      },
+    }),
+  );
+  const otherSeated = () =>
+    [
+      ...diagnosticBoards.slots.map((slot) => slot.occupant.value),
+      ...fuseHolders.map(({ holder }) => holder.slots![0].occupant.value),
+    ].filter((device): device is MachineDevice => device !== null);
 
   const removedListeners = new Set<(board: MachineDevice) => void>();
-  let installed = new Set<MachineDevice>([...seated(), capacitors, ...otherSeated()]);
+  let installed = new Set<MachineDevice>([
+    ...seated(),
+    capacitors,
+    ...otherSeated(),
+  ]);
 
   let clock = 0;
   const update = (delta: number) => {

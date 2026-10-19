@@ -85,13 +85,13 @@ export function createLevel0Spares(
         ? machine.spareFuse()
         : kind === 'neumann-link' || kind === 'neumann-diagnostics'
           ? machine.spareDiagnostics(kind)
-        : kind.startsWith('plc-') && kind !== 'plc-comms'
-          ? machine.spare(kind as Parameters<typeof machine.spare>[0])
-          : machineComponent(kit, kind, {
-              name: `Spare ${title}`,
-              power: { value: false },
-              attachment: 'fixed',
-            });
+          : kind.startsWith('plc-') && kind !== 'plc-comms'
+            ? machine.spare(kind as Parameters<typeof machine.spare>[0])
+            : machineComponent(kit, kind, {
+                name: `Spare ${title}`,
+                power: { value: false },
+                attachment: 'fixed',
+              });
     if (!original.object.userData.portable)
       original.object.traverse((child) => {
         delete child.userData.portable;
@@ -111,7 +111,8 @@ export function createLevel0Spares(
     const device = parts.add(portablePart);
     device.object.userData.machineComponentKind = kind;
     device.object.name = `Spare ${title}`;
-    if (kind.startsWith('plc-') || kind.startsWith('neumann-')) device.object.rotation.z = Math.PI / 2;
+    if (kind.startsWith('plc-') || kind.startsWith('neumann-'))
+      device.object.rotation.z = Math.PI / 2;
     else if (original.dropProfile.shape === 'flat' && kind !== 'capacitors')
       device.object.rotation.x = -Math.PI / 2;
     device.object.updateMatrixWorld(true);

@@ -29,18 +29,23 @@ export function createCabinetPlacement(
     opacity: 0,
     depthWrite: false,
   });
+  const ray = new Raycaster();
   const targets = sockets.map((socket) => {
     const target = new Mesh(
       new PlaneGeometry(socket.width, socket.height),
       material,
     );
     target.name = 'Cabinet insertion target';
+    // These helpers belong only to placement. They must never intercept
+    // the room's control clicks or the shared pickup raycaster.
+    target.raycast = (caster, hits) => {
+      if (caster === ray) Mesh.prototype.raycast.call(target, caster, hits);
+    };
     target.position.copy(socket.position);
     target.visible = false;
     socket.home.add(target);
     return target;
   });
-  const ray = new Raycaster();
   const point = new Vector2();
   const within = (object: Object3D, parent: Object3D) => {
     for (let at: Object3D | null = object; at; at = at.parent)

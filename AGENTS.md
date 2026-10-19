@@ -8,6 +8,8 @@ For now the game is a series of development rooms that test the concepts the mac
 
 ## Rules
 
+- All particles and visual effects are non-interactive. Use `ParticleSprite` / `ParticlePoints` from `src/toolkit/components/core/views/particles.ts` for particle rendering; mesh-based effects must also disable raycasting. Fire, smoke, dust, sparks, embers, sprays and glow sprites must never intercept use, pickup or placement rays, whether visible, hidden or transparent.
+
 - The simulated machine has no safety gatekeeping: it is intentionally easy to damage or destroy. Detachable components may always be removed and fitted while powered; live handling produces sparks, pops, flashes and plausible faults instead of an isolation refusal or pickup lock. Isolation changes the consequences, not permission to act. Keep physical compatibility and occupied-slot checks. Fixed or soldered parts remain fixed unless explicitly modeled as detachable. Story instructions may advise isolation, but do not enforce it as a safety lock.
 - Carried-object placement feedback is contextual: a green circle means the held object can be inserted into the aimed target, a red X means that reachable target rejects it (wrong part, occupied slot or another real incompatibility). Targets beyond interaction range leave the normal crosshair; distance alone must not produce an X. Feedback and insertion must use the same acceptance decision.
 - Work on `main`. Do not create branches or worktrees unless the owner asks.

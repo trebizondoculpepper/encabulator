@@ -1,4 +1,5 @@
-import { AdditiveBlending, Group, Sprite, SpriteMaterial } from 'three';
+import { ParticleSprite } from '../../core/views/particles';
+import { AdditiveBlending, Group, SpriteMaterial } from 'three';
 import { createCanvasTexture } from '../../core/views/screens';
 
 /**
@@ -28,7 +29,7 @@ export function createEmbers(
   spark.context.fillRect(0, 0, 8, 8);
   spark.texture.needsUpdate = true;
   const sprites = Array.from({ length: count }, (_, i) => {
-    const sprite = new Sprite(
+    const sprite = new ParticleSprite(
       new SpriteMaterial({
         map: spark.texture,
         transparent: true,

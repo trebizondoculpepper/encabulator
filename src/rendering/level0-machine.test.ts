@@ -1,3 +1,4 @@
+import { createCabinetPlacement } from './cabinet-placement';
 import { createLevel0Failures } from './level0-failures';
 import { createBbcComputer } from '../toolkit/components/industrial-control/logic/bbc-micro';
 import { createLevel0Scenarios } from './level0-scenarios';
@@ -1037,11 +1038,13 @@ it('works the annunciator isolator through the open door, from its body as well 
     new Vector3(0, 0, -1),
   );
   ray.camera = new PerspectiveCamera();
-  const hit = ray.intersectObject(mcc.group, true).find((h) => {
-    for (let o: Object3D | null = h.object; o; o = o.parent)
-      if (!o.visible) return false;
-    return true;
-  });
+  const placement = createCabinetPlacement(
+    mcc.group,
+    ray.camera,
+    machine.repairSockets,
+    1,
+  );
+  const hit = ray.intersectObject(mcc.group, true)[0];
   let object: Object3D | null = hit?.object ?? null;
   while (object && !mcc.parts.uses.has(object)) object = object.parent;
   expect(object, `Hit ${hit?.object.name}`).not.toBeNull();
@@ -1054,12 +1057,12 @@ it('works the annunciator isolator through the open door, from its body as well 
   work();
   expect(unit.powered.value).toBe(true);
   expect(mcc.diagnosticEndpoint.value).toBe(true);
+  placement.dispose();
   dispose();
 });
 
-
 it('replaces the automation control fuse physically, preserving a blown cartridge fault', () => {
-  const {machine, room, powerUp, run, dispose} = sandbox();
+  const { machine, room, powerUp, run, dispose } = sandbox();
   powerUp();
   const unit = machine.mcc.circuits.get(UNITS.automation)!;
   const holder = unit.devices.find((device) => device.kind === 'fuse')!;
@@ -1071,7 +1074,9 @@ it('replaces the automation control fuse physically, preserving a blown cartridg
   expect(holder.slots![0].occupant.value).toBeNull();
   unit.reset();
   expect(old.faulted.value).toBe(true);
-  const socket = machine.repairSockets.find((socket) => socket.home === holder.object)!;
+  const socket = machine.repairSockets.find(
+    (socket) => socket.home === holder.object,
+  )!;
   expect(socket.accepts(old.object)).toBe(true);
   expect(socket.place(old.object)).toBe(true);
   expect(unit.powered.value).toBe(false);
@@ -1087,29 +1092,38 @@ it('replaces the automation control fuse physically, preserving a blown cartridg
 });
 
 it('removes and replaces both Neumann cards, with an amber annunciator fault and offline BBC diagnostics', () => {
-  const {machine, room, powerUp, run, dispose} = sandbox();
+  const { machine, room, powerUp, run, dispose } = sandbox();
   powerUp();
   const boards = machine.mcc.circuits.get('section1.bucket3')!.diagnostics!;
   const diagnostics = boards.slots[1].occupant.value!;
   const link = boards.slots[0].occupant.value!;
   const slotModels: Object3D[] = [];
-  boards.object.traverse((object) => { if (object.userData.contactLength) slotModels.push(object); });
+  boards.object.traverse((object) => {
+    if (object.userData.contactLength) slotModels.push(object);
+  });
   expect(slotModels).toHaveLength(4);
-  expect(slotModels.every((object) => object.userData.contactLength === 0.09)).toBe(true);
+  expect(
+    slotModels.every((object) => object.userData.contactLength === 0.09),
+  ).toBe(true);
   pull(diagnostics, room);
   run(0.1);
   expect(boards.diagnosticsOnline.value).toBe(false);
   expect(machine.mcc.diagnosticEndpoint.value).toBe(false);
   const colours = new Set<string | null>();
-  for (let n=0; n<12; n++) {
+  for (let n = 0; n < 12; n++) {
     run(0.1);
-    machine.mcc.group.traverse((o) => { if(o.name.startsWith('Status ')) colours.add(o.userData.lit ?? null); });
+    machine.mcc.group.traverse((o) => {
+      if (o.name.startsWith('Status ')) colours.add(o.userData.shown ?? null);
+    });
   }
   // Every status window uses the same dedicated component-failure flash.
-  expect(colours).toContain(null);
+  expect(colours).toEqual(new Set([null, '#ffb12a']));
   const spare = machine.spareDiagnostics('neumann-diagnostics');
   room.add(spare.object);
-  const socket = machine.repairSockets.find((socket) => socket.home === boards.object && socket.position.x === boards.slots[1].x)!;
+  const socket = machine.repairSockets.find(
+    (socket) =>
+      socket.home === boards.object && socket.position.x === boards.slots[1].x,
+  )!;
   expect(socket.accepts(link.object)).toBe(false);
   expect(socket.accepts(spare.object)).toBe(true);
   expect(socket.place(spare.object)).toBe(true);
@@ -1118,5 +1132,50 @@ it('removes and replaces both Neumann cards, with an amber annunciator fault and
   expect(machine.mcc.diagnosticEndpoint.value).toBe(false);
   expect(boards.diagnosticsOnline.value).toBe(true);
   spare.dispose();
+  dispose();
+});
+
+it('shows green when the correct carried card targets the visible connector from an angle', () => {
+  const { machine, room, powerUp, run, dispose } = sandbox();
+  powerUp();
+  machine.mcc.openAll(true);
+  run(2);
+  const camera = new PerspectiveCamera(55, 1, 0.01, 100);
+  const placement = createCabinetPlacement(
+    machine.mcc.group,
+    camera,
+    machine.repairSockets,
+    1,
+  );
+  const diagnostics =
+    machine.mcc.circuits.get('section1.bucket3')!.diagnostics!;
+  const cards = [...machine.assembly.cards!, ...diagnostics.cards];
+  const wrong = machine.spareFuse();
+  room.add(wrong.object);
+  for (const card of cards) {
+    const portable = card.object.userData.portable as PortableObject;
+    const connector = card.object.getWorldPosition(new Vector3());
+    connector.z += 0.024;
+    pull(card, room);
+    run(0.1);
+    camera.position.copy(connector).add(new Vector3(0.15, 0.35, 1));
+    camera.lookAt(connector);
+    camera.updateMatrixWorld(true);
+    expect(
+      placement.targetFeedback(card.object, portable, 0, 0),
+      card.object.name,
+    ).toBe('accept');
+    expect(
+      placement.targetFeedback(
+        wrong.object,
+        wrong.object.userData.portable as PortableObject,
+        0,
+        0,
+      ),
+    ).toBe('reject');
+    expect(placement.heldAction(card.object, portable, 0, 0)).toBe(true);
+  }
+  placement.dispose();
+  wrong.dispose();
   dispose();
 });

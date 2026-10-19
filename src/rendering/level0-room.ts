@@ -1,6 +1,13 @@
 import { createCabinetPlacement } from './cabinet-placement';
 import { createDazzle } from '../toolkit/components/core/views/dazzle';
-import { Group, Mesh, PerspectiveCamera, Raycaster, Vector2 } from 'three';
+import {
+  Group,
+  Mesh,
+  PerspectiveCamera,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from 'three';
 import type { Object3D } from 'three';
 import {
   LEVEL0_CHAIRS,
@@ -40,7 +47,10 @@ import {
 import { dressSkip } from '../toolkit/components/site-dressing/logic/skip-dressing';
 import { createBinTossing } from '../toolkit/components/site-dressing/parts/bin-tossing';
 import type { TossBin } from '../toolkit/components/site-dressing/parts/bin-tossing';
-import { createFirstPerson } from '../toolkit/controls/input/first-person';
+import {
+  createFirstPerson,
+  EYE_HEIGHT_METRES,
+} from '../toolkit/controls/input/first-person';
 import { knobDirection } from '../toolkit/controls/input/knob-turning';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import { devWalls } from '../toolkit/gallery/logic/dev-room-links';
@@ -142,10 +152,12 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   const pointer = new Vector2();
   const usableAt = (x: number, y: number) => {
     raycaster.setFromCamera(pointer.set(x, y), camera);
-    const hit = raycaster.intersectObjects(
-      [mcc.group, workstation.group, simulator.group, ...room.fittings],
-      true,
-    )[0];
+    const hit = raycaster
+      .intersectObjects(
+        [mcc.group, workstation.group, simulator.group, ...room.fittings],
+        true,
+      )
+      .find((hit) => !hit.object.userData.noCollision);
     if (!hit || hit.distance > 3.2 * m) return null;
     for (
       let object: Object3D | null = hit.object;
@@ -181,6 +193,11 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       maxZ: (LEVEL0_MACHINE.z + ISOLATOR.front) * m,
     },
   ];
+  const isolatorPoint = mcc.circuits
+    .get('section1.bucket3')!
+    .breaker!.object.getWorldPosition(new Vector3());
+  isolatorPoint.y += 0.025 * m;
+  isolatorPoint.z += 0.095 * m;
   const walk = createFirstPerson({
     nearbyTargetFeedback: tossing.targetFeedback,
     allowPickup: machine.allowPickup,
@@ -210,10 +227,13 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
                 .get('view')
                 ?.startsWith('annunciator')
             ? {
-                x: (LEVEL0_MACHINE.x - 1.79) * m,
+                x: isolatorPoint.x,
                 z: (LEVEL0_MACHINE.z + 0.8) * m,
                 yaw: 0,
-                pitch: -0.78,
+                pitch: Math.atan2(
+                  isolatorPoint.y - EYE_HEIGHT_METRES * m,
+                  (LEVEL0_MACHINE.z + 0.8) * m - isolatorPoint.z,
+                ),
               }
             : { ...LEVEL0_START, x: LEVEL0_START.x * m, z: LEVEL0_START.z * m },
     solids: () => [

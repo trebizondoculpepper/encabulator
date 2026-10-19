@@ -2,7 +2,6 @@ import { makeBoardPortable } from '../../core/parts/portable-board';
 import { MACHINE_DROP_PROFILES } from '../logic/machine-drop-profiles';
 import type { MachineDevice } from './machine-components';
 import type { PortableObject } from '../../../controls/input/object-handling';
-import { mergeStatic } from '../../core/views/merge-static';
 import { computed, effect, signal } from '@preact/signals-core';
 import { BoxGeometry, Mesh } from 'three';
 import { beginPart } from '../../core/parts/parts';
@@ -68,7 +67,6 @@ export function neumannDiagnostics(
       label.replace('\n', ' '),
       'ND',
     );
-    mergeStatic(pcb, 10);
     pcb.rotation.y = Math.PI / 2;
     pcb.position.z = 0.09;
     card.object.add(pcb);
@@ -171,7 +169,6 @@ export function neumannDiagnostics(
   const led = initial[0].object.getObjectByName(
     'Neumann Link Controller connection LED',
   )!;
-  mergeStatic(motherboard, 10);
   let audible = true;
   let previouslyConnected = false;
   let stopBeep = () => {};

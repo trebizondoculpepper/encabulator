@@ -1,3 +1,4 @@
+import { ParticlePoints } from '../../core/views/particles';
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -8,7 +9,6 @@ import {
   ExtrudeGeometry,
   Group,
   Mesh,
-  Points,
   PointsMaterial,
   Shape,
   SphereGeometry,
@@ -608,7 +608,7 @@ export function createSprinklerHead(kit: PanelKit, fallDistance = 3) {
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  const drops = new Points(
+  const drops = new ParticlePoints(
     geometry,
     new PointsMaterial({
       map: softDot(kit),
@@ -854,7 +854,7 @@ export function createExtinguisher(kit: PanelKit, kind: ExtinguisherKind) {
   const life = new Float32Array(count).map(() => Math.random());
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
-  const cloud = new Points(
+  const cloud = new ParticlePoints(
     geometry,
     new PointsMaterial({
       color:
@@ -1095,7 +1095,7 @@ export function createBinFire(kit: PanelKit) {
       depthWrite: false,
     });
     kit.materials.push(material);
-    const points = new Points(flameGeometry, material);
+    const points = new ParticlePoints(flameGeometry, material);
     points.frustumCulled = false;
     group.add(points);
     return { points, material, base };
@@ -1135,7 +1135,7 @@ export function createBinFire(kit: PanelKit) {
     depthWrite: false,
   });
   kit.materials.push(puffs);
-  const cloud = new Points(geometry, puffs);
+  const cloud = new ParticlePoints(geometry, puffs);
   cloud.frustumCulled = false;
   group.add(cloud);
   let time = 0;

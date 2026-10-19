@@ -1,10 +1,5 @@
-import {
-  AdditiveBlending,
-  Group,
-  PointLight,
-  Sprite,
-  SpriteMaterial,
-} from 'three';
+import { ParticleSprite } from './particles';
+import { AdditiveBlending, Group, PointLight, SpriteMaterial } from 'three';
 import type { PanelKit } from './eighties-controls';
 import { createCanvasTexture } from './screens';
 
@@ -43,8 +38,7 @@ function glowing(kit: PanelKit, map: ReturnType<typeof spot>, colour: string) {
     opacity: 0,
   });
   kit.materials.push(material);
-  const sprite = new Sprite(material);
-  sprite.raycast = () => {};
+  const sprite = new ParticleSprite(material);
   return sprite;
 }
 

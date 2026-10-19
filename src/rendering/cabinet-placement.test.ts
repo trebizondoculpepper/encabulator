@@ -5,6 +5,7 @@ import {
   MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
+  Raycaster,
   Scene,
   Vector3,
 } from 'three';
@@ -123,6 +124,20 @@ it('uses the normal crosshair beyond reach, through a closed door, or for hidden
   door.visible = false;
   f.home.visible = false;
   expect(f.handling.targetFeedback(0, 0)).toBeNull();
+  f.socket.dispose();
+  f.handling.dispose();
+});
+
+it('never intercepts ordinary control or pickup rays with invisible placement helpers', () => {
+  const f = fixture();
+  f.object.visible = false;
+  f.root.updateMatrixWorld(true);
+  const ray = new Raycaster(f.camera.position.clone(), new Vector3(0, 0, -1));
+  const hits = ray.intersectObject(f.home, true);
+  expect(hits.length).toBeGreaterThan(0);
+  expect(
+    hits.some((hit) => hit.object.name === 'Cabinet insertion target'),
+  ).toBe(false);
   f.socket.dispose();
   f.handling.dispose();
 });

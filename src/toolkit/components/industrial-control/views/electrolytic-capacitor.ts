@@ -1,3 +1,4 @@
+import { ParticleSprite } from '../../core/views/particles';
 import {
   AdditiveBlending,
   BoxGeometry,
@@ -6,7 +7,6 @@ import {
   Mesh,
   PointLight,
   SphereGeometry,
-  Sprite,
   SpriteMaterial,
 } from 'three';
 import { createMicroLabel, kitPaint } from '../../core/views/eighties-controls';
@@ -119,7 +119,7 @@ export function createElectrolyticCapacitorView(kit: PanelKit, height = 0.045) {
   effects.userData.noCollision = true;
   effects.position.y = height + 0.006;
   group.add(effects);
-  const flash = new Sprite(
+  const flash = new ParticleSprite(
     new SpriteMaterial({
       color: '#d1ecff',
       transparent: true,
@@ -134,7 +134,7 @@ export function createElectrolyticCapacitorView(kit: PanelKit, height = 0.045) {
   const light = new PointLight('#badfff', 0, 0.35);
   effects.add(light);
   const embers = Array.from({ length: 5 }, () => {
-    const spark = new Sprite(
+    const spark = new ParticleSprite(
       new SpriteMaterial({
         color: '#ffad41',
         transparent: true,

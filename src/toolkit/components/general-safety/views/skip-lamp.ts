@@ -1,3 +1,4 @@
+import { ParticleSprite } from '../../core/views/particles';
 import {
   AdditiveBlending,
   CatmullRomCurve3,
@@ -5,7 +6,6 @@ import {
   LatheGeometry,
   Mesh,
   MeshStandardMaterial,
-  Sprite,
   SpriteMaterial,
   TubeGeometry,
   Vector2,
@@ -124,7 +124,7 @@ export function createSkipLamp(kit: PanelKit) {
   const loop = new Mesh(new TubeGeometry(strap, 32, 0.004, 6, false), yellow);
   loop.scale.z = 2.5;
   lamp.add(loop);
-  const glow = new Sprite(
+  const glow = new ParticleSprite(
     new SpriteMaterial({
       map: haloTexture(),
       blending: AdditiveBlending,

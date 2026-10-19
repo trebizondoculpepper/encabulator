@@ -21,7 +21,7 @@ export const MACHINE_ENVELOPES = {
   'drive-power': [0.094, 0.034, 0.0305],
 } as const;
 
-/** Device face at +z; only the service lever/screw takes a use action. */
+/** Device face at +z; the part supplies the action for its lever or body. */
 export function createMachineDeviceView(
   kit: PanelKit,
   kind: MachineComponentKind,
@@ -145,8 +145,10 @@ export function createMachineDeviceView(
       kind === 'breaker' ? 0.028 : 0.008,
       0.006,
     ),
-    dark,
+    kind === 'breaker' ? metal : dark,
   );
+  handle.name =
+    kind === 'breaker' ? 'Breaker operating lever' : 'Service lever';
   handle.position.z = 0.003;
   service.add(handle);
   if (kind === 'terminal') {
@@ -372,6 +374,13 @@ export function createMachineDeviceView(
           : inserted
             ? 0
             : -0.4;
+      if (kind === 'breaker') {
+        // A visible throw as well as a tilt: from above, equal opposing
+        // tilts alone can look almost identical on a dark handle.
+        service.position.y =
+          -height * 0.35 + (failed ? 0 : on ? 0.009 : -0.009);
+        service.userData.position = failed ? 'tripped' : on ? 'on' : 'off';
+      }
       // Pulling an electronics module releases it from its backplane.
       const target =
         kind.startsWith('plc-') && !inserted && !detached ? depth + 0.04 : 0;
