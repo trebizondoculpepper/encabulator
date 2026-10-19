@@ -3,7 +3,8 @@
  * of dev1 (colour channels breathing apart, π drifting, space warping)
  * and of dev2 (ghosting, geometric patterns, apparitions) building with
  * the model's strain, 0 to 1. Faint at first, easy to put down to tired
- * eyes; strongest just before the end. When the machine breaks down they
+ * eyes; strongest just before the end, when the sky through the
+ * skylights turns to hell. When the machine breaks down they
  * stop at once, and normality ensues.
  */
 
@@ -16,6 +17,8 @@ export interface Strangeness {
   patterns: number;
   /** dev2's apparitions, how many a minute. */
   apparitionsPerMinute: number;
+  /** The sky turning to hell, 0 to 1 (`src/game/level0-sky.ts`). */
+  hell: number;
 }
 
 /** Where each effect begins and is full, as strain. */
@@ -24,6 +27,8 @@ export const STRANGENESS = {
   ghosting: [0.15, 0.6],
   patterns: [0.35, 0.9],
   apparitions: [0.5, 1],
+  // The last and loudest sign: the sky goes to hell near the end.
+  hell: [0.6, 0.9],
 } as const;
 
 const ramp = (x: number, [from, to]: readonly [number, number]) =>
@@ -42,6 +47,7 @@ export const MOST: Strangeness = {
   // Much fainter again, at the owner's word: a ghost of a pattern.
   patterns: 0.06,
   apparitionsPerMinute: 4,
+  hell: 1,
 };
 
 export const NORMAL: Strangeness = {
@@ -49,6 +55,7 @@ export const NORMAL: Strangeness = {
   ghosting: 0,
   patterns: 0,
   apparitionsPerMinute: 0,
+  hell: 0,
 };
 
 export function strangeness(strain: number, brokenDown: boolean): Strangeness {
@@ -59,5 +66,6 @@ export function strangeness(strain: number, brokenDown: boolean): Strangeness {
     patterns: MOST.patterns * ramp(strain, STRANGENESS.patterns),
     apparitionsPerMinute:
       MOST.apparitionsPerMinute * ramp(strain, STRANGENESS.apparitions),
+    hell: MOST.hell * ramp(strain, STRANGENESS.hell),
   };
 }

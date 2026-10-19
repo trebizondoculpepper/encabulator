@@ -56,14 +56,12 @@ export function addWarehouseLighting(
     environment?: number;
   } = {},
 ) {
-  const skyLevel = options.daylight ?? 1;
+  let skyLevel = options.daylight ?? 1;
   const full = 8 * metre * metre * (options.brightness ?? 1);
   const bounce = new AmbientLight('#ecebe2', 0);
-  scene.add(
-    new HemisphereLight('#e1e9ec', '#6f7067', 0.85 * skyLevel),
-    new AmbientLight('#e9ece5', 0.3 * skyLevel),
-    bounce,
-  );
+  const hemisphere = new HemisphereLight('#e1e9ec', '#6f7067', 0.85 * skyLevel);
+  const ambient = new AmbientLight('#e9ece5', 0.3 * skyLevel);
+  scene.add(hemisphere, ambient, bounce);
   const daylight = new DirectionalLight('#edf3f5', 1.3 * skyLevel);
   daylight.position.set(7 * metre, 24 * metre, 5 * metre);
   daylight.castShadow = true;
@@ -116,5 +114,26 @@ export function addWarehouseLighting(
         options.environment * (skyLevel + (1 - skyLevel) * lit);
   };
   update();
-  return { update };
+  return {
+    update,
+    /**
+     * A different sky: its colours, and how much daylight it lets in
+     * (`daylight`, as the option), its sun (or moon) coloured too.
+     */
+    setSky(look: {
+      sky: string;
+      ground: string;
+      sun: string;
+      daylight: number;
+    }) {
+      skyLevel = look.daylight;
+      hemisphere.color.set(look.sky);
+      hemisphere.groundColor.set(look.ground);
+      hemisphere.intensity = 0.85 * skyLevel;
+      ambient.intensity = 0.3 * skyLevel;
+      daylight.color.set(look.sun);
+      daylight.intensity = 1.3 * skyLevel;
+      update();
+    },
+  };
 }

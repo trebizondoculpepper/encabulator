@@ -7,6 +7,8 @@ import {
   LEVEL0_START,
 } from '../game/level0-room-plan';
 import { WAREHOUSE_BOUNDS, WAREHOUSE_ROOF } from '../game/warehouse-room-plan';
+import { SKIES, pickWeather, skyLook } from '../game/level0-sky';
+import type { Weather } from '../game/level0-sky';
 import { ejectCabinetDrop } from '../game/cabinet-drop';
 import {
   MCC_DEPTH,
@@ -76,7 +78,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   } = createLevel0Scene(kit, m);
   const renderer = createRenderer(canvas);
   const freeEnvironment = useEnvironment(renderer, scene, LEVEL0_ENVIRONMENT);
-  renderer.setClearColor('#cbd3d6');
+  renderer.setClearColor(SKIES.overcast.background);
   renderer.shadowMap.enabled = true;
   const camera = new PerspectiveCamera(55, 1, 0.05, 100 * m);
   // Merged detail too small to see from where the player stands is not drawn.
@@ -294,6 +296,36 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
   resize();
+  // The sky: overcast, sunny or night, drawn as the game starts (or as
+  // `?sky=` asks), turned to hell by the dimensional shift near the end.
+  let weather = pickWeather(new URLSearchParams(location.search).get('sky'));
+  let shownSky = '';
+  let skyClock = 0;
+  /** Development: the sky held this far into hell (null: as it is). */
+  let hellHeld: number | null = null;
+  let skySeconds: number | null = null;
+  const showSky = (seconds: number, hell: number) => {
+    // Hell's light breathes and gutters like a furnace.
+    const flicker =
+      hell > 0
+        ? 1 +
+          0.12 * hell * Math.sin(seconds * 2.3) +
+          0.06 * hell * Math.sin(seconds * 7.9)
+        : 1;
+    const look = skyLook(weather, hell);
+    look.daylight *= flicker;
+    // The clouds drift on whatever happens; in hell they churn.
+    skyClock += (seconds - (skySeconds ?? seconds)) * look.drift;
+    skySeconds = seconds;
+    room.sky.update(skyClock);
+    const key = `${weather}|${hell.toFixed(3)}|${flicker.toFixed(3)}`;
+    if (key === shownSky) return;
+    shownSky = key;
+    lighting.setSky(look);
+    room.sky.colour(look.glazing, look.clouds);
+    renderer.setClearColor(look.background);
+  };
+  showSky(0, 0);
   let last = 0;
   renderer.setAnimationLoop((time) => {
     if (canvas.parentElement?.hidden) {
@@ -319,6 +351,7 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
       Math.max(machine.plant.strain.value, symptoms.strain),
       machine.plant.brokenDown.value,
     );
+    showSky(time / 1000, hellHeld ?? strangeness.level.hell);
     partAudio.listen(camera, m);
     machineSides.update(camera);
     culler.update();
@@ -399,6 +432,15 @@ export function startLevel0Room(canvas: HTMLCanvasElement) {
     /** The scenario simulator's actions (development only). */
     scenarios,
     simulator,
+    /** The sky: set a starting condition (overcast, sunny or night). */
+    sky(next: Weather) {
+      weather = next;
+      return weather;
+    },
+    /** Hold the sky this far into hell, 0 to 1 (null lets it be). */
+    hell(k: number | null) {
+      hellHeld = k;
+    },
     /** A frame's draw calls and objects, and how much detail is culled. */
     stats: () => ({
       ...renderer.info.render,

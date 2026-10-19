@@ -131,8 +131,14 @@ export function createLevel0Strangeness({
       ghosting.settings.strength = now.ghosting;
       patterns.settings.strength = now.patterns;
       hallucinations.settings.perMinute = now.apparitionsPerMinute;
-      if (brokenDown) {
-        // Normality: whatever was showing goes at once.
+      const normal =
+        now.activity === 0 &&
+        now.ghosting === 0 &&
+        now.patterns === 0 &&
+        now.apparitionsPerMinute === 0;
+      if (brokenDown || normal) {
+        // Normality, however it comes: whatever was showing goes at once,
+        // the burnt-in ghosts of earlier frames with it.
         ghosting.ghosts.length = 0;
         hallucinations.apparitions.length = 0;
       }

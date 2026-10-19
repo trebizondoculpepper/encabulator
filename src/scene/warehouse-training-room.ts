@@ -10,9 +10,11 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  RepeatWrapping,
   Vector3,
 } from 'three';
 import type { Material, Object3D } from 'three';
+import { createCanvasTexture } from '../toolkit/components/core/views/screens';
 import {
   WAREHOUSE_SKYLIGHTS,
   WAREHOUSE_TRUSSES,
@@ -21,10 +23,7 @@ import {
 } from '../game/warehouse-room-plan';
 import type { Footprint } from '../toolkit/controls/logic/walk-collision';
 import type { PanelKit } from '../toolkit/components/core/views/eighties-controls';
-import {
-  createMicroLabel,
-  kitGlow,
-} from '../toolkit/components/core/views/eighties-controls';
+import { createMicroLabel } from '../toolkit/components/core/views/eighties-controls';
 import { architecturalPart } from '../toolkit/components/architectural/parts/architectural-parts';
 import { createPartSet } from '../toolkit/components/core/parts/parts';
 import type { ArchitecturalKind } from '../toolkit/components/architectural/logic/architectural-fittings';
@@ -40,6 +39,143 @@ import {
   staticMergeEnabled,
 } from '../toolkit/components/core/views/merge-static';
 import { warehouseSurfaces } from './warehouse-surfaces';
+
+/** The sky layer: this high over the floor, and this wide, metres. */
+const SKY_HEIGHT = 40;
+const SKY_SPAN = 300;
+
+/**
+ * A sheet of soft clouds, `cover` of it cloud, the rest clear (alpha), in
+ * white with grey shadows to be tinted by its layer's colour. It tiles.
+ */
+function cloudTexture(kit: PanelKit, seed: number, cover: number) {
+  const size = 512;
+  const { context, texture } = createCanvasTexture(size, size);
+  kit.textures.push(texture);
+  context.clearRect(0, 0, size, size);
+  let state = seed;
+  const random = () => {
+    state = (state * 16807) % 2147483647;
+    return state / 2147483647;
+  };
+  /** A soft puff, drawn round every edge too, so the sheet tiles. */
+  const puff = (
+    x: number,
+    y: number,
+    r: number,
+    shade: number,
+    alpha: number,
+  ) => {
+    for (const dx of [-size, 0, size])
+      for (const dy of [-size, 0, size]) {
+        const g = context.createRadialGradient(
+          x + dx,
+          y + dy,
+          0,
+          x + dx,
+          y + dy,
+          r,
+        );
+        g.addColorStop(0, `rgba(${shade}, ${shade}, ${shade}, ${alpha})`);
+        g.addColorStop(
+          0.55,
+          `rgba(${shade}, ${shade}, ${shade}, ${alpha * 0.6})`,
+        );
+        g.addColorStop(1, `rgba(${shade}, ${shade}, ${shade}, 0)`);
+        context.fillStyle = g;
+        context.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
+      }
+  };
+  // Clumps of cloud with clear sky between: each a few puffs, a shadowed
+  // underside below and a lit top above, so they have form.
+  for (let i = 0; i < Math.round(40 * cover); i++) {
+    const cx = random() * size;
+    const cy = random() * size;
+    const spread = 18 + random() * 30;
+    for (let k = 0; k < 6; k++) {
+      const x = cx + (random() - 0.5) * spread * 2;
+      const y = cy + (random() - 0.5) * spread;
+      const r = 10 + random() * 20;
+      puff(x + r * 0.25, y + r * 0.3, r, 70, 0.7);
+      puff(x - r * 0.15, y - r * 0.2, r * 0.75, 255, 0.85);
+    }
+  }
+  texture.wrapS = texture.wrapT = RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * The sky over a building, seen through its skylights: a high base layer
+ * and, well below it, a layer of broken cloud, so the two move against
+ * each other as one walks and the sky reads as deep and distant. Each has
+ * its colour (`colour(base, clouds)`), and the clouds drift and churn
+ * (`update(seconds, speed)`).
+ */
+function createSkyLayers(kit: PanelKit) {
+  const group = new Group();
+  group.name = 'Sky';
+  const layer = (
+    height: number,
+    texture: ReturnType<typeof cloudTexture>,
+    repeat: number,
+    transparent: boolean,
+  ) => {
+    texture.repeat.set(repeat, repeat);
+    const material = new MeshBasicMaterial({
+      color: '#ffffff',
+      map: texture,
+      transparent,
+      depthWrite: !transparent,
+      fog: false,
+    });
+    kit.materials.push(material);
+    const mesh = new Mesh(new PlaneGeometry(SKY_SPAN, SKY_SPAN), material);
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.y = height;
+    mesh.raycast = () => {};
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    group.add(mesh);
+    return { material, texture };
+  };
+  // High: faint, wide cloud; low: denser, smaller clumps nearer.
+  const high = layer(SKY_HEIGHT + 8, cloudTexture(kit, 11, 0.5), 4, false);
+  // The high layer is a sky colour with soft cloud shading, not see-through.
+  high.material.transparent = false;
+  const backing = new Mesh(
+    new PlaneGeometry(SKY_SPAN, SKY_SPAN),
+    new MeshBasicMaterial({ color: '#cbd7dc', fog: false }),
+  );
+  kit.materials.push(backing.material);
+  backing.rotation.x = Math.PI / 2;
+  backing.position.y = SKY_HEIGHT + 8.5;
+  backing.raycast = () => {};
+  group.add(backing);
+  high.material.transparent = true;
+  high.material.depthWrite = false;
+  const low = layer(SKY_HEIGHT - 10, cloudTexture(kit, 29, 0.8), 9, true);
+  return {
+    group,
+    /** The sky's colour behind, and its clouds' colour. */
+    colour(base: string, clouds: string) {
+      backing.material.color.set(base);
+      high.material.color.set(clouds);
+      low.material.color.set(clouds);
+    },
+    /** Drift the clouds: `speed` 1 is a gentle breeze. */
+    update(seconds: number, speed = 1) {
+      high.texture.offset.set(
+        seconds * 0.0012 * speed,
+        seconds * 0.0005 * speed,
+      );
+      low.texture.offset.set(
+        seconds * 0.0035 * speed,
+        -seconds * 0.0016 * speed,
+      );
+    },
+  };
+}
 
 /** Empty early-1990s Guildford industrial shell. No Level 2 apparatus or utility interiors. */
 export function createWarehouseTrainingRoom(
@@ -286,6 +422,19 @@ export function createWarehouseTrainingRoom(
   // Light purlins and a nearly flat, profiled roof deck with ten actual apertures.
   for (let x = -13.5; x < 15; x += 3)
     box(group, p.steel, 0.065, 0.16, 30, x, 7.05, 0);
+  // The skylights' glazing: a faint, clear film. The sky itself is one
+  // distant layer far above the roof (`sky`), seen through the skylights
+  // moving slowly as one walks, as a distant sky does; a room changes it
+  // by its material's colour.
+  const glazing = new MeshBasicMaterial({
+    color: '#e6eef2',
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+  });
+  kit.materials.push(glazing);
+  const sky = createSkyLayers(kit);
+  group.add(sky.group);
   for (let z = -12; z <= 12; z += 6)
     for (let x = -12; x <= 12; x += 6) {
       const light = WAREHOUSE_SKYLIGHTS.find((s) => s.x === x && s.z === z);
@@ -294,7 +443,6 @@ export function createWarehouseTrainingRoom(
         box(group, p.roof, 1.9, 0.08, 6, x + 2.05, 7.22, z);
         for (const dz of [-2.4, 2.4])
           box(group, p.roof, 2.2, 0.08, 1.2, x, 7.22, z + dz);
-        const glazing = kitGlow(kit, '#cbd7dc');
         const pane = box(group, glazing, 2.2, 0.04, 3.6, x, 7.3, z);
         pane.castShadow = false;
         for (const dx of [-1.13, 1.13])
@@ -592,6 +740,8 @@ export function createWarehouseTrainingRoom(
   return {
     group,
     parts,
+    /** The sky above the skylights: its colours, and its clouds' drift. */
+    sky,
     fittings: [...fitted],
     /** The fittings' still meshes merged away, for a development check. */
     merged,
